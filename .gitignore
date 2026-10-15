@@ -7,3 +7,4 @@ dist/
 scrutator-out/
 *.db
 design/
+*.log
