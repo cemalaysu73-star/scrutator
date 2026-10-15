@@ -27,6 +27,11 @@ def source_health(store: Store, scan_id: int) -> dict[str, dict[str, Any]]:
     return health
 
 
+def _meta_json(store: Store, scan_id: int, key: str) -> Any:
+    raw = store.get_meta(scan_id, key)
+    return json.loads(raw) if raw else None
+
+
 def build_report(
     store: Store,
     scan_id: int,
@@ -47,9 +52,12 @@ def build_report(
         }
         for ev in store.evidence_for_scan(scan_id)
     }
+    if ai_info is None:
+        ai_info = _meta_json(store, scan_id, "ai")
     return {
         "tool": {"name": "scrutator", "version": __version__},
         "scan": {"id": scan_id, "seed": seed, "started_at": started_at},
+        "scope": _meta_json(store, scan_id, "scope"),
         "generated_at": generated_at or datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "summary": {
             "entities": len(entities),

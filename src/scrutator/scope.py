@@ -58,6 +58,15 @@ class ScopePolicy:
             raise ValueError("scope is empty: list at least one domain, cidr or asn")
         return policy
 
+    def to_dict(self) -> dict[str, list[str]]:
+        """Canonical form, suitable for ScopePolicy(**policy.to_dict()) and for recording
+        what a scan was authorised to touch."""
+        return {
+            "domains": list(self._domains),
+            "cidrs": [str(net) for net in self._networks],
+            "asns": sorted(self._asns),
+        }
+
     def decide(self, target: str) -> Decision:
         if not isinstance(target, str) or not target.strip() or _FORBIDDEN.search(target):
             return _deny("malformed target")

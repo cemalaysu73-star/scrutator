@@ -15,6 +15,12 @@ CREATE TABLE IF NOT EXISTS scans (
     seed TEXT NOT NULL,
     started_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS scan_meta (
+    scan_id INTEGER NOT NULL,
+    key TEXT NOT NULL,
+    value TEXT NOT NULL,
+    PRIMARY KEY (scan_id, key)
+);
 CREATE TABLE IF NOT EXISTS entities (
     scan_id INTEGER NOT NULL,
     id TEXT NOT NULL,
@@ -89,7 +95,7 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
-def _chain_hash(prev_hash: str, record_json: str) -> str:
+def chain_hash(prev_hash: str, record_json: str) -> str:
     return hashlib.sha256((prev_hash + record_json).encode()).hexdigest()
 
 
@@ -117,6 +123,29 @@ class Store:
         if row is None:
             raise KeyError(f"no such scan: {scan_id}")
         return row["seed"], row["started_at"]
+
+    def scans(self) -> list[dict]:
+        rows = self._db.execute("SELECT id, seed, started_at FROM scans ORDER BY id").fetchall()
+        return [dict(r) for r in rows]
+
+    def latest_scan(self, seed: str) -> int | None:
+        row = self._db.execute(
+            "SELECT id FROM scans WHERE seed = ? ORDER BY id DESC LIMIT 1", (seed,)
+        ).fetchone()
+        return int(row["id"]) if row else None
+
+    def set_meta(self, scan_id: int, key: str, value: str) -> None:
+        with self._db:
+            self._db.execute(
+                "INSERT OR REPLACE INTO scan_meta (scan_id, key, value) VALUES (?, ?, ?)",
+                (scan_id, key, value),
+            )
+
+    def get_meta(self, scan_id: int, key: str) -> str | None:
+        row = self._db.execute(
+            "SELECT value FROM scan_meta WHERE scan_id = ? AND key = ?", (scan_id, key)
+        ).fetchone()
+        return row["value"] if row else None
 
     # entities
     def upsert_entity(self, scan_id: int, entity: Entity, state: ScopeState) -> bool:
@@ -225,7 +254,7 @@ class Store:
             body = json.dumps(record, sort_keys=True)
             self._db.execute(
                 "INSERT INTO audit (scan_id, seq, prev_hash, hash, record) VALUES (?, ?, ?, ?, ?)",
-                (scan_id, seq, prev, _chain_hash(prev, body), body),
+                (scan_id, seq, prev, chain_hash(prev, body), body),
             )
 
     def audit_log(self, scan_id: int) -> list[dict]:
@@ -233,6 +262,14 @@ class Store:
             "SELECT record FROM audit WHERE scan_id = ? ORDER BY seq", (scan_id,)
         ).fetchall()
         return [json.loads(r["record"]) for r in rows]
+
+    def audit_rows(self, scan_id: int) -> list[dict]:
+        """The raw chain: seq, prev_hash, hash and the record exactly as hashed."""
+        rows = self._db.execute(
+            "SELECT seq, prev_hash, hash, record FROM audit WHERE scan_id = ? ORDER BY seq",
+            (scan_id,),
+        ).fetchall()
+        return [dict(r) for r in rows]
 
     def verify_audit(self, scan_id: int) -> bool:
         prev = GENESIS_HASH
@@ -243,7 +280,7 @@ class Store:
         ):
             if r["seq"] != expected_seq or r["prev_hash"] != prev:
                 return False
-            if _chain_hash(prev, r["record"]) != r["hash"]:
+            if chain_hash(prev, r["record"]) != r["hash"]:
                 return False
             prev = r["hash"]
             expected_seq += 1

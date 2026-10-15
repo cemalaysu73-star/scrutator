@@ -1,3 +1,5 @@
+import json
+
 from scrutator.agent.runner import AgentStats, run_agent
 from scrutator.ai.runtime import AIRuntime
 from scrutator.engine import Engine
@@ -21,6 +23,7 @@ async def run_scan(
     allow_active: bool = False,
 ) -> tuple[int, AgentStats]:
     scan_id = store.create_scan(seed.value)
+    store.set_meta(scan_id, "scope", json.dumps(scope.to_dict(), sort_keys=True))
     if ai is not None:
         ai.bind(store, scan_id)
     engine = Engine(store, scope, ctx, allow_active=allow_active)
