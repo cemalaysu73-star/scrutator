@@ -4,8 +4,10 @@ from collections.abc import Iterable
 
 from scrutator.model.canonical import canonical_host
 
-_IPV4 = re.compile(r"(?<![\w.])(?:\d{1,3}\.){3}\d{1,3}(?![\w.]*\w)")
-_IPV6 = re.compile(r"(?<![\w:])(?:[0-9A-Fa-f]{0,4}:){2,7}[0-9A-Fa-f]{0,4}(?![\w:])")
+# Boundaries only exclude characters that would make the match part of a longer number.
+# Letters must not block a match: JSON-escaped newlines put an "n" right before a hostname.
+_IPV4 = re.compile(r"(?<![\d.])(?:\d{1,3}\.){3}\d{1,3}(?!\.?\d)")
+_IPV6 = re.compile(r"(?<![0-9A-Fa-f:])(?:[0-9A-Fa-f]{0,4}:){2,7}[0-9A-Fa-f]{0,4}(?![0-9A-Fa-f:])")
 
 
 class Redactor:
@@ -38,8 +40,9 @@ class Redactor:
         for org in sorted(self._orgs, key=len, reverse=True):
             text = re.sub(re.escape(org), self._orgs[org], text, flags=re.IGNORECASE)
         for apex in sorted(self._apex, key=len, reverse=True):
-            pattern = rf"(?<![A-Za-z0-9-]){re.escape(apex)}(?![A-Za-z0-9-])"
-            text = re.sub(pattern, self._apex[apex], text, flags=re.IGNORECASE)
+            # No word boundaries: leaking the target's name is worse than an ugly pseudonym,
+            # and restore() reverses any occurrence.
+            text = re.sub(re.escape(apex), self._apex[apex], text, flags=re.IGNORECASE)
 
         def swap_ip(match: re.Match[str]) -> str:
             value = match.group(0)

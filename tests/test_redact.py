@@ -18,11 +18,22 @@ def test_apex_ip_and_org_are_pseudonymised_and_restorable():
     assert r.restore(out) == text
 
 
-def test_subdomain_labels_are_kept_and_lookalikes_untouched():
+def test_subdomain_labels_are_kept_and_embedded_names_are_not_leaked():
     r = make()
-    out = r.redact("dev.staging.acme.com and evilacme.com and acme.com.evil.net")
+    text = "dev.staging.acme.com and evilacme.com and acme.com.evil.net"
+    out = r.redact(text)
     assert out.startswith("dev.staging.d1.example and ")
-    assert "evilacme.com" in out
+    assert "acme.com" not in out
+    assert r.restore(out) == text
+
+
+def test_names_glued_to_letters_are_still_redacted():
+    r = make()
+    # evidence is shown with JSON-escaped newlines, so an "n" sits right before the name
+    text = 'acme.com\nwww.acme.com\n192.0.2.10\nacme.com.evil.net'
+    out = r.redact(text)
+    assert "acme.com" not in out and "192.0.2.10" not in out
+    assert r.restore(out) == text
 
 
 def test_same_ip_gets_the_same_alias_and_distinct_ips_differ():
