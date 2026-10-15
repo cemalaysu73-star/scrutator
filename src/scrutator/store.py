@@ -54,6 +54,34 @@ CREATE TABLE IF NOT EXISTS audit (
     record TEXT NOT NULL,
     PRIMARY KEY (scan_id, seq)
 );
+CREATE TABLE IF NOT EXISTS egress (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    scan_id INTEGER NOT NULL,
+    at TEXT NOT NULL,
+    role TEXT NOT NULL,
+    provider TEXT NOT NULL,
+    model TEXT NOT NULL,
+    host TEXT NOT NULL,
+    bytes_sent INTEGER NOT NULL,
+    payload_sha256 TEXT NOT NULL,
+    redacted INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS hypotheses (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    scan_id INTEGER NOT NULL,
+    text TEXT NOT NULL,
+    status TEXT NOT NULL,
+    evidence_ids TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS statements (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    scan_id INTEGER NOT NULL,
+    text TEXT NOT NULL,
+    evidence_ids TEXT NOT NULL,
+    status TEXT NOT NULL,
+    reason TEXT NOT NULL,
+    confidence TEXT
+);
 """
 
 
@@ -220,3 +248,93 @@ class Store:
             prev = r["hash"]
             expected_seq += 1
         return True
+
+    # AI egress log
+    def record_egress(
+        self,
+        scan_id: int,
+        *,
+        role: str,
+        provider: str,
+        model: str,
+        host: str,
+        bytes_sent: int,
+        payload_sha256: str,
+        redacted: bool,
+    ) -> None:
+        with self._db:
+            self._db.execute(
+                "INSERT INTO egress (scan_id, at, role, provider, model, host, bytes_sent,"
+                " payload_sha256, redacted) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (scan_id, _now(), role, provider, model, host, bytes_sent, payload_sha256, int(redacted)),
+            )
+
+    def egress_log(self, scan_id: int) -> list[dict]:
+        rows = self._db.execute(
+            "SELECT at, role, provider, model, host, bytes_sent, payload_sha256, redacted"
+            " FROM egress WHERE scan_id = ? ORDER BY id",
+            (scan_id,),
+        ).fetchall()
+        return [{**dict(r), "redacted": bool(r["redacted"])} for r in rows]
+
+    # agent hypotheses
+    def add_hypothesis(self, scan_id: int, text: str) -> int:
+        with self._db:
+            cur = self._db.execute(
+                "INSERT INTO hypotheses (scan_id, text, status, evidence_ids) VALUES (?, ?, 'open', '[]')",
+                (scan_id, text),
+            )
+        return int(cur.lastrowid)
+
+    def settle_hypothesis(self, hypothesis_id: int, status: str, evidence_ids: list[str]) -> None:
+        with self._db:
+            self._db.execute(
+                "UPDATE hypotheses SET status = ?, evidence_ids = ? WHERE id = ?",
+                (status, json.dumps(sorted(evidence_ids)), hypothesis_id),
+            )
+
+    def hypotheses(self, scan_id: int) -> list[dict]:
+        rows = self._db.execute(
+            "SELECT id, text, status, evidence_ids FROM hypotheses WHERE scan_id = ? ORDER BY id",
+            (scan_id,),
+        ).fetchall()
+        return [
+            {"id": r["id"], "text": r["text"], "status": r["status"], "evidence_ids": json.loads(r["evidence_ids"])}
+            for r in rows
+        ]
+
+    # summary statements (writer output after verification)
+    def add_statement(
+        self,
+        scan_id: int,
+        *,
+        text: str,
+        evidence_ids: list[str],
+        status: str,
+        reason: str = "",
+        confidence: str | None = None,
+    ) -> None:
+        with self._db:
+            self._db.execute(
+                "INSERT INTO statements (scan_id, text, evidence_ids, status, reason, confidence)"
+                " VALUES (?, ?, ?, ?, ?, ?)",
+                (scan_id, text, json.dumps(sorted(evidence_ids)), status, reason, confidence),
+            )
+
+    def statements(self, scan_id: int, status: str | None = None) -> list[dict]:
+        query = "SELECT text, evidence_ids, status, reason, confidence FROM statements WHERE scan_id = ?"
+        params: tuple = (scan_id,)
+        if status is not None:
+            query += " AND status = ?"
+            params = (scan_id, status)
+        rows = self._db.execute(query + " ORDER BY id", params).fetchall()
+        return [
+            {
+                "text": r["text"],
+                "evidence_ids": json.loads(r["evidence_ids"]),
+                "status": r["status"],
+                "reason": r["reason"],
+                "confidence": r["confidence"],
+            }
+            for r in rows
+        ]
