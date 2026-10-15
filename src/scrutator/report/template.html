@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Scrutator report</title>
+<style>
+:root{--bg:#fff;--fg:#14181f;--muted:#5b6472;--line:#dfe3ea;--card:#f6f8fb;--low:#b45309;--medium:#1d4ed8;--high:#047857}
+@media (prefers-color-scheme:dark){:root{--bg:#0e1116;--fg:#e6e9ef;--muted:#9aa3b2;--line:#252b36;--card:#161b22;--low:#fbbf24;--medium:#7aa2ff;--high:#34d399}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,sans-serif}
+main{max-width:1100px;margin:0 auto;padding:24px 16px 64px}
+h1{font-size:22px;margin:0 0 4px}
+h2{font-size:16px;margin:32px 0 8px}
+.muted{color:var(--muted)}
+.cards{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0}
+.card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:10px 14px;min-width:110px}
+.card b{display:block;font-size:20px}
+table{width:100%;border-collapse:collapse}
+th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:top;word-break:break-word}
+.badge{font-size:12px;font-weight:600;text-transform:uppercase}
+.low{color:var(--low)}.medium{color:var(--medium)}.high{color:var(--high)}
+details{margin:2px 0}
+pre{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:8px;overflow:auto;max-height:240px;white-space:pre-wrap}
+svg{width:100%;height:520px;background:var(--card);border:1px solid var(--line);border-radius:8px;color:var(--fg)}
+select,input{background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:4px 8px;margin:0 8px 8px 0}
+</style>
+</head>
+<body>
+<main>
+<h1>Scrutator report</h1>
+<div class="muted" id="meta"></div>
+<div class="cards" id="cards"></div>
+<h2>Findings</h2>
+<div id="findings"></div>
+<h2>Graph</h2>
+<svg id="graph" role="img" aria-label="Entity graph"></svg>
+<h2>Entities</h2>
+<div id="entities"></div>
+</main>
+<script type="application/json" id="data">__DATA__</script>
+<script>
+const D = JSON.parse(document.getElementById("data").textContent);
+const el = (tag, props = {}, ...kids) => {
+  const node = document.createElement(tag);
+  for (const [key, value] of Object.entries(props)) node[key] = value;
+  for (const kid of kids) node.append(kid);
+  return node;
+};
+
+document.getElementById("meta").textContent =
+  `${D.scan.seed} · scan #${D.scan.id} · generated ${D.generated_at} · scrutator ${D.tool.version}`;
+
+const cards = document.getElementById("cards");
+const counts = {
+  "Entities": D.summary.entities,
+  "In scope": D.summary.by_scope.in || 0,
+  "Linked": D.summary.by_scope.linked || 0,
+  "Out of scope": D.summary.by_scope.out || 0,
+  "Edges": D.summary.edges,
+  "Findings": D.summary.findings,
+};
+for (const [label, value] of Object.entries(counts)) {
+  cards.append(el("div", {className: "card"}, el("b", {textContent: String(value)}), label));
+}
+
+function renderFindings() {
+  const table = el("table", {}, el("tr", {}, el("th", {textContent: "Claim"}), el("th", {textContent: "Confidence"}), el("th", {textContent: "Evidence"})));
+  for (const f of D.findings) {
+    const evidenceCell = el("td");
+    for (const id of f.evidence_ids) {
+      const ev = D.evidence[id];
+      evidenceCell.append(el("details", {},
+        el("summary", {textContent: `${ev.source}: ${ev.request}`}),
+        el("div", {className: "muted", textContent: `collected ${ev.collected_at} · id ${id}`}),
+        el("pre", {textContent: ev.payload.slice(0, 20000)})));
+    }
+    table.append(el("tr", {},
+      el("td", {textContent: f.claim}),
+      el("td", {}, el("span", {className: `badge ${f.confidence}`, textContent: f.confidence})),
+      evidenceCell));
+  }
+  document.getElementById("findings").append(table);
+}
+
+function renderEntities() {
+  const host = document.getElementById("entities");
+  const typeSelect = el("select", {}, el("option", {value: "", textContent: "all types"}));
+  for (const t of Object.keys(D.summary.by_type)) typeSelect.append(el("option", {value: t, textContent: t}));
+  const scopeSelect = el("select", {}, el("option", {value: "", textContent: "all scopes"}));
+  for (const s of ["in", "linked", "out"]) scopeSelect.append(el("option", {value: s, textContent: s}));
+  const search = el("input", {type: "search", placeholder: "filter"});
+  const body = el("tbody");
+  const draw = () => {
+    body.replaceChildren();
+    for (const e of D.entities) {
+      if (typeSelect.value && e.type !== typeSelect.value) continue;
+      if (scopeSelect.value && e.state !== scopeSelect.value) continue;
+      if (search.value && !e.value.includes(search.value.toLowerCase())) continue;
+      body.append(el("tr", {}, el("td", {textContent: e.value}), el("td", {textContent: e.type}), el("td", {textContent: e.state})));
+    }
+  };
+  for (const control of [typeSelect, scopeSelect, search]) control.addEventListener("input", draw);
+  host.append(typeSelect, scopeSelect, search,
+    el("table", {}, el("thead", {}, el("tr", {}, el("th", {textContent: "Value"}), el("th", {textContent: "Type"}), el("th", {textContent: "Scope"}))), body));
+  draw();
+}
+
+function drawGraph() {
+  const svg = document.getElementById("graph");
+  const W = 1000, H = 520;
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  const rank = {in: 0, linked: 1, out: 2};
+  const ents = [...D.entities].sort((a, b) => rank[a.state] - rank[b.state]).slice(0, 300);
+  const index = new Map(ents.map((e, i) => [e.id, i]));
+  const nodes = ents.map((e, i) => ({
+    e,
+    x: W / 2 + Math.cos(i) * 200 * (1 + i / ents.length),
+    y: H / 2 + Math.sin(i) * 150 * (1 + i / ents.length),
+    vx: 0, vy: 0,
+  }));
+  const links = D.edges.filter(l => index.has(l.src) && index.has(l.dst)).map(l => [index.get(l.src), index.get(l.dst)]);
+  for (let step = 0; step < 250; step++) {
+    for (let i = 0; i < nodes.length; i++) {
+      for (let j = i + 1; j < nodes.length; j++) {
+        const a = nodes[i], b = nodes[j];
+        let dx = a.x - b.x, dy = a.y - b.y;
+        const d2 = Math.max(dx * dx + dy * dy, 25), d = Math.sqrt(d2), f = 900 / d2;
+        dx /= d; dy /= d;
+        a.vx += dx * f; a.vy += dy * f; b.vx -= dx * f; b.vy -= dy * f;
+      }
+    }
+    for (const [i, j] of links) {
+      const a = nodes[i], b = nodes[j];
+      const dx = b.x - a.x, dy = b.y - a.y;
+      a.vx += dx * 0.01; a.vy += dy * 0.01; b.vx -= dx * 0.01; b.vy -= dy * 0.01;
+    }
+    for (const n of nodes) {
+      n.vx += (W / 2 - n.x) * 0.002; n.vy += (H / 2 - n.y) * 0.002;
+      n.x = Math.min(W - 10, Math.max(10, n.x + n.vx));
+      n.y = Math.min(H - 10, Math.max(10, n.y + n.vy));
+      n.vx *= 0.6; n.vy *= 0.6;
+    }
+  }
+  const NS = "http://www.w3.org/2000/svg";
+  const mk = (tag, attrs) => {
+    const node = document.createElementNS(NS, tag);
+    for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
+    return node;
+  };
+  for (const [i, j] of links) {
+    svg.append(mk("line", {x1: nodes[i].x, y1: nodes[i].y, x2: nodes[j].x, y2: nodes[j].y, stroke: "currentColor", "stroke-opacity": 0.25}));
+  }
+  const colors = {domain: "#2b5fd9", ip: "#047857", asn: "#b45309", org: "#7c3aed"};
+  for (const n of nodes) {
+    const circle = mk("circle", {
+      cx: n.x, cy: n.y, r: n.e.state === "in" ? 6 : 4,
+      fill: colors[n.e.type] || "#888", "fill-opacity": n.e.state === "out" ? 0.35 : 1,
+    });
+    const title = mk("title", {});
+    title.textContent = `${n.e.type}: ${n.e.value} (${n.e.state})`;
+    circle.append(title);
+    svg.append(circle);
+  }
+}
+
+renderFindings();
+renderEntities();
+drawGraph();
+</script>
+</body>
+</html>
