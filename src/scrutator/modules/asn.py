@@ -1,0 +1,32 @@
+from scrutator.model import Entity, EntityType, Evidence
+from scrutator.modules.base import Module, ModuleContext, ModuleError, Observation
+from scrutator.modules.registry import register
+
+
+@register
+class Asn(Module):
+    """Which autonomous system announces an IP, via RIPEstat prefix-overview (no key)."""
+
+    name = "asn"
+    accepts = frozenset({EntityType.IP})
+
+    async def run(self, entity: Entity, ctx: ModuleContext) -> list[Observation]:
+        resp = await ctx.http.get(
+            "https://stat.ripe.net/data/prefix-overview/data.json", params={"resource": entity.value}
+        )
+        if resp.status_code != 200:
+            raise ModuleError(f"ripestat returned HTTP {resp.status_code}")
+        try:
+            asns = resp.json()["data"]["asns"]
+        except (ValueError, KeyError, TypeError) as exc:
+            raise ModuleError("ripestat returned an unexpected payload") from exc
+
+        evidence = Evidence.create(self.name, f"GET {resp.request.url}", resp.text)
+        observations: list[Observation] = []
+        for item in asns:
+            try:
+                target = Entity(type=EntityType.ASN, value=str(item["asn"]))
+            except (KeyError, TypeError, ValueError):
+                continue
+            observations.append(Observation(target, "announced_by", evidence))
+        return observations
