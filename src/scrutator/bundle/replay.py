@@ -2,6 +2,7 @@ import asyncio
 import json
 import re
 from dataclasses import dataclass
+from typing import Any
 from urllib.parse import urlsplit
 
 import httpx
@@ -15,6 +16,10 @@ ALLOWED_HTTP_HOSTS = frozenset(
     {"crt.sh", "rdap.org", "stat.ripe.net", "web.archive.org", "index.commoncrawl.org"}
 )
 _DNS = re.compile(r"DNS (A|AAAA|CNAME|MX|NS|TXT) (\S+)")
+
+# Top-level response-envelope fields that differ on every call and say nothing about the data
+# (RIPEstat adds timings, a query id and the answering server to every reply).
+_VOLATILE = frozenset({"process_time", "query_id", "server_id", "time", "cached", "version", "build_version"})
 
 
 @dataclass(frozen=True)
@@ -53,13 +58,65 @@ def parse_request(request: str) -> tuple[str, ...] | None:
     return None
 
 
-def _same_http(old: str, new: str) -> bool:
+def _loads_any(text: str) -> Any:
+    """A JSON document, or newline-delimited JSON as a list, or None."""
+    try:
+        return json.loads(text)
+    except ValueError:
+        pass
+    rows = []
+    for line in text.splitlines():
+        if not line.strip():
+            continue
+        try:
+            rows.append(json.loads(line))
+        except ValueError:
+            return None
+    return rows or None
+
+
+def _members(value: Any) -> list[Any]:
+    """The elements of a live response plus the members of its rows, so a recorded URL string
+    matches a live row such as ["http://..."] (Wayback) or {"url": "http://..."} (Common Crawl)."""
+    items = value if isinstance(value, list) else [value]
+    found: list[Any] = []
+    for item in items:
+        found.append(item)
+        if isinstance(item, list):
+            found.extend(item)
+        elif isinstance(item, dict):
+            found.extend(item.values())
+    return found
+
+
+def _contains(recorded: Any, live: list[Any]) -> bool:
+    if isinstance(recorded, dict):
+        return any(
+            isinstance(row, dict) and all(k in row and row[k] == v for k, v in recorded.items())
+            for row in live
+        )
+    return recorded in live
+
+
+def supports(old: str, new: str) -> bool:
+    """Does the live response still say what the recorded payload says? Evidence for a
+    hostname can be a slice of a longer response, and some sources add per-call noise, so
+    equality is the wrong test. Equal text, equal JSON (ignoring volatile envelope fields),
+    a recorded array whose elements are all still present, or contained plain text all count."""
     if old == new:
         return True
-    try:
-        return json.loads(old) == json.loads(new)
-    except ValueError:
-        return False
+    old_json, new_json = _loads_any(old), _loads_any(new)
+    if old_json is None or new_json is None:
+        return old in new
+    if isinstance(old_json, dict) and isinstance(new_json, dict):
+        strip = lambda d: {k: v for k, v in d.items() if k not in _VOLATILE}  # noqa: E731
+        return strip(old_json) == strip(new_json)
+    if isinstance(old_json, list):
+        if not old_json:
+            return new_json == old_json
+        live = _members(new_json)
+        return all(_contains(item, live) for item in old_json)
+    return old_json == new_json
 
 
 def _same_dns(old: str, new: str) -> bool:
@@ -69,8 +126,8 @@ def _same_dns(old: str, new: str) -> bool:
 async def replay_evidence(
     records: list[dict], http: httpx.AsyncClient, resolver: Resolver, *, concurrency: int = 4
 ) -> list[ReplayResult]:
-    """Re-issue each replayable request and say whether the source still returns the same
-    thing. Drift is information, not failure: sources change and go down."""
+    """Re-issue each replayable request and say whether the source still supports the
+    recorded evidence. Drift is information, not failure: sources change and go down."""
     semaphore = asyncio.Semaphore(concurrency)
 
     async def one(rec: dict) -> ReplayResult:
@@ -86,7 +143,7 @@ async def replay_evidence(
                     response = await http.get(parsed[1])
                     if response.status_code != 200:
                         return result("unavailable", f"HTTP {response.status_code}")
-                    same = _same_http(rec["payload"], response.text)
+                    same = supports(rec["payload"], response.text)
                 else:
                     answers = await resolver.lookup(parsed[2], parsed[1])
                     same = _same_dns(rec["payload"], "\n".join(answers))
