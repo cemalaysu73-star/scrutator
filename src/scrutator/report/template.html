@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Scrutator report</title>
 <style>
-:root{--bg:#fff;--fg:#14181f;--muted:#5b6472;--line:#dfe3ea;--card:#f6f8fb;--low:#b45309;--medium:#1d4ed8;--high:#047857}
-@media (prefers-color-scheme:dark){:root{--bg:#0e1116;--fg:#e6e9ef;--muted:#9aa3b2;--line:#252b36;--card:#161b22;--low:#fbbf24;--medium:#7aa2ff;--high:#34d399}}
+:root{--bg:#fff;--fg:#14181f;--muted:#5b6472;--line:#dfe3ea;--card:#f6f8fb;--low:#b45309;--medium:#1d4ed8;--high:#047857;--bad:#b42318}
+@media (prefers-color-scheme:dark){:root{--bg:#0e1116;--fg:#e6e9ef;--muted:#9aa3b2;--line:#252b36;--card:#161b22;--low:#fbbf24;--medium:#7aa2ff;--high:#34d399;--bad:#f97066}}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,sans-serif}
 main{max-width:1100px;margin:0 auto;padding:24px 16px 64px}
@@ -19,11 +19,13 @@ h2{font-size:16px;margin:32px 0 8px}
 table{width:100%;border-collapse:collapse}
 th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:top;word-break:break-word}
 .badge{font-size:12px;font-weight:600;text-transform:uppercase}
-.low{color:var(--low)}.medium{color:var(--medium)}.high{color:var(--high)}
+.low{color:var(--low)}.medium{color:var(--medium)}.high{color:var(--high)}.bad{color:var(--bad)}
 details{margin:2px 0}
 pre{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:8px;overflow:auto;max-height:240px;white-space:pre-wrap}
 svg{width:100%;height:520px;background:var(--card);border:1px solid var(--line);border-radius:8px;color:var(--fg)}
 select,input{background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:4px 8px;margin:0 8px 8px 0}
+ul.statements{padding-left:20px}
+ul.statements li{margin:6px 0}
 </style>
 </head>
 <body>
@@ -31,12 +33,14 @@ select,input{background:var(--bg);color:var(--fg);border:1px solid var(--line);b
 <h1>Scrutator report</h1>
 <div class="muted" id="meta"></div>
 <div class="cards" id="cards"></div>
+<div id="extra"></div>
 <h2>Findings</h2>
 <div id="findings"></div>
 <h2>Graph</h2>
 <svg id="graph" role="img" aria-label="Entity graph"></svg>
 <h2>Entities</h2>
 <div id="entities"></div>
+<div id="extra-after"></div>
 </main>
 <script type="application/json" id="data">__DATA__</script>
 <script>
@@ -47,9 +51,15 @@ const el = (tag, props = {}, ...kids) => {
   for (const kid of kids) node.append(kid);
   return node;
 };
+const section = (hostId, title, node) => {
+  document.getElementById(hostId).append(el("h2", {textContent: title}), node);
+};
 
+const aiLine = D.ai
+  ? " · AI: " + Object.entries(D.ai.providers || {}).map(([role, p]) => `${role} ${p.provider}/${p.model} (${p.local ? "local" : "cloud"})`).join(", ")
+  : " · AI: off";
 document.getElementById("meta").textContent =
-  `${D.scan.seed} · scan #${D.scan.id} · generated ${D.generated_at} · scrutator ${D.tool.version}`;
+  `${D.scan.seed} · scan #${D.scan.id} · generated ${D.generated_at} · scrutator ${D.tool.version}${aiLine}`;
 
 const cards = document.getElementById("cards");
 const counts = {
@@ -62,6 +72,50 @@ const counts = {
 };
 for (const [label, value] of Object.entries(counts)) {
   cards.append(el("div", {className: "card"}, el("b", {textContent: String(value)}), label));
+}
+
+function renderNarrative() {
+  const statements = D.summary_statements || [];
+  if (!statements.length) return;
+  const list = el("ul", {className: "statements"});
+  for (const s of statements) {
+    const refs = el("details", {}, el("summary", {textContent: `${s.evidence_ids.length} evidence record(s)`}));
+    for (const id of s.evidence_ids) {
+      const ev = D.evidence[id];
+      if (ev) refs.append(el("div", {className: "muted", textContent: `${ev.source}: ${ev.request}`}));
+    }
+    list.append(el("li", {}, el("span", {textContent: s.text + " "}), el("span", {className: `badge ${s.confidence}`, textContent: s.confidence}), refs));
+  }
+  section("extra", "AI summary (every statement checked against the cited evidence)", list);
+}
+
+function renderSources() {
+  const rows = Object.entries(D.sources || {}).sort(([a], [b]) => a.localeCompare(b));
+  if (!rows.length) return;
+  const table = el("table", {}, el("tr", {}, ...["Source", "OK", "Failed", "Denied", "Skipped", "Errors"].map(t => el("th", {textContent: t}))));
+  let gaps = 0;
+  for (const [name, h] of rows) {
+    gaps += h.error;
+    table.append(el("tr", {},
+      el("td", {textContent: name}),
+      el("td", {textContent: String(h.ok)}),
+      el("td", {className: h.error ? "bad" : "", textContent: String(h.error)}),
+      el("td", {textContent: String(h.denied)}),
+      el("td", {textContent: String(h.skipped)}),
+      el("td", {textContent: h.errors.join("; ")})));
+  }
+  const note = el("p", {className: "muted", textContent: gaps
+    ? `${gaps} source run(s) failed. Coverage has gaps: a missing result may only mean a source did not answer.`
+    : "Every source run answered."});
+  section("extra", "Source coverage", el("div", {}, note, table));
+}
+
+function renderLeads() {
+  const leads = D.unverified_leads || [];
+  if (!leads.length) return;
+  const list = el("ul", {className: "statements"});
+  for (const l of leads) list.append(el("li", {}, el("span", {textContent: l.text + " "}), el("span", {className: "muted", textContent: `(rejected: ${l.reason})`})));
+  section("extra-after", "Unverified leads (not part of the report)", list);
 }
 
 function renderFindings() {
@@ -164,9 +218,12 @@ function drawGraph() {
   }
 }
 
+renderNarrative();
+renderSources();
 renderFindings();
 renderEntities();
 drawGraph();
+renderLeads();
 </script>
 </body>
 </html>

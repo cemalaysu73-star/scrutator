@@ -1,13 +1,39 @@
 import json
 from collections import Counter
 from datetime import datetime, timezone
+from typing import Any
 
 from scrutator import __version__
 from scrutator.findings import build_findings
 from scrutator.store import Store
 
 
-def build_report(store: Store, scan_id: int, *, generated_at: str | None = None) -> dict:
+def source_health(store: Store, scan_id: int) -> dict[str, dict[str, Any]]:
+    """Per data source: how many runs succeeded, failed, were denied or skipped, and the
+    first few distinct error messages. A source that failed is a gap in coverage."""
+    health: dict[str, dict[str, Any]] = {}
+    for record in store.audit_log(scan_id):
+        module = record.get("module")
+        if not module:
+            continue
+        entry = health.setdefault(
+            module, {"ok": 0, "error": 0, "denied": 0, "skipped": 0, "errors": []}
+        )
+        event = record.get("event")
+        if event in ("ok", "error", "denied", "skipped"):
+            entry[event] += 1
+        if event == "error" and len(entry["errors"]) < 3 and record.get("error") not in entry["errors"]:
+            entry["errors"].append(record["error"])
+    return health
+
+
+def build_report(
+    store: Store,
+    scan_id: int,
+    *,
+    generated_at: str | None = None,
+    ai_info: dict[str, Any] | None = None,
+) -> dict:
     seed, started_at = store.get_scan(scan_id)
     entities = store.entities(scan_id)
     edges = store.edges(scan_id)
@@ -49,6 +75,17 @@ def build_report(store: Store, scan_id: int, *, generated_at: str | None = None)
             for f in findings
         ],
         "evidence": evidence,
+        "sources": source_health(store, scan_id),
+        "summary_statements": [
+            {"text": s["text"], "evidence_ids": s["evidence_ids"], "confidence": s["confidence"]}
+            for s in store.statements(scan_id, status="verified")
+        ],
+        "unverified_leads": [
+            {"text": s["text"], "reason": s["reason"]} for s in store.statements(scan_id, status="rejected")
+        ],
+        "hypotheses": store.hypotheses(scan_id),
+        "egress": store.egress_log(scan_id),
+        "ai": ai_info,
     }
 
 
