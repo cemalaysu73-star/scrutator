@@ -30,6 +30,7 @@ async def test_ollama_sends_schema_as_format_and_parses_reply(http):
     assert body["model"] == "qwen3:8b"
     assert body["format"] == SCHEMA
     assert body["stream"] is False
+    assert body["think"] is False  # reasoning models are ~19x slower with thinking on
     assert [m["role"] for m in body["messages"]] == ["system", "user"]
     assert completion.data == {"answer": 7}
     assert (completion.prompt_tokens, completion.completion_tokens) == (12, 5)
@@ -61,6 +62,34 @@ async def test_ollama_http_and_network_errors_become_ai_errors(http):
         router.post("http://127.0.0.1:11434/api/chat").mock(side_effect=httpx.ConnectError("down"))
         with pytest.raises(AIError):
             await provider.complete_json("s", "u", SCHEMA)
+
+
+async def test_ollama_retries_without_think_for_models_that_do_not_support_it(http):
+    provider = OllamaProvider(http, "plain-model")
+    ok = {"message": {"content": '{"answer": 1}'}}
+    with respx.mock() as router:
+        route = router.post("http://127.0.0.1:11434/api/chat").mock(
+            side_effect=[
+                httpx.Response(400, json={"error": '"plain-model" does not support thinking'}),
+                httpx.Response(200, json=ok),
+            ]
+        )
+        completion = await provider.complete_json("s", "u", SCHEMA)
+    assert completion.data == {"answer": 1}
+    assert route.call_count == 2
+    assert "think" in json.loads(route.calls[0].request.content)
+    assert "think" not in json.loads(route.calls[1].request.content)
+
+
+async def test_ollama_does_not_retry_unrelated_client_errors(http):
+    provider = OllamaProvider(http, "m")
+    with respx.mock() as router:
+        route = router.post("http://127.0.0.1:11434/api/chat").mock(
+            return_value=httpx.Response(400, json={"error": "model not found"})
+        )
+        with pytest.raises(AIError):
+            await provider.complete_json("s", "u", SCHEMA)
+    assert route.call_count == 1
 
 
 async def test_openai_compatible_local_server_without_key(http):

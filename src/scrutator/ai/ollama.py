@@ -11,7 +11,8 @@ from scrutator.ai.types import AIError, Completion
 
 class OllamaProvider:
     """Ollama's native chat API. The JSON schema goes in `format`, which constrains
-    generation token by token."""
+    generation token by token. Thinking is switched off: on a 9B reasoning model it turned a
+    one-second answer into fifteen (measured), and the schema already forces the output shape."""
 
     name = "ollama"
 
@@ -27,10 +28,18 @@ class OllamaProvider:
             "model": self.model,
             "stream": False,
             "format": schema,
+            "think": False,
             "options": {"temperature": 0},
             "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
         }
-        data, size, digest = await post_json(self.client, f"{self.base_url}/api/chat", body)
+        url = f"{self.base_url}/api/chat"
+        try:
+            data, size, digest = await post_json(self.client, url, body)
+        except AIError as exc:
+            if "think" not in str(exc).lower():
+                raise
+            body.pop("think")  # this model has no thinking mode
+            data, size, digest = await post_json(self.client, url, body)
         try:
             text = data["message"]["content"]
         except (KeyError, TypeError) as exc:
