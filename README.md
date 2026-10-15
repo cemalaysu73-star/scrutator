@@ -5,10 +5,11 @@ organisation's internet-facing infrastructure in which every claim links to the 
 it came from. The AI is local-first: it runs on a model on your machine, and cloud models are
 an explicit, logged opt-in.
 
-**Status: v0.2.** Passive scanning with six keyless sources, a deny-by-default scope guard,
-an evidence store, JSON and HTML reports, a budgeted agent, and an AI summary in which every
-statement is checked against evidence by a separate verifier. Proof bundles, risk analysis,
-attribution and the benchmark are planned.
+**Status: v0.3.** Passive scanning with six keyless sources, a deny-by-default scope guard,
+an evidence store, JSON and HTML reports, a budgeted agent, an AI summary in which every
+statement is checked against evidence by a separate verifier, signed proof bundles that anyone
+can verify and replay, diff between scans, and scheduled watching. Risk analysis, attribution
+and the benchmark are planned.
 
 ## Install
 
@@ -58,6 +59,45 @@ Findings cannot exist without evidence ids. Each evidence record is the raw resp
 source, stored once and addressed by hash. A finding's confidence is the number of distinct
 sources that agree: one is low, two medium, three or more high. Every module call is written
 to a hash-chained audit log.
+
+## Proof bundles
+
+A scan can be exported as a signed bundle that anyone can check without trusting you or this tool's output.
+
+```bash
+scrutator keygen                      # once: creates ~/.config/scrutator/signing.key and signing.pub
+scrutator scan example.com --bundle   # also writes <out>/proof.scrutator
+scrutator export 3 --bundle proof.scrutator   # or export any scan in the database
+scrutator verify proof.scrutator --pin <fingerprint-or-signing.pub>
+scrutator verify proof.scrutator --pin signing.pub --replay
+```
+
+A bundle holds `report.json`, every raw evidence record (`evidence.jsonl`), the hash-chained audit
+log (`audit.jsonl`) and a signed manifest. `verify` checks each layer on its own: file hashes, the
+Ed25519 signature, the audit chain, that every evidence record hashes to its id, that everything the
+report cites is in the bundle, and that the report's findings are exactly what the evidence implies.
+Change one byte anywhere and a named check fails.
+
+**A valid signature only proves the bundle matches the key inside it.** Anyone can sign a forged
+bundle with their own key, so give readers your key fingerprint through a channel they trust and
+have them verify with `--pin`. Without `--pin`, `verify` warns.
+
+`--replay` re-issues the recorded requests (HTTPS GETs to the public sources the modules use, and DNS
+lookups) and reports each as unchanged, changed or unavailable. Drift is not forgery: sources change
+and go down. Replay only ever contacts that fixed set of source hosts, so a hostile bundle cannot
+make `verify` fetch arbitrary URLs.
+
+### Compare and monitor
+
+```bash
+scrutator diff 1 2                         # two scans in the database
+scrutator diff old.scrutator new.scrutator # two verified bundles
+scrutator watch example.com --every 6h --webhook https://hooks.example.test/x
+```
+
+`watch` re-scans on a schedule, prints what changed, writes `diff-<n>.json`, and posts a summary
+(counts and changes, no raw evidence) to the webhook. Webhooks must be HTTPS (plain HTTP only for
+localhost). Watch scans are deterministic; they do not use AI.
 
 ## AI
 

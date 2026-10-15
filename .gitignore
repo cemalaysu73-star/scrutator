@@ -8,3 +8,6 @@ scrutator-out/
 *.db
 design/
 *.log
+keys/
+out/
+*.scrutator
