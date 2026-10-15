@@ -33,7 +33,8 @@ class Rdap(Module):
 
     async def run(self, entity: Entity, ctx: ModuleContext) -> list[Observation]:
         kind = "ip" if entity.type is EntityType.IP else "domain"
-        resp = await ctx.http.get(f"https://rdap.org/{kind}/{entity.value}")
+        url = f"https://rdap.org/{kind}/{entity.value}"
+        resp = await ctx.http.get(url)
         if resp.status_code == 404:
             return []
         if resp.status_code != 200:
@@ -45,7 +46,9 @@ class Rdap(Module):
         if not isinstance(data, dict):
             raise ModuleError("rdap returned an unexpected payload")
 
-        evidence = Evidence.create(self.name, f"GET {resp.request.url}", resp.text)
+        # Record the request that was made, not the registry the redirector sent us to:
+        # replay repeats this request and follows the same redirect.
+        evidence = Evidence.create(self.name, f"GET {url}", resp.text)
         observations: list[Observation] = []
         if entity.type is EntityType.IP:
             owner = _org(data.get("name"))
