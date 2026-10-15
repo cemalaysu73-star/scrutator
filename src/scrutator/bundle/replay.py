@@ -20,6 +20,11 @@ _DNS = re.compile(r"DNS (A|AAAA|CNAME|MX|NS|TXT) (\S+)")
 # Top-level response-envelope fields that differ on every call and say nothing about the data
 # (RIPEstat adds timings, a query id and the answering server to every reply).
 _VOLATILE = frozenset({"process_time", "query_id", "server_id", "time", "cached", "version", "build_version"})
+# RDAP boilerplate, at any depth: self-links (ARIN echoes an arbitrary address from the queried
+# network), notices, remarks and the port-43 hint. Registration dates, name servers, registrars
+# and network names are facts and are kept.
+_RDAP_NOISE_KEYS = frozenset({"links", "notices", "remarks", "port43"})
+_RDAP_STAMP = "last update of rdap database"
 
 
 @dataclass(frozen=True)
@@ -75,6 +80,19 @@ def _loads_any(text: str) -> Any:
     return rows or None
 
 
+def _denoise(value: Any) -> Any:
+    """Drop RDAP boilerplate that changes on every call, at any depth."""
+    if isinstance(value, dict):
+        return {k: _denoise(v) for k, v in value.items() if k not in _RDAP_NOISE_KEYS}
+    if isinstance(value, list):
+        return [
+            _denoise(v)
+            for v in value
+            if not (isinstance(v, dict) and str(v.get("eventAction", "")).lower() == _RDAP_STAMP)
+        ]
+    return value
+
+
 def _members(value: Any) -> list[Any]:
     """The elements of a live response plus the members of its rows, so a recorded URL string
     matches a live row such as ["http://..."] (Wayback) or {"url": "http://..."} (Common Crawl)."""
@@ -101,15 +119,16 @@ def _contains(recorded: Any, live: list[Any]) -> bool:
 def supports(old: str, new: str) -> bool:
     """Does the live response still say what the recorded payload says? Evidence for a
     hostname can be a slice of a longer response, and some sources add per-call noise, so
-    equality is the wrong test. Equal text, equal JSON (ignoring volatile envelope fields),
-    a recorded array whose elements are all still present, or contained plain text all count."""
+    equality is the wrong test. Equal text, equal JSON (ignoring volatile envelope fields and
+    RDAP boilerplate), a recorded array whose elements are all still present, or contained
+    plain text all count."""
     if old == new:
         return True
     old_json, new_json = _loads_any(old), _loads_any(new)
     if old_json is None or new_json is None:
         return old in new
     if isinstance(old_json, dict) and isinstance(new_json, dict):
-        strip = lambda d: {k: v for k, v in d.items() if k not in _VOLATILE}  # noqa: E731
+        strip = lambda d: _denoise({k: v for k, v in d.items() if k not in _VOLATILE})  # noqa: E731
         return strip(old_json) == strip(new_json)
     if isinstance(old_json, list):
         if not old_json:
