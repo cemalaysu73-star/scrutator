@@ -32,7 +32,11 @@ class Engine:
     def _classify(self, parent_state: ScopeState, rel: str, entity: Entity) -> ScopeState:
         if self.scope.decide_entity(entity).allowed:
             return ScopeState.IN
-        if entity.type is EntityType.IP and rel == "resolves_to" and parent_state is ScopeState.IN:
+        if (
+            entity.type is EntityType.IP
+            and rel == "resolves_to"
+            and parent_state in (ScopeState.IN, ScopeState.CANDIDATE)
+        ):
             return ScopeState.LINKED
         return ScopeState.OUT
 
