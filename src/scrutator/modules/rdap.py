@@ -1,16 +1,17 @@
 from scrutator.model import Entity, EntityType, Evidence
-from scrutator.modules._names import host_entity
+from scrutator.modules._names import host_entity, usable_org
 from scrutator.modules.base import Fact, Module, ModuleContext, ModuleError, Observation
 from scrutator.modules.registry import register
 
 
-def _vcard_name(entity: dict) -> str | None:
+def _vcard_value(entity: dict, properties: tuple[str, ...] = ("fn",)) -> str | None:
     card = entity.get("vcardArray")
     if not (isinstance(card, list) and len(card) == 2 and isinstance(card[1], list)):
         return None
-    for item in card[1]:
-        if isinstance(item, list) and len(item) >= 4 and item[0] == "fn":
-            return str(item[3])
+    for wanted in properties:
+        for item in card[1]:
+            if isinstance(item, list) and len(item) >= 4 and item[0] == wanted:
+                return str(item[3])
     return None
 
 
@@ -25,8 +26,8 @@ def _org(value: str | None) -> Entity | None:
 
 @register
 class Rdap(Module):
-    """Registration data for a domain (name servers, registrar) or an IP (network owner)
-    through the rdap.org bootstrap redirector."""
+    """Registration data for a domain (name servers, registrar, and the registrant when the
+    registry publishes one) or an IP (network owner) through the rdap.org bootstrap redirector."""
 
     name = "rdap"
     accepts = frozenset({EntityType.DOMAIN, EntityType.IP})
@@ -61,10 +62,17 @@ class Rdap(Module):
             if target:
                 observations.append(Observation(target, "ns", evidence))
         for sub in data.get("entities", []):
-            if isinstance(sub, dict) and "registrar" in sub.get("roles", []):
-                registrar = _org(_vcard_name(sub))
+            if not isinstance(sub, dict):
+                continue
+            roles = sub.get("roles", [])
+            if "registrar" in roles:
+                registrar = _org(_vcard_value(sub))
                 if registrar:
                     observations.append(Observation(registrar, "registrar", evidence))
+            if "registrant" in roles:
+                registrant = _org(usable_org(_vcard_value(sub, ("fn", "org"))))
+                if registrant:
+                    observations.append(Observation(registrant, "registrant", evidence))
         if not observations:
             # no name server or registrar to hang a relation on: the registration dates (expiry)
             # are still evidence the scan holds

@@ -41,3 +41,26 @@ def hosts_from_urls(urls: Iterable[str], *, root: str, max_samples: int = 5) -> 
         if len(samples) < max_samples and url not in samples:
             samples.append(url)
     return hosts
+
+
+# Registries replace a registrant they must not publish with a placeholder, and privacy services
+# put their own name there. A placeholder is not evidence that two domains share an owner. This is
+# a short list of the wording seen in practice, not a complete one: a placeholder missing from it
+# would be recorded as if it were an organisation.
+_PLACEHOLDERS = (
+    "redacted", "privacy", "proxy", "withheld", "not disclosed", "data protected", "gdpr",
+    "whoisguard", "private registration", "non-public", "statutory masking",
+)
+_EMPTY = {"", "n/a", "na", "none", "unknown", "-", "null"}
+
+
+def usable_org(value: object) -> str | None:
+    """An organisation name with its whitespace cleaned up, or None for anything that is not a
+    real name: a non-string, a redaction placeholder or a privacy service."""
+    if not isinstance(value, str):
+        return None
+    text = " ".join(value.split())
+    lowered = text.lower()
+    if len(text) < 3 or lowered in _EMPTY or any(word in lowered for word in _PLACEHOLDERS):
+        return None
+    return text
