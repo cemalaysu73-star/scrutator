@@ -9,13 +9,14 @@ import httpx
 
 from scrutator.model.canonical import canonical_host
 from scrutator.modules.base import Resolver
+from scrutator.resolver import lookup_status
 
 # The hosts the built-in modules query. A bundle is untrusted input: replay may only ever
 # contact these, so a hostile bundle cannot turn a verifier into a request forwarder.
 ALLOWED_HTTP_HOSTS = frozenset(
     {"crt.sh", "rdap.org", "stat.ripe.net", "web.archive.org", "index.commoncrawl.org"}
 )
-_DNS = re.compile(r"DNS (A|AAAA|CNAME|MX|NS|TXT) (\S+)")
+_DNS = re.compile(r"DNS (A|AAAA|CNAME|MX|NS|TXT|CAA) (\S+)")
 
 # Top-level response-envelope fields that differ on every call and say nothing about the data
 # (RIPEstat adds timings, a query id and the answering server to every reply).
@@ -164,8 +165,8 @@ async def replay_evidence(
                         return result("unavailable", f"HTTP {response.status_code}")
                     same = supports(rec["payload"], response.text)
                 else:
-                    answers = await resolver.lookup(parsed[2], parsed[1])
-                    same = _same_dns(rec["payload"], "\n".join(answers))
+                    answer = await lookup_status(resolver, parsed[2], parsed[1])
+                    same = _same_dns(rec["payload"], answer.payload())
             except Exception as exc:  # noqa: BLE001 - a source being down is a result, not a crash
                 return result("unavailable", type(exc).__name__)
         return result("unchanged" if same else "changed")
