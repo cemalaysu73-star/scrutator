@@ -1,9 +1,31 @@
 from dataclasses import dataclass
 
 import dns.asyncresolver
+import dns.flags
+import dns.rdatatype
 import dns.resolver
 
 NEGATIVE = frozenset({"nxdomain", "nodata"})
+NXNAME = 128  # pseudo-type in an NSEC bitmap: "this name does not exist" (compact denial of existence)
+
+
+def _denies_existence(error: dns.resolver.NoAnswer) -> bool:
+    """True when a NOERROR/empty response is really a compact denial of existence: Cloudflare and
+    others answer a missing name with NOERROR and an NSEC whose type bitmap lists NXNAME, instead of
+    sending NXDOMAIN. An NSEC without NXNAME is an ordinary NODATA for a name that exists."""
+    try:
+        response = error.response()
+    except KeyError:  # raised without a response (nothing to inspect)
+        return False
+    for rrset in response.authority:
+        if rrset.rdtype != dns.rdatatype.NSEC:
+            continue
+        for rdata in rrset:
+            for window, bitmap in rdata.windows:
+                index, mask = divmod(NXNAME - window * 256, 8)
+                if 0 <= index < len(bitmap) and bitmap[index] & (0x80 >> mask):
+                    return True
+    return False
 
 
 @dataclass(frozen=True)
@@ -54,14 +76,16 @@ class DnsResolver:
         if nameservers:
             self._resolver.nameservers = list(nameservers)
         self._resolver.lifetime = timeout
+        # Ask for DNSSEC records: a recursive resolver sends the NSEC (and its NXNAME marker) only to DO queries.
+        self._resolver.use_edns(0, dns.flags.DO, 1232)
 
     async def query(self, name: str, rtype: str) -> DnsAnswer:
         try:
             answer = await self._resolver.resolve(name, rtype)
         except dns.resolver.NXDOMAIN:
             return DnsAnswer("nxdomain")
-        except dns.resolver.NoAnswer:
-            return DnsAnswer("nodata")
+        except dns.resolver.NoAnswer as error:
+            return DnsAnswer("nxdomain" if _denies_existence(error) else "nodata")
         except dns.resolver.NoNameservers:
             return DnsAnswer("servfail")
         records = tuple(record.to_text() for record in answer)

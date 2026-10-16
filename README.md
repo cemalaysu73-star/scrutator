@@ -290,9 +290,12 @@ test, not this paragraph):
   servers are Cloudflare's, so expect `concentration-dns` (info). The null MX record (`0 .`) means
   "no mail", so there must be **no** `dmarc-missing`. The SPF record is `-all`, so there must be no SPF risk.
 - Old certificates in the CT logs name hosts such as `dev`, `m`, `products` and `support` that DNS no
-  longer knows. `ghost-hostname` (info, analyst) needs a real NXDOMAIN, but Cloudflare-hosted zones such
-  as example.com answer NOERROR/NODATA with an NSEC `NXNAME` denial instead, so no ghost findings appear
-  there (known gap: the NXDOMAIN rules miss on such zones). `caa-missing` appears if the apex has no CAA record.
+  longer knows, so expect four `ghost-hostname` findings (info, analyst), each citing a stored `DNS A
+  <host>` record whose payload is `NXDOMAIN`. Cloudflare-hosted zones such as example.com do not send a
+  real NXDOMAIN for a missing name: they answer NOERROR with an NSEC record whose type bitmap lists
+  `NXNAME` ("compact denial of existence"), and only to a query that asks for DNSSEC records. Scrutator
+  sets the DO bit and treats that answer as `nxdomain`; an NSEC without `NXNAME` stays `nodata`, which is
+  why the apex CAA lookup is still `NODATA` and `caa-missing` appears if the apex has no CAA record.
 - `verify` should pass every check, including `risks derivable` and `packs intact`. With `--replay`
   the NXDOMAIN, NODATA and CAA records should replay as `unchanged`, and `skipped` should be 0.
 - Any risk that looks wrong is a bug: open the evidence it cites, and file an issue with the evidence id.
