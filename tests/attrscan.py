@@ -89,8 +89,8 @@ class Run:
     report: dict
 
 
-async def scan(http, **options):
-    store, dns, log = Store(":memory:"), resolver(), []
+async def scan(http, *, db=":memory:", **options):
+    store, dns, log = Store(db), resolver(), []
     ctx = ModuleContext(http=http, resolver=dns)
     with respx.mock(assert_all_called=False) as router:
         sources(router, log)

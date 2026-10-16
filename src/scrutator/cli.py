@@ -12,6 +12,11 @@ from scrutator.ai.config import AIConfig, AIMode, load_config
 from scrutator.ai.doctor import render_doctor, run_doctor
 from scrutator.ai.setup import build_runtime, cloud_hosts
 from scrutator.ai.types import AIError
+from scrutator.analyst.leads import run_leads
+from scrutator.attribution import BANDS
+from scrutator.attribution.model import band_rank
+from scrutator.attribution.promote import PromotionError
+from scrutator.attribution.promote import promote as promote_candidate
 from scrutator.bundle.keys import (
     fingerprint,
     generate_keypair,
@@ -142,6 +147,8 @@ def scan(
     bundle: bool = typer.Option(False, "--bundle/--no-bundle", help="Also write a signed proof bundle to <out>/proof.scrutator."),
     key_dir: Optional[Path] = typer.Option(None, "--key-dir", help="Directory with signing.key (default: ~/.config/scrutator)."),
     packs_dirs: list[Path] = typer.Option([], "--packs", help="Extra knowledge pack directory (repeatable); extends or overrides the bundled packs."),
+    attribute: bool = typer.Option(False, "--attribution/--no-attribution", help="Mark names that may belong to the organisation as candidates and look at them passively, once."),
+    max_candidates: int = typer.Option(20, "--max-candidates", help="With --attribution: how many candidates to look at."),
 ) -> None:
     """Run a passive scan and write evidence-backed reports."""
     wanted = {f.strip() for f in formats.split(",") if f.strip()}
@@ -174,12 +181,14 @@ def scan(
             scan_id, stats = await run_scan(
                 seed_entity, scope, store, ctx, ai=runtime,
                 max_steps=max_steps or config.max_steps, max_entities=max_entities, packs=packs,
+                attribution=attribute, max_candidates=max_candidates,
             )
             verdict = await summarise(runtime, store, scan_id) if runtime is not None and summary else None
-            return scan_id, stats, runtime, used, verdict
+            leads = await run_leads(runtime, store, scan_id) if runtime is not None and attribute else None
+            return scan_id, stats, runtime, used, verdict, leads
 
     try:
-        scan_id, stats, runtime, used, verdict = asyncio.run(go())
+        scan_id, stats, runtime, used, verdict, leads = asyncio.run(go())
     except (ValueError, AIError) as exc:
         raise _fail(str(exc)) from exc
 
@@ -206,6 +215,8 @@ def scan(
         f"({stats.modules_run} module runs, {stats.rounds} rounds)."
     )
     typer.echo(_risk_line(report["risks"]) + " Run `scrutator risk` for the list.")
+    if attribute:
+        typer.echo(_candidate_line(report["attribution"]) + " Run `scrutator candidates` for the list.")
     if stats.steps_exhausted:
         typer.echo("Step budget reached: some lookups were not run. Raise --max-steps to cover them.")
     failed = sum(h["error"] for h in report["sources"].values())
@@ -227,6 +238,12 @@ def scan(
             )
             if verdict.same_model:
                 typer.echo("Warning: writer and verifier use the same model; use a different one for independence.")
+        if leads is not None:
+            typer.echo(
+                f"Leads: {len(leads.verified)} verified, {len(leads.rejected)} rejected, {leads.dropped} dropped"
+                + (f" ({leads.skipped_reason})" if leads.skipped_reason else "")
+                + "."
+            )
     typer.echo(f"Wrote {', '.join(written)} to {out}")
     if bundle_path is not None:
         typer.echo(f"Proof bundle: {bundle_path} (signing key {manifest['key_fingerprint']})")
@@ -471,6 +488,138 @@ def risk(
         if blocking:
             typer.echo(f"{len(blocking)} risk(s) at or above {fail_on}.", err=True)
             raise typer.Exit(1)
+
+
+def _candidate_line(attribution: dict) -> str:
+    bands = attribution["bands"]
+    detail = ", ".join(f"{bands[band]} {band}" for band in BANDS[:3])
+    return f"Candidates: {sum(bands[band] for band in BANDS[:3])} ({detail})."
+
+
+def _latest_scan(db: Path) -> str:
+    if not db.exists():
+        raise _fail(f"no database at {db}")
+    store = Store(db)
+    scans = store.scans()
+    store.close()
+    if not scans:
+        raise _fail("the database holds no scans")
+    return str(scans[-1]["id"])
+
+
+def _min_band(value: str) -> int:
+    if value not in BANDS:
+        raise _fail(f"--min-band must be one of {list(BANDS)}")
+    return band_rank(value)
+
+
+def _entity_id(raw: str) -> str:
+    text = raw.strip().lower()
+    return text if ":" in text else f"domain:{text}"
+
+
+def _attribution_of(scan_ref: Optional[str], db: Path) -> tuple[dict, str]:
+    report, label = _load_report(scan_ref if scan_ref is not None else _latest_scan(db), db)
+    if "attribution" not in report:
+        raise _fail(f"{label} predates attribution: it has no attribution section")
+    return report, label
+
+
+@app.command("candidates")
+def candidates_cmd(
+    scan_ref: Optional[str] = typer.Argument(None, metavar="[SCAN]", help="A scan id in --db, or a .scrutator bundle (default: the latest scan)."),
+    db: Path = typer.Option(Path("scrutator-out/scrutator.db"), "--db", help="SQLite database for scan ids."),
+    min_band: str = typer.Option("possible", "--min-band", help="confirmed, probable, possible or unlikely."),
+    as_json: bool = typer.Option(False, "--json", help="Machine-readable output."),
+) -> None:
+    """List the names outside the scope that may belong to the organisation, strongest first."""
+    floor = _min_band(min_band)
+    report, label = _attribution_of(scan_ref, db)
+    promoted = {p["entity"] for p in report.get("promotions", [])}
+    items = [c for c in report["attribution"]["candidates"] if band_rank(c["band"]) >= floor]
+    if as_json:
+        typer.echo(json.dumps({"scan": report["scan"], "candidates": items, "promotions": report.get("promotions", [])}, indent=2, sort_keys=True))
+        return
+    typer.echo(f"{label} of {report['scan']['seed']}. {_candidate_line(report['attribution'])}")
+    for item in items:
+        mark = ", promoted" if item["entity_id"] in promoted else ""
+        typer.echo(f"[{item['band'].upper():<9}] {item['score']:.2f}  {item['entity_id']}  ({item['state']}{mark}; {len(item['signals'])} signal(s), {len(item['evidence_ids'])} evidence record(s))")
+    if any(item["state"] == "candidate" for item in items):
+        typer.echo("Explain one with `scrutator attribution --entity NAME`; accept one into scope with `scrutator promote NAME --scope FILE`.")
+
+
+@app.command("attribution")
+def attribution_cmd(
+    scan_ref: Optional[str] = typer.Argument(None, metavar="[SCAN]", help="A scan id in --db, or a .scrutator bundle (default: the latest scan)."),
+    db: Path = typer.Option(Path("scrutator-out/scrutator.db"), "--db", help="SQLite database for scan ids."),
+    entity: Optional[str] = typer.Option(None, "--entity", help="Explain one name (for example partner.example.net)."),
+    min_band: str = typer.Option("possible", "--min-band", help="confirmed, probable, possible or unlikely."),
+    as_json: bool = typer.Option(False, "--json", help="Machine-readable output."),
+) -> None:
+    """Explain why names outside the scope may belong to the organisation: every signal, the evidence behind it, and what could make it wrong."""
+    floor = _min_band(min_band)
+    report, label = _attribution_of(scan_ref, db)
+    items = report["attribution"]["candidates"]
+    if entity is not None:
+        wanted = _entity_id(entity)
+        items = [c for c in items if c["entity_id"] == wanted]
+        if not items:
+            raise _fail(f"{wanted} has no attribution in {label}")
+    else:
+        items = [c for c in items if band_rank(c["band"]) >= floor]
+    leads = report.get("leads", {"verified": [], "rejected": []})
+    if as_json:
+        typer.echo(json.dumps({"attribution": {**report["attribution"], "candidates": items}, "leads": leads}, indent=2, sort_keys=True))
+        return
+    typer.echo(f"{label} of {report['scan']['seed']}. {_candidate_line(report['attribution'])}")
+    for item in items:
+        typer.echo(f"\n[{item['band'].upper()}] {item['entity_id']}  score {item['score']:.2f}  ({item['state']})")
+        for signal in item["signals"]:
+            typer.echo(f"  {'+' if signal['weight'] > 0 else '-'} {signal['kind']} {signal['weight']:.2f}: {signal['detail']} ({len(signal['evidence_ids'])} evidence record(s))")
+            if signal["note"]:
+                typer.echo(f"      {signal['note']}")
+        for note in item["premortem"]:
+            typer.echo(f"  ? {note['text']}")
+    if leads["verified"]:
+        typer.echo("\nAnalyst leads (AI, verified against the evidence they cite):")
+        for lead in leads["verified"]:
+            typer.echo(f"  [{lead['kind']}] {lead['claim']}" + (f"  (suggested check, not run: {lead['check']})" if lead["check"] else ""))
+
+
+@app.command("promote")
+def promote_cmd(
+    entity: str = typer.Argument(..., help="The candidate to accept into scope, for example partner.example.net."),
+    scope_file: Path = typer.Option(..., "--scope", help="The scope file to add it to; it is the only thing that defines scope."),
+    scan_id: Optional[int] = typer.Option(None, "--scan", help="Scan id (default: the latest scan in the database)."),
+    db: Path = typer.Option(Path("scrutator-out/scrutator.db"), "--db", help="SQLite database."),
+    yes: bool = typer.Option(False, "--yes", help="Do not ask for confirmation."),
+) -> None:
+    """Accept a candidate into scope: write it to the scope file and record who accepted it, on what evidence, in the audit log."""
+    entity_id = _entity_id(entity)
+    chosen = scan_id if scan_id is not None else int(_latest_scan(db))
+    store = Store(db)
+    try:
+        try:
+            report = build_report(store, chosen)
+        except KeyError as exc:
+            raise _fail(f"no scan {chosen} in {db}") from exc
+        item = next((c for c in report["attribution"]["candidates"] if c["entity_id"] == entity_id), None)
+        if item is None or item["state"] != "candidate":
+            raise _fail(f"{entity_id} is not a candidate of scan #{chosen}: only candidates can be promoted")
+        typer.echo(
+            f"{entity_id} is {item['band']} (score {item['score']:.2f}) on {len(item['evidence_ids'])} evidence record(s). "
+            f"Promoting it adds {item['value']} and every name under it to {scope_file}."
+        )
+        if not yes and not typer.confirm("Accept it into scope?", default=False):
+            raise _fail("promotion declined")
+        try:
+            record = promote_candidate(store, chosen, entity_id, scope_file=scope_file, via="cli")
+        except PromotionError as exc:
+            raise _fail(str(exc)) from exc
+    finally:
+        store.close()
+    typer.echo(f"Promoted {entity_id} at {record['at']}; recorded in the audit log of scan #{chosen}.")
+    typer.echo(f"{scope_file} now lists it (the previous file is kept as {scope_file.name}.bak). Scan again to investigate it fully.")
 
 
 @packs_app.command("list")
