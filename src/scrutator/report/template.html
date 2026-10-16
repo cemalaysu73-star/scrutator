@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Scrutator report</title>
 <style>
-:root{--bg:#fff;--fg:#14181f;--muted:#5b6472;--line:#dfe3ea;--card:#f6f8fb;--low:#b45309;--medium:#1d4ed8;--high:#047857;--bad:#b42318}
-@media (prefers-color-scheme:dark){:root{--bg:#0e1116;--fg:#e6e9ef;--muted:#9aa3b2;--line:#252b36;--card:#161b22;--low:#fbbf24;--medium:#7aa2ff;--high:#34d399;--bad:#f97066}}
+:root{--bg:#fff;--fg:#14181f;--muted:#5b6472;--line:#dfe3ea;--card:#f6f8fb;--low:#b45309;--medium:#1d4ed8;--high:#047857;--bad:#b42318;--sev-info:#5b6472;--sev-low:#b45309;--sev-medium:#c2410c;--sev-high:#b42318}
+@media (prefers-color-scheme:dark){:root{--bg:#0e1116;--fg:#e6e9ef;--muted:#9aa3b2;--line:#252b36;--card:#161b22;--low:#fbbf24;--medium:#7aa2ff;--high:#34d399;--bad:#f97066;--sev-info:#9aa3b2;--sev-low:#fbbf24;--sev-medium:#fb923c;--sev-high:#f97066}}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,sans-serif}
 main{max-width:1100px;margin:0 auto;padding:24px 16px 64px}
@@ -19,12 +19,16 @@ h2{font-size:16px;margin:32px 0 8px}
 table{width:100%;border-collapse:collapse}
 th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:top;word-break:break-word}
 .badge{font-size:12px;font-weight:600;text-transform:uppercase}
+.sev-info{color:var(--sev-info)}.sev-low{color:var(--sev-low)}.sev-medium{color:var(--sev-medium)}.sev-high{color:var(--sev-high)}
 .low{color:var(--low)}.medium{color:var(--medium)}.high{color:var(--high)}.bad{color:var(--bad)}
 details{margin:2px 0}
 pre{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:8px;overflow:auto;max-height:240px;white-space:pre-wrap}
 svg{width:100%;height:520px;background:var(--card);border:1px solid var(--line);border-radius:8px;color:var(--fg)}
 select,input{background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:4px 8px;margin:0 8px 8px 0}
 ul.statements{padding-left:20px}
+.remedy{margin-top:4px}
+td.sev{white-space:nowrap;word-break:normal;width:1%}
+.tag{font-size:12px;border:1px solid var(--line);border-radius:4px;padding:0 4px;margin-left:6px}
 ul.statements li{margin:6px 0}
 </style>
 </head>
@@ -34,6 +38,7 @@ ul.statements li{margin:6px 0}
 <div class="muted" id="meta"></div>
 <div class="cards" id="cards"></div>
 <div id="extra"></div>
+<div id="risks"></div>
 <h2>Findings</h2>
 <div id="findings"></div>
 <h2>Graph</h2>
@@ -116,6 +121,66 @@ function renderLeads() {
   const list = el("ul", {className: "statements"});
   for (const l of leads) list.append(el("li", {}, el("span", {textContent: l.text + " "}), el("span", {className: "muted", textContent: `(rejected: ${l.reason})`})));
   section("extra-after", "Unverified leads (not part of the report)", list);
+}
+
+function evidenceDetails(ids) {
+  const cell = el("div");
+  for (const id of ids) {
+    const ev = D.evidence[id];
+    if (!ev) continue;
+    cell.append(el("details", {},
+      el("summary", {textContent: `${ev.source}: ${ev.request}`}),
+      el("div", {className: "muted", textContent: `collected ${ev.collected_at} · id ${id}`}),
+      el("pre", {textContent: ev.payload.slice(0, 20000)})));
+  }
+  return cell;
+}
+
+function renderRisks() {
+  const risks = D.risks || [];
+  const host = el("div");
+  const counts = {high: 0, medium: 0, low: 0, info: 0};
+  for (const r of risks) counts[r.severity] = (counts[r.severity] || 0) + 1;
+  host.append(el("p", {className: "muted", textContent: risks.length
+    ? `${risks.length} risk(s): ${counts.high} high, ${counts.medium} medium, ${counts.low} low, ${counts.info} info. Each one cites the evidence it rests on; the analyst category marks oddities a reviewer could miss.`
+    : "No risks were derived from the evidence this scan collected. That is not a clean bill of health: a source that failed or a lookup that did not run produces no finding."}));
+  if (risks.length) {
+    const filter = el("select", {}, el("option", {value: "", textContent: "all categories"}), el("option", {value: "risk", textContent: "risk"}), el("option", {value: "analyst", textContent: "analyst"}));
+    const body = el("tbody");
+    const draw = () => {
+      body.replaceChildren();
+      for (const r of risks) {
+        if (filter.value && r.category !== filter.value) continue;
+        const what = el("td", {}, el("b", {textContent: r.title}), el("span", {className: "tag", textContent: r.rule_id}));
+        if (r.category === "analyst") what.append(el("span", {className: "tag", textContent: "analyst"}));
+        what.append(el("div", {textContent: r.explanation}), el("div", {className: "muted remedy", textContent: "Remediation: " + r.remediation}));
+        what.append(el("div", {className: "muted", textContent: "Entities: " + r.entity_ids.join(", ")}));
+        body.append(el("tr", {},
+          el("td", {className: "sev"}, el("span", {className: `badge sev-${r.severity}`, textContent: r.severity}), el("div", {className: "muted", textContent: `confidence ${r.confidence}`})),
+          what,
+          el("td", {}, evidenceDetails(r.evidence_ids))));
+      }
+    };
+    filter.addEventListener("input", draw);
+    host.append(filter, el("table", {}, el("thead", {}, el("tr", {}, ...["Severity", "Risk", "Evidence"].map(t => el("th", {textContent: t})))), body));
+    draw();
+  }
+  section("risks", "Risks", host);
+}
+
+function renderDependencies() {
+  const deps = D.dependencies || [];
+  if (!deps.length) return;
+  const table = el("table", {}, el("thead", {}, el("tr", {}, ...["Role", "Provider", "Seen through", "Names", "Evidence"].map(t => el("th", {textContent: t})))));
+  const body = el("tbody");
+  for (const d of deps) {
+    const names = el("details", {}, el("summary", {textContent: `${d.hostnames.length} name(s)`}), el("div", {className: "muted", textContent: d.hostnames.join(", ")}));
+    const provider = el("td", {textContent: d.provider});
+    if (!d.verified) provider.append(el("span", {className: "tag", textContent: "pattern not yet verified"}));
+    body.append(el("tr", {}, el("td", {textContent: d.category}), provider, el("td", {textContent: d.via.join(", ")}), el("td", {}, names), el("td", {}, evidenceDetails(d.evidence_ids))));
+  }
+  table.append(body);
+  section("risks", "Provider dependencies", el("div", {}, el("p", {className: "muted", textContent: "Which third parties stand behind the in-scope names, recognised from the knowledge packs."}), table));
 }
 
 function renderFindings() {
@@ -220,6 +285,8 @@ function drawGraph() {
 
 renderNarrative();
 renderSources();
+renderRisks();
+renderDependencies();
 renderFindings();
 renderEntities();
 drawGraph();
