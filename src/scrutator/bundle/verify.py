@@ -7,6 +7,8 @@ from pathlib import Path
 from scrutator.bundle.keys import fingerprint, verify_signature
 from scrutator.bundle.reader import BundleError, read_raw
 from scrutator.findings import findings_from_report
+from scrutator.packs import KINDS, PackSet, load_packs
+from scrutator.risk.engine import RULESET_VERSION, analyze
 from scrutator.store import GENESIS_HASH, chain_hash
 
 _DATA_FILES = {"report.json", "evidence.jsonl", "audit.jsonl"}
@@ -43,6 +45,81 @@ def _jsonl(data: bytes) -> list[dict]:
                 raise ValueError("a line is not a JSON object")
             rows.append(value)
     return rows
+
+
+def _trusted_packs() -> PackSet:
+    """This tool's own bundled packs, the reference a bundle's embedded packs are compared with."""
+    return load_packs()
+
+
+def _packs_problem(report: dict, warnings: list[str]) -> str:
+    """Why the packs embedded in the report cannot be trusted, or an empty string.
+
+    The embedded entries are what the risk rules ran on, so they are checked three ways: they
+    must hash to what the report declares; bundled pack files must carry the content hash of
+    this tool's copy of the same version; and without user packs the merged content must equal
+    this tool's. With user packs the merged content cannot be matched to a trusted copy, but a
+    bundled entry may still not be removed. A bundle made with other pack versions than this
+    tool ships is accepted with a warning: there is nothing to compare it with."""
+    declared = PackSet.from_dict(report["packs"])
+    if declared.effective_sha256 != report["packs"]["effective_sha256"]:
+        return "the pack entries do not match the hash the report declares for them"
+    trusted = _trusted_packs()
+    ours = {(f["name"], f["kind"]): f for f in trusted.files if f["origin"] == "bundled"}
+    user_files, uncomparable = False, False
+    for item in declared.files:
+        if item["origin"] != "bundled":
+            user_files = True
+            continue
+        mine = ours.get((item["name"], item["kind"]))
+        if mine is None or mine["version"] != item["version"]:
+            uncomparable = True
+        elif mine["content_sha256"] != item["content_sha256"]:
+            return f"{item['name']} differs from this tool's bundled pack of the same version"
+    if uncomparable:
+        warnings.append(
+            "the bundle was made with other bundled pack versions than this tool ships, so its pack "
+            "content could not be compared with a trusted copy."
+        )
+        return ""
+    if user_files:
+        have, want = declared.effective(), trusted.effective()
+        for kind in KINDS:
+            missing = {e["id"] for e in want[kind]} - {e["id"] for e in have[kind]}
+            if missing:
+                return f"bundled {kind} entries were removed: {sorted(missing)[:3]}"
+        warnings.append("the bundle includes user packs, which cannot be compared with a trusted copy; the signer is vouching for them.")
+    elif declared.effective_sha256 != trusted.effective_sha256:
+        return "the pack content differs from this tool's bundled packs"
+    return ""
+
+
+def _analysis_problem(manifest: dict, report: dict, warnings: list[str]) -> tuple[str, bool]:
+    """Does the manifest's record of the analysis match the report? Returns the problem (empty
+    if none) and whether the risks can be re-derived by this tool. Re-deriving is attempted even
+    when the record disagrees, so one forgery shows up in every check it breaks."""
+    analysis = manifest.get("analysis")
+    complete = all(key in report for key in ("risks", "dependencies", "packs"))
+    if analysis is None:
+        return "", complete
+    if not complete:
+        return "the manifest records a risk analysis but the report has none", False
+    problem = ""
+    recorded = [
+        {k: item[k] for k in ("name", "kind", "version", "origin", "content_sha256")}
+        for item in report["packs"]["files"]
+    ]
+    if analysis.get("packs") != recorded or analysis.get("effective_sha256") != report["packs"]["effective_sha256"]:
+        problem = "the manifest and the report disagree about the packs used"
+    elif analysis.get("risks") != len(report["risks"]):
+        problem = "the manifest and the report disagree about the number of risks"
+    comparable = analysis.get("ruleset") == RULESET_VERSION
+    if not comparable:
+        warnings.append(
+            f"the risks were made by rule set {analysis.get('ruleset')}; this tool implements "
+            f"{RULESET_VERSION}, so they were not re-derived."
+        )
+    return problem, comparable
 
 
 def verify_bundle(path: str | Path, *, pinned_fingerprint: str | None = None) -> VerifyReport:
@@ -140,6 +217,8 @@ def verify_bundle(path: str | Path, *, pinned_fingerprint: str | None = None) ->
             cited.update(edge["evidence_ids"])
         for statement in report["summary_statements"]:
             cited.update(statement["evidence_ids"])
+        for risk in report.get("risks", []):
+            cited.update(risk["evidence_ids"])
         missing = sorted(cited - evidence_ids)
         also_missing = sorted(cited - set(report["evidence"]))
         add(
@@ -153,4 +232,20 @@ def verify_bundle(path: str | Path, *, pinned_fingerprint: str | None = None) ->
         add("scan identity", same_scan, "" if same_scan else "the report is for a different scan than the manifest")
     except (ValueError, KeyError, TypeError) as exc:
         add("report references", False, f"malformed report: {exc}")
+        return result
+
+    # the risk analysis: recorded in the manifest, built on trusted packs, re-derivable from the report
+    try:
+        problem, derivable_here = _analysis_problem(manifest, report, result.warnings)
+        add("analysis recorded", not problem, problem)
+        if "packs" in report:
+            problem = _packs_problem(report, result.warnings)
+            add("packs intact", not problem, problem)
+        if derivable_here and "packs" in report:
+            same = analyze(report) == {"risks": report["risks"], "dependencies": report["dependencies"]}
+            add("risks derivable", same, "" if same else "the risks are not what the cited evidence and the packs imply")
+        elif manifest.get("analysis") is None and "risks" not in report:
+            add("risks derivable", True, "bundle predates risk analysis")
+    except Exception as exc:  # noqa: BLE001 - a bundle is untrusted input; whatever it breaks, the check fails
+        add("risks derivable", False, f"malformed risk analysis: {type(exc).__name__}: {exc}")
     return result

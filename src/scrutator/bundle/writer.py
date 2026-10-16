@@ -12,6 +12,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from scrutator import __version__
 from scrutator.bundle.keys import fingerprint, public_raw_from_private, sign
 from scrutator.report import build_report, render_json
+from scrutator.risk.engine import RULESET_VERSION
 from scrutator.store import Store
 
 FORMAT_VERSION = 1
@@ -21,6 +22,21 @@ DATA_FILES = ("report.json", "evidence.jsonl", "audit.jsonl")
 def _jsonl(items: list[dict]) -> bytes:
     body = "\n".join(json.dumps(item, sort_keys=True) for item in items)
     return (body + "\n").encode("utf-8") if items else b""
+
+
+def analysis_record(report: dict) -> dict:
+    """What the manifest says about the risk analysis: the rule set, the pack files (version and
+    content hash) and the hash of the merged pack content. The signature covers it, and
+    `verify` compares it with the report."""
+    return {
+        "ruleset": RULESET_VERSION,
+        "risks": len(report["risks"]),
+        "packs": [
+            {key: item[key] for key in ("name", "kind", "version", "origin", "content_sha256")}
+            for item in report["packs"]["files"]
+        ],
+        "effective_sha256": report["packs"]["effective_sha256"],
+    }
 
 
 def create_bundle(
@@ -60,6 +76,7 @@ def create_bundle(
             name: {"sha256": hashlib.sha256(data).hexdigest(), "bytes": len(data)}
             for name, data in files.items()
         },
+        "analysis": analysis_record(report),
         "public_key": base64.b64encode(public_raw).decode(),
         "key_fingerprint": fingerprint(public_raw),
     }
