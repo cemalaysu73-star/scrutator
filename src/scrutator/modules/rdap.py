@@ -1,6 +1,6 @@
 from scrutator.model import Entity, EntityType, Evidence
 from scrutator.modules._names import host_entity
-from scrutator.modules.base import Module, ModuleContext, ModuleError, Observation
+from scrutator.modules.base import Fact, Module, ModuleContext, ModuleError, Observation
 from scrutator.modules.registry import register
 
 
@@ -31,7 +31,7 @@ class Rdap(Module):
     name = "rdap"
     accepts = frozenset({EntityType.DOMAIN, EntityType.IP})
 
-    async def run(self, entity: Entity, ctx: ModuleContext) -> list[Observation]:
+    async def run(self, entity: Entity, ctx: ModuleContext) -> list[Observation | Fact]:
         kind = "ip" if entity.type is EntityType.IP else "domain"
         url = f"https://rdap.org/{kind}/{entity.value}"
         resp = await ctx.http.get(url)
@@ -49,7 +49,7 @@ class Rdap(Module):
         # Record the request that was made, not the registry the redirector sent us to:
         # replay repeats this request and follows the same redirect.
         evidence = Evidence.create(self.name, f"GET {url}", resp.text)
-        observations: list[Observation] = []
+        observations: list[Observation | Fact] = []
         if entity.type is EntityType.IP:
             owner = _org(data.get("name"))
             if owner:
@@ -65,4 +65,8 @@ class Rdap(Module):
                 registrar = _org(_vcard_name(sub))
                 if registrar:
                     observations.append(Observation(registrar, "registrar", evidence))
+        if not observations:
+            # no name server or registrar to hang a relation on: the registration dates (expiry)
+            # are still evidence the scan holds
+            observations.append(Fact(evidence))
         return observations
