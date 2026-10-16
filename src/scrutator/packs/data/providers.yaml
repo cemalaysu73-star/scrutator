@@ -1,0 +1,90 @@
+# Provider fingerprints (spec section 13). One entry per provider and category.
+#
+# Matching: ns / mx / spf / cname are host suffixes on label boundaries (a label may contain *);
+# asn is an AS number; issuer is a lower-case substring of a certificate issuer name.
+# Every entry carries `examples` that it must match (tested), and a `source` to check it against.
+# verified: true means the patterns were checked against that source on 2026-10-16;
+# verified: false means they are widely known but not yet re-checked: please check one and send a PR.
+schema: 1
+kind: providers
+version: 2026.10.1
+updated: 2026-10-16
+description: Name server, mail, CDN, hosting and certificate authority fingerprints.
+entries:
+  # DNS hosting (name server suffixes)
+  - {id: cloudflare-dns, provider: Cloudflare, category: dns, ns: [ns.cloudflare.com], examples: [hera.ns.cloudflare.com], source: "https://developers.cloudflare.com/dns/nameservers/", verified: true}
+  - {id: aws-route53, provider: Amazon Route 53, category: dns, ns: ["awsdns-*.com", "awsdns-*.net", "awsdns-*.org", "awsdns-*.co.uk"], examples: [ns-2048.awsdns-64.com, ns-2051.awsdns-67.co.uk], source: "https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/white-label-name-servers.html", verified: true}
+  - {id: azure-dns, provider: Microsoft Azure DNS, category: dns, ns: [azure-dns.com, azure-dns.net, azure-dns.org, azure-dns.info], examples: [ns1-37.azure-dns.com, ns4-37.azure-dns.info], source: "https://learn.microsoft.com/en-us/azure/dns/dns-delegate-domain-azure-dns", verified: true}
+  - {id: google-cloud-dns, provider: Google Cloud DNS, category: dns, ns: ["ns-cloud-*.googledomains.com"], examples: [ns-cloud-a1.googledomains.com], source: "https://docs.cloud.google.com/dns/docs/update-name-servers", verified: true, note: "Only the a-shard example is on the cited page; the other shard letters follow the same pattern."}
+  - {id: nsone-dns, provider: NS1, category: dns, ns: [nsone.net], examples: [dns1.p01.nsone.net], source: "https://ns1.com/", verified: false}
+  - {id: akamai-edge-dns, provider: Akamai Edge DNS, category: dns, ns: [akam.net], examples: [a1-64.akam.net], source: "https://www.akamai.com/products/edge-dns", verified: false}
+  - {id: oracle-dyn-dns, provider: Oracle Dyn DNS, category: dns, ns: [dynect.net], examples: [ns1.p01.dynect.net], source: "https://www.oracle.com/cloud/networking/dns/", verified: false}
+  - {id: ultradns, provider: UltraDNS, category: dns, ns: [ultradns.net, ultradns.com, ultradns.org, ultradns.biz], examples: [pdns1.ultradns.net], source: "https://vercara.com/ultradns", verified: false}
+  - {id: godaddy-dns, provider: GoDaddy DNS, category: dns, ns: [domaincontrol.com], examples: [ns01.domaincontrol.com], source: "https://www.godaddy.com/", verified: false}
+  - {id: namecheap-dns, provider: Namecheap DNS, category: dns, ns: [registrar-servers.com], examples: [dns1.registrar-servers.com], source: "https://www.namecheap.com/support/knowledgebase/", verified: false}
+  - {id: digitalocean-dns, provider: DigitalOcean DNS, category: dns, ns: [ns1.digitalocean.com, ns2.digitalocean.com, ns3.digitalocean.com], examples: [ns1.digitalocean.com], source: "https://docs.digitalocean.com/products/networking/dns/", verified: false}
+  - {id: hetzner-dns, provider: Hetzner DNS, category: dns, ns: [ns.hetzner.com, ns.hetzner.de], examples: [hydrogen.ns.hetzner.com], source: "https://docs.hetzner.com/dns-console/dns/general/dns-overview/", verified: false}
+  - {id: gandi-dns, provider: Gandi LiveDNS, category: dns, ns: [dns.gandi.net], examples: [a.dns.gandi.net], source: "https://docs.gandi.net/en/domain_names/", verified: false}
+  - {id: ovh-dns, provider: OVHcloud DNS, category: dns, ns: [ovh.net, anycast.me], examples: [dns200.anycast.me, ns200.ovh.net], source: "https://help.ovhcloud.com/", verified: false}
+  - {id: vercel-dns, provider: Vercel DNS, category: dns, ns: [vercel-dns.com], examples: [ns1.vercel-dns.com], source: "https://vercel.com/docs/domains", verified: false}
+  - {id: icann-iana-dns, provider: ICANN (IANA example domains), category: dns, ns: [iana-servers.net], examples: [a.iana-servers.net], source: "https://www.iana.org/help/example-domains", verified: false}
+
+  # Mail (MX targets and SPF include domains)
+  - {id: google-workspace-mail, provider: Google Workspace, category: mail, mx: [smtp.google.com, aspmx.l.google.com, googlemail.com], examples: [smtp.google.com, alt1.aspmx.l.google.com], source: "https://knowledge.workspace.google.com/admin/domains/set-up-mx-records-for-google-workspace", verified: true, note: "smtp.google.com is the current MX; the page says older aspmx. names remain supported."}
+  - {id: google-workspace-spf, provider: Google Workspace, category: mail, spf: [_spf.google.com], examples: [_spf.google.com], source: "https://knowledge.workspace.google.com/admin/domains/set-up-mx-records-for-google-workspace", verified: false}
+  - {id: microsoft-365-mail, provider: Microsoft 365, category: mail, mx: [mail.protection.outlook.com], spf: [spf.protection.outlook.com], examples: [contoso-com.mail.protection.outlook.com, spf.protection.outlook.com], source: "https://learn.microsoft.com/en-us/microsoft-365/enterprise/external-domain-name-system-records", verified: true}
+  - {id: proofpoint-mail, provider: Proofpoint, category: mail, mx: [pphosted.com, ppe-hosted.com], examples: [mxa-00123456.gslb.pphosted.com], source: "https://www.proofpoint.com/", verified: false}
+  - {id: mimecast-mail, provider: Mimecast, category: mail, mx: [mimecast.com, mimecast-offshore.com], spf: [_netblocks.mimecast.com], examples: [us-smtp-inbound-1.mimecast.com, _netblocks.mimecast.com], source: "https://www.mimecast.com/", verified: false}
+  - {id: zoho-mail, provider: Zoho Mail, category: mail, mx: [zoho.com, zoho.eu, zoho.in], spf: [zoho.com, zoho.eu], examples: [mx.zoho.com, zoho.eu], source: "https://www.zoho.com/mail/help/adminconsole/configure-email-delivery.html", verified: false}
+  - {id: fastmail, provider: Fastmail, category: mail, mx: [messagingengine.com], spf: [spf.messagingengine.com], examples: [in1-smtp.messagingengine.com, spf.messagingengine.com], source: "https://www.fastmail.help/", verified: false}
+  - {id: proton-mail, provider: Proton Mail, category: mail, mx: [protonmail.ch], spf: [_spf.protonmail.ch], examples: [mail.protonmail.ch, _spf.protonmail.ch], source: "https://proton.me/support/custom-domain", verified: false}
+  - {id: amazon-ses, provider: Amazon SES, category: mail, mx: ["inbound-smtp.*.amazonaws.com"], spf: [amazonses.com], examples: [inbound-smtp.us-east-1.amazonaws.com, amazonses.com], source: "https://docs.aws.amazon.com/ses/latest/dg/receiving-email-mx-record.html", verified: false}
+  - {id: sendgrid, provider: Twilio SendGrid, category: mail, spf: [sendgrid.net], examples: [sendgrid.net], source: "https://www.twilio.com/docs/sendgrid", verified: false}
+  - {id: mailgun, provider: Mailgun, category: mail, mx: [mailgun.org], spf: [mailgun.org], examples: [mxa.mailgun.org, mailgun.org], source: "https://documentation.mailgun.com/", verified: false}
+  - {id: cisco-secure-email, provider: Cisco Secure Email, category: mail, mx: [iphmx.com], examples: [mx1.hc1234-56.iphmx.com], source: "https://www.cisco.com/c/en/us/products/security/email-security/", verified: false}
+  - {id: barracuda-email, provider: Barracuda Email Security, category: mail, mx: [barracudanetworks.com], examples: [d123456a.ess.barracudanetworks.com], source: "https://www.barracuda.com/", verified: false}
+  - {id: yandex-mail, provider: Yandex Mail, category: mail, mx: [mx.yandex.net, mx.yandex.ru], spf: [_spf.yandex.net], examples: [mx.yandex.net, _spf.yandex.net], source: "https://yandex.com/support/connect/", verified: false}
+  - {id: icloud-mail, provider: iCloud Mail, category: mail, mx: [mail.icloud.com], examples: [mx01.mail.icloud.com], source: "https://support.apple.com/", verified: false}
+
+  # CDN (CNAME targets, then AS numbers)
+  - {id: fastly-cdn, provider: Fastly, category: cdn, cname: [fastly.net], examples: [dualstack.nonssl.global.fastly.net], source: "https://www.fastly.com/documentation/guides/getting-started/domains/working-with-domains/working-with-cname-records-and-your-dns-provider", verified: true}
+  - {id: aws-cloudfront, provider: Amazon CloudFront, category: cdn, cname: [cloudfront.net], examples: [d111111abcdef8.cloudfront.net], source: "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/CNAMEs.html", verified: false}
+  - {id: akamai-cdn, provider: Akamai, category: cdn, cname: [edgekey.net, edgesuite.net, akamaiedge.net, akamai.net], examples: [e1234.a.akamaiedge.net, www.example.com.edgekey.net], source: "https://techdocs.akamai.com/", verified: false}
+  - {id: azure-cdn, provider: Microsoft Azure, category: cdn, cname: [azureedge.net], examples: [demo.azureedge.net], source: "https://github.com/EdOverflow/can-i-take-over-xyz", verified: true, note: "Listed upstream with the Azure services; checked against the project's fingerprint list on 2026-10-16."}
+  - {id: cloudflare-edge, provider: Cloudflare, category: cdn, asn: [13335], examples: [AS13335], source: "https://developers.cloudflare.com/fundamentals/concepts/cloudflare-ip-addresses/", verified: true, note: "AS13335 and the netblock owner CLOUDFLARENET were observed for example.com in a live scan on 2026-10-15."}
+  - {id: fastly-asn, provider: Fastly, category: cdn, asn: [54113], examples: [AS54113], source: "https://www.fastly.com/documentation/reference/network/", verified: false}
+  - {id: akamai-asn, provider: Akamai, category: cdn, asn: [20940, 16625], examples: [AS20940], source: "https://www.akamai.com/", verified: false}
+  - {id: edgio-asn, provider: Edgio (Edgecast), category: cdn, asn: [15133], examples: [AS15133], source: "https://edg.io/", verified: false}
+
+  # Hosting and platforms (CNAME targets, then AS numbers)
+  - {id: aws-hosting, provider: Amazon Web Services, category: hosting, cname: [elb.amazonaws.com, s3.amazonaws.com, elasticbeanstalk.com], examples: [my-lb-123.us-east-1.elb.amazonaws.com, assets.s3.amazonaws.com, demo.elasticbeanstalk.com], source: "https://github.com/EdOverflow/can-i-take-over-xyz", verified: true, note: "Suffixes as listed upstream on 2026-10-16."}
+  - {id: azure-hosting, provider: Microsoft Azure, category: hosting, cname: [cloudapp.net, cloudapp.azure.com, azurewebsites.net, blob.core.windows.net, azure-api.net, azurehdinsight.net, azurecontainer.io, database.windows.net, azuredatalakestore.net, search.windows.net, azurecr.io, redis.cache.windows.net, servicebus.windows.net, visualstudio.com], examples: [demo.azurewebsites.net, demo.cloudapp.net, demo.blob.core.windows.net], source: "https://github.com/EdOverflow/can-i-take-over-xyz", verified: true, note: "Suffixes as listed upstream on 2026-10-16."}
+  - {id: github-pages, provider: GitHub Pages, category: hosting, cname: [github.io], examples: [example-org.github.io], source: "https://docs.github.com/en/pages/configuring-a-custom-domain-for-your-github-pages-site/managing-a-custom-domain-for-your-github-pages-site", verified: true}
+  - {id: heroku, provider: Heroku, category: hosting, cname: [herokuapp.com, herokudns.com], examples: [demo.herokuapp.com, demo-1234.herokudns.com], source: "https://devcenter.heroku.com/articles/custom-domains", verified: false}
+  - {id: netlify, provider: Netlify, category: hosting, cname: [netlify.app], examples: [demo.netlify.app], source: "https://docs.netlify.com/domains-https/custom-domains/", verified: false}
+  - {id: vercel-hosting, provider: Vercel, category: hosting, cname: [vercel-dns.com, vercel.app], examples: [cname.vercel-dns.com, demo.vercel.app], source: "https://vercel.com/docs/domains", verified: false}
+  - {id: shopify, provider: Shopify, category: hosting, cname: [myshopify.com], examples: [shops.myshopify.com], source: "https://help.shopify.com/en/manual/domains", verified: false}
+  - {id: wpengine, provider: WP Engine, category: hosting, cname: [wpengine.com], examples: [demo.wpengine.com], source: "https://wpengine.com/support/", verified: false}
+  - {id: wix, provider: Wix, category: hosting, cname: [wixdns.net], examples: [demo.wixdns.net], source: "https://support.wix.com/", verified: false}
+  - {id: squarespace, provider: Squarespace, category: hosting, cname: [squarespace.com], examples: [ext-cust.squarespace.com], source: "https://support.squarespace.com/", verified: false}
+  - {id: aws-asn, provider: Amazon Web Services, category: hosting, asn: [16509, 14618], examples: [AS16509], source: "https://docs.aws.amazon.com/vpc/latest/userguide/aws-ip-ranges.html", verified: false}
+  - {id: google-cloud-asn, provider: Google, category: hosting, asn: [15169, 396982], examples: [AS15169], source: "https://cloud.google.com/compute/docs/faq", verified: false}
+  - {id: microsoft-asn, provider: Microsoft Azure, category: hosting, asn: [8075], examples: [AS8075], source: "https://learn.microsoft.com/en-us/azure/virtual-network/service-tags-overview", verified: false}
+  - {id: github-asn, provider: GitHub, category: hosting, asn: [36459], examples: [AS36459], source: "https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/about-githubs-ip-addresses", verified: false}
+  - {id: digitalocean-asn, provider: DigitalOcean, category: hosting, asn: [14061], examples: [AS14061], source: "https://www.digitalocean.com/", verified: false}
+  - {id: ovh-asn, provider: OVHcloud, category: hosting, asn: [16276], examples: [AS16276], source: "https://www.ovhcloud.com/", verified: false}
+  - {id: hetzner-asn, provider: Hetzner, category: hosting, asn: [24940], examples: [AS24940], source: "https://www.hetzner.com/", verified: false}
+  - {id: linode-asn, provider: Akamai (Linode), category: hosting, asn: [63949], examples: [AS63949], source: "https://www.linode.com/", verified: false}
+
+  # Certificate authorities (substring of the certificate issuer name, as crt.sh reports it)
+  - {id: lets-encrypt, provider: Let's Encrypt, category: ca, issuer: ["let's encrypt"], examples: ["C=US, O=Let's Encrypt, CN=R3"], source: "https://letsencrypt.org/certificates/", verified: false}
+  - {id: digicert, provider: DigiCert, category: ca, issuer: [digicert], examples: ["C=US, O=DigiCert Inc, CN=DigiCert TLS RSA SHA256 2020 CA1"], source: "https://www.digicert.com/kb/digicert-root-certificates.htm", verified: false}
+  - {id: sectigo, provider: Sectigo, category: ca, issuer: [sectigo], examples: ["C=GB, O=Sectigo Limited, CN=Sectigo Public Server Authentication CA OV R36"], source: "https://crt.sh/", verified: true, note: "This issuer string was observed in crt.sh output for example.com in a live scan on 2026-10-15."}
+  - {id: google-trust-services, provider: Google Trust Services, category: ca, issuer: [google trust services], examples: ["C=US, O=Google Trust Services, CN=WR2"], source: "https://pki.goog/", verified: false}
+  - {id: amazon-trust-services, provider: Amazon Trust Services, category: ca, issuer: ["o=amazon"], examples: ["C=US, O=Amazon, CN=Amazon RSA 2048 M01"], source: "https://www.amazontrust.com/repository/", verified: false}
+  - {id: globalsign, provider: GlobalSign, category: ca, issuer: [globalsign], examples: ["C=BE, O=GlobalSign nv-sa, CN=GlobalSign Atlas R3 DV TLS CA 2024 Q1"], source: "https://www.globalsign.com/en/repository", verified: false}
+  - {id: godaddy-ca, provider: GoDaddy, category: ca, issuer: [godaddy, go daddy], examples: ["C=US, O=GoDaddy.com, Inc., CN=Go Daddy Secure Certificate Authority - G2"], source: "https://certs.godaddy.com/repository", verified: false}
+  - {id: entrust, provider: Entrust, category: ca, issuer: [entrust], examples: ["C=US, O=Entrust, Inc., CN=Entrust Certification Authority - L1K"], source: "https://www.entrust.com/", verified: false}
+  - {id: zerossl, provider: ZeroSSL, category: ca, issuer: [zerossl], examples: ["C=AT, O=ZeroSSL, CN=ZeroSSL RSA Domain Secure Site CA"], source: "https://zerossl.com/", verified: false}
+  - {id: cloudflare-ca, provider: Cloudflare, category: ca, issuer: [cloudflare inc], examples: ["C=US, O=Cloudflare, Inc., CN=Cloudflare Inc ECC CA-3"], source: "https://developers.cloudflare.com/ssl/reference/certificate-authorities/", verified: false}
+  - {id: symantec-legacy, provider: Symantec and Thawte (legacy), category: ca, issuer: [symantec, thawte], examples: ["C=US, O=\"thawte, Inc.\", CN=thawte SSL CA - G2", "C=US, O=Symantec Corporation, OU=Symantec Trust Network, CN=Symantec Class 3 Secure Server CA - G4"], source: "https://crt.sh/", verified: true, note: "Both issuer strings were observed in crt.sh output for example.com on 2026-10-15; these CAs no longer issue (DigiCert took over the business)."}

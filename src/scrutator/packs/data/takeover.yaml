@@ -1,0 +1,43 @@
+# Takeover fingerprints (spec section 13): services whose hostnames can be claimed by someone
+# else when a CNAME that points at them dangles.
+#
+# Source: the community project can-i-take-over-xyz (https://github.com/EdOverflow/can-i-take-over-xyz),
+# fingerprints.json read on 2026-10-16. An entry is listed here only if that file gives a CNAME
+# pattern for the service and marks it "Vulnerable" (or "Edge case"). Services marked "Not vulnerable"
+# are left out on purpose.
+#
+# dangling: nxdomain          the target name does not exist in DNS; a passive lookup can see it.
+# dangling: http-fingerprint  the name resolves but the service shows an "unclaimed" page; that needs
+#                             an active probe, which passive mode never makes. Passive mode reports
+#                             such a service only when its target also fails to resolve.
+schema: 1
+kind: takeover
+version: 2026.10.1
+updated: 2026-10-16
+description: Claimable-service fingerprints for dangling CNAME detection.
+entries:
+  - {id: aws-elastic-beanstalk, provider: AWS Elastic Beanstalk, cname: [elasticbeanstalk.com], status: vulnerable, dangling: nxdomain, examples: [demo.us-east-1.elasticbeanstalk.com], source: "https://github.com/EdOverflow/can-i-take-over-xyz", verified: true}
+  - {id: microsoft-azure, provider: Microsoft Azure, cname: [cloudapp.net, cloudapp.azure.com, azurewebsites.net, blob.core.windows.net, azure-api.net, azurehdinsight.net, azureedge.net, azurecontainer.io, database.windows.net, azuredatalakestore.net, search.windows.net, azurecr.io, redis.cache.windows.net, servicebus.windows.net, visualstudio.com], status: vulnerable, dangling: nxdomain, examples: [shop-demo.azurewebsites.net, demo.cloudapp.net, demo.blob.core.windows.net], source: "https://github.com/EdOverflow/can-i-take-over-xyz", verified: true}
+  - {id: discourse-hosted, provider: Discourse (hosted), cname: [trydiscourse.com], status: vulnerable, dangling: nxdomain, examples: [forum.trydiscourse.com], source: "https://hackerone.com/reports/264494", verified: true}
+  - {id: aws-s3, provider: AWS S3 website bucket, cname: [s3.amazonaws.com], status: vulnerable, dangling: http-fingerprint, examples: [assets.s3.amazonaws.com], source: "https://github.com/EdOverflow/can-i-take-over-xyz", verified: true}
+  - {id: bitbucket-io, provider: Bitbucket, cname: [bitbucket.io], status: vulnerable, dangling: http-fingerprint, examples: [team.bitbucket.io], source: "https://github.com/EdOverflow/can-i-take-over-xyz", verified: true}
+  - {id: ghost-pro, provider: Ghost, cname: [ghost.io], status: vulnerable, dangling: http-fingerprint, examples: [blog.ghost.io], source: "https://github.com/EdOverflow/can-i-take-over-xyz", verified: true}
+  - {id: readme-io, provider: Readme, cname: [readme.io], status: vulnerable, dangling: http-fingerprint, examples: [docs.readme.io], source: "https://github.com/EdOverflow/can-i-take-over-xyz", verified: true}
+  - {id: wordpress-com, provider: WordPress.com, cname: [wordpress.com], status: vulnerable, dangling: http-fingerprint, examples: [blog.wordpress.com], source: "https://github.com/EdOverflow/can-i-take-over-xyz", verified: true}
+  - {id: helpjuice, provider: Helpjuice, cname: [helpjuice.com], status: vulnerable, dangling: http-fingerprint, examples: [help.helpjuice.com], source: "https://help.helpjuice.com/en_US/using-your-custom-domain/how-to-set-up-a-custom-domain", verified: true}
+  - {id: helpscout-docs, provider: Help Scout Docs, cname: [helpscoutdocs.com], status: vulnerable, dangling: http-fingerprint, examples: [docs.helpscoutdocs.com], source: "https://docs.helpscout.net/article/42-setup-custom-domain", verified: true}
+  - {id: helprace, provider: Helprace, cname: [helprace.com], status: vulnerable, dangling: http-fingerprint, examples: [help.helprace.com], source: "https://github.com/EdOverflow/can-i-take-over-xyz", verified: true}
+  - {id: hatenablog, provider: Hatena Blog, cname: [hatenablog.com], status: vulnerable, dangling: http-fingerprint, examples: [demo.hatenablog.com], source: "https://github.com/EdOverflow/can-i-take-over-xyz", verified: true}
+  - {id: launchrock, provider: LaunchRock, cname: [launchrock.com], status: vulnerable, dangling: http-fingerprint, examples: [demo.launchrock.com], source: "https://github.com/EdOverflow/can-i-take-over-xyz", verified: true}
+  - {id: ngrok, provider: ngrok, cname: [ngrok.io], status: vulnerable, dangling: http-fingerprint, examples: [demo.ngrok.io], source: "https://ngrok.com/docs", verified: true}
+  - {id: gemfury, provider: Gemfury, cname: [furyns.com], status: vulnerable, dangling: http-fingerprint, examples: [demo.furyns.com], source: "https://khaledibnalwalid.wordpress.com/2020/06/25/gemfury-subdomain-takeover/", verified: true}
+  - {id: anima, provider: Anima, cname: [animaapp.io], status: vulnerable, dangling: http-fingerprint, examples: [demo.animaapp.io], source: "https://docs.animaapp.com/v1/launchpad/08-custom-domain.html", verified: true}
+  - {id: airee, provider: Airee, cname: [airee.ru], status: vulnerable, dangling: http-fingerprint, examples: [demo.airee.ru], source: "https://github.com/EdOverflow/can-i-take-over-xyz", verified: true}
+  - {id: agile-crm, provider: Agile CRM, cname: [agilecrm.com], status: vulnerable, dangling: http-fingerprint, examples: [demo.agilecrm.com], source: "https://github.com/EdOverflow/can-i-take-over-xyz", verified: true}
+  - {id: uptimerobot, provider: UptimeRobot status page, cname: [stats.uptimerobot.com], status: vulnerable, dangling: http-fingerprint, examples: [stats.uptimerobot.com], source: "https://exploit.linuxsec.org/uptimerobot-com-custom-domain-subdomain-takeover/", verified: true}
+  - {id: strikingly, provider: Strikingly, cname: [s.strikinglydns.com], status: vulnerable, dangling: http-fingerprint, examples: [s.strikinglydns.com], source: "https://medium.com/@sherif0x00/takeover-subdomains-pointing-to-strikingly-5e67df80cdfd", verified: true}
+  - {id: surge-sh, provider: Surge, cname: [na-west1.surge.sh], status: vulnerable, dangling: http-fingerprint, examples: [na-west1.surge.sh], source: "https://surge.sh/help/adding-a-custom-domain", verified: true}
+  - {id: surveysparrow, provider: SurveySparrow, cname: [surveysparrow.com], status: vulnerable, dangling: http-fingerprint, examples: [demo.surveysparrow.com], source: "https://help.surveysparrow.com/custom-domain", verified: true}
+  - {id: uberflip, provider: Uberflip, cname: [read.uberflip.com], status: vulnerable, dangling: http-fingerprint, examples: [read.uberflip.com], source: "https://help.uberflip.com/hc/en-us/articles/360018786372-Custom-Domain-Set-up-Your-Hub-on-a-Subdomain", verified: true}
+  - {id: youtrack-cloud, provider: JetBrains YouTrack Cloud, cname: [youtrack.cloud], status: vulnerable, dangling: http-fingerprint, examples: [demo.youtrack.cloud], source: "https://www.jetbrains.com/help/youtrack/incloud/Domain-Settings.html", verified: true}
+  - {id: github-pages-takeover, provider: GitHub Pages, cname: [github.io], status: edge-case, dangling: http-fingerprint, examples: [example-org.github.io], source: "https://github.com/EdOverflow/can-i-take-over-xyz", verified: false, note: "Upstream lists GitHub as an edge case without a CNAME pattern; the github.io suffix comes from GitHub's own Pages documentation."}

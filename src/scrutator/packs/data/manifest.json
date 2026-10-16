@@ -1,4 +1,8 @@
 {
-  "files": {},
+  "files": {
+    "providers.yaml": "51c1f72fd849587030c508af64a118d03afd9a2c223f397f90959f110633b24e",
+    "signals.yaml": "b5f67bd72839f7926b8a0cf3e4ff614018e3caac915d6aabadb37a5fbd304a03",
+    "takeover.yaml": "b888a81a184720a6045931fe1c9ad1d775d001af4c4d5fa6625919c3342fcd81"
+  },
   "schema": 1
 }

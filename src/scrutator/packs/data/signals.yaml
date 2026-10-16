@@ -1,0 +1,13 @@
+# Signal frequencies (spec section 13): how common each attribution signal is across unrelated
+# organisations. They feed the IDF-style discount of the attribution engine in v0.5.
+#
+# This file is deliberately empty. A frequency is a measurement over a corpus of unrelated
+# organisations, and no such corpus has been collected yet; inventing numbers here would break
+# the rule that nothing in a report is stated without evidence. The schema, the loader and the
+# validation are in place, so v0.5 only has to add measured entries (with `sample_size`).
+schema: 1
+kind: signals
+version: 2026.10.1
+updated: 2026-10-16
+description: Attribution signal frequencies (measured entries arrive with v0.5).
+entries: []
