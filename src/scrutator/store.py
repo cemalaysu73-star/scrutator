@@ -84,6 +84,17 @@ CREATE TABLE IF NOT EXISTS hypotheses (
     status TEXT NOT NULL,
     evidence_ids TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS leads (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    scan_id INTEGER NOT NULL,
+    kind TEXT NOT NULL,
+    claim TEXT NOT NULL,
+    entity_ids TEXT NOT NULL,
+    evidence_ids TEXT NOT NULL,
+    check_text TEXT NOT NULL,
+    status TEXT NOT NULL,
+    reason TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS statements (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     scan_id INTEGER NOT NULL,
@@ -387,6 +398,46 @@ class Store:
                 "status": r["status"],
                 "reason": r["reason"],
                 "confidence": r["confidence"],
+            }
+            for r in rows
+        ]
+
+    # AI leads and pre-mortems (after verification)
+    def add_lead(
+        self,
+        scan_id: int,
+        *,
+        kind: str,
+        claim: str,
+        entity_ids: list[str],
+        evidence_ids: list[str],
+        status: str,
+        check: str = "",
+        reason: str = "",
+    ) -> None:
+        with self._db:
+            self._db.execute(
+                "INSERT INTO leads (scan_id, kind, claim, entity_ids, evidence_ids, check_text, status, reason)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (scan_id, kind, claim, json.dumps(sorted(entity_ids)), json.dumps(sorted(evidence_ids)), check, status, reason),
+            )
+
+    def leads(self, scan_id: int, status: str | None = None) -> list[dict]:
+        query = "SELECT kind, claim, entity_ids, evidence_ids, check_text, status, reason FROM leads WHERE scan_id = ?"
+        params: tuple = (scan_id,)
+        if status is not None:
+            query += " AND status = ?"
+            params = (scan_id, status)
+        rows = self._db.execute(query + " ORDER BY id", params).fetchall()
+        return [
+            {
+                "kind": r["kind"],
+                "claim": r["claim"],
+                "entity_ids": json.loads(r["entity_ids"]),
+                "evidence_ids": json.loads(r["evidence_ids"]),
+                "check": r["check_text"],
+                "status": r["status"],
+                "reason": r["reason"],
             }
             for r in rows
         ]

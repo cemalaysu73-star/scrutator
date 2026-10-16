@@ -52,6 +52,18 @@ def promotions(records: list[dict]) -> list[dict]:
     ]
 
 
+def _leads(store: Store, scan_id: int) -> dict:
+    """AI leads and pre-mortems: the verified ones are part of the report, the rest are listed
+    apart as unverified, with the reason."""
+    def shown(lead: dict) -> dict:
+        return {key: lead[key] for key in ("kind", "claim", "entity_ids", "evidence_ids", "check")}
+
+    return {
+        "verified": [shown(lead) for lead in store.leads(scan_id, "verified")],
+        "rejected": [{**shown(lead), "reason": lead["reason"]} for lead in store.leads(scan_id, "rejected")],
+    }
+
+
 def core_report(store: Store, scan_id: int) -> dict:
     """The part of a report the analyses read: scope, entities, relations and evidence."""
     return {
@@ -100,6 +112,7 @@ def build_report(
             "findings": len(findings),
             "risks": 0,
             "candidates": 0,
+            "leads": 0,
         },
         "entities": core["entities"],
         "edges": core["edges"],
@@ -126,12 +139,14 @@ def build_report(
         "ai": ai_info,
         "packs": packs.to_dict(),
         "promotions": promotions(store.audit_log(scan_id)),
+        "leads": _leads(store, scan_id),
     }
     analysis = analyze(report, packs)
     report["risks"] = analysis["risks"]
     report["dependencies"] = analysis["dependencies"]
     report["summary"]["risks"] = len(analysis["risks"])
     report["attribution"] = attribute(report, packs)
+    report["summary"]["leads"] = len(report["leads"]["verified"])
     report["summary"]["candidates"] = sum(1 for c in report["attribution"]["candidates"] if c["band"] != "unlikely")
     return report
 
