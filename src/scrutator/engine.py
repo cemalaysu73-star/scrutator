@@ -1,7 +1,7 @@
 import asyncio
 
 from scrutator.model import Entity, EntityType, ScopeState
-from scrutator.modules.base import Mode, Module, ModuleContext
+from scrutator.modules.base import Fact, Mode, Module, ModuleContext
 from scrutator.scope import ScopePolicy
 from scrutator.store import Store
 
@@ -64,6 +64,11 @@ class Engine:
         explorable: list[Entity] = []
         evidence_ids: set[str] = set()
         for obs in observations:
+            if isinstance(obs, Fact):
+                self.store.add_evidence(obs.evidence)
+                self.store.add_scan_evidence(scan_id, obs.evidence.id)
+                evidence_ids.add(obs.evidence.id)
+                continue
             if obs.entity == entity:
                 continue
             self.store.add_evidence(obs.evidence)

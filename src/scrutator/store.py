@@ -52,6 +52,11 @@ CREATE TABLE IF NOT EXISTS edge_evidence (
     evidence_id TEXT NOT NULL,
     PRIMARY KEY (scan_id, src, rel, dst, evidence_id)
 );
+CREATE TABLE IF NOT EXISTS scan_evidence (
+    scan_id INTEGER NOT NULL,
+    evidence_id TEXT NOT NULL,
+    PRIMARY KEY (scan_id, evidence_id)
+);
 CREATE TABLE IF NOT EXISTS audit (
     scan_id INTEGER NOT NULL,
     seq INTEGER NOT NULL,
@@ -201,11 +206,21 @@ class Store:
         row = self._db.execute("SELECT * FROM evidence WHERE id = ?", (evidence_id,)).fetchone()
         return Evidence(**dict(row)) if row else None
 
+    def add_scan_evidence(self, scan_id: int, evidence_id: str) -> None:
+        """Attach evidence to a scan without attaching it to a relation (see modules.base.Fact)."""
+        with self._db:
+            self._db.execute(
+                "INSERT OR IGNORE INTO scan_evidence (scan_id, evidence_id) VALUES (?, ?)",
+                (scan_id, evidence_id),
+            )
+
     def evidence_for_scan(self, scan_id: int) -> list[Evidence]:
+        """Every evidence record the scan holds: cited by a relation, or attached as a fact."""
         rows = self._db.execute(
-            "SELECT DISTINCT e.* FROM evidence e"
-            " JOIN edge_evidence ee ON ee.evidence_id = e.id"
-            " WHERE ee.scan_id = ? ORDER BY e.id",
+            "SELECT e.* FROM evidence e WHERE e.id IN ("
+            " SELECT evidence_id FROM edge_evidence WHERE scan_id = ?1"
+            " UNION SELECT evidence_id FROM scan_evidence WHERE scan_id = ?1)"
+            " ORDER BY e.id",
             (scan_id,),
         ).fetchall()
         return [Evidence(**dict(r)) for r in rows]

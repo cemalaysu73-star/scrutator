@@ -30,6 +30,15 @@ class Observation:
     evidence: Evidence
 
 
+@dataclass(frozen=True)
+class Fact:
+    """Evidence that belongs to the scan but to no relation: a definite negative result
+    ("DNS A ghost.example.com -> NXDOMAIN") or a record that adds no entity. The engine
+    stores it with the scan and in the audit log; it creates no edge."""
+
+    evidence: Evidence
+
+
 @dataclass
 class ModuleContext:
     """`http` must follow redirects (RDAP bootstrap relies on it)."""
@@ -47,4 +56,4 @@ class Module(ABC):
     timeout: ClassVar[float] = 60.0
 
     @abstractmethod
-    async def run(self, entity: Entity, ctx: ModuleContext) -> list[Observation]: ...
+    async def run(self, entity: Entity, ctx: ModuleContext) -> list[Observation | Fact]: ...
