@@ -290,8 +290,9 @@ test, not this paragraph):
   servers are Cloudflare's, so expect `concentration-dns` (info). The null MX record (`0 .`) means
   "no mail", so there must be **no** `dmarc-missing`. The SPF record is `-all`, so there must be no SPF risk.
 - Old certificates in the CT logs name hosts such as `dev`, `m`, `products` and `support` that DNS no
-  longer knows; expect `ghost-hostname` findings (info, analyst) citing both the certificate and the
-  NXDOMAIN. `caa-missing` appears if the apex has no CAA record.
+  longer knows. `ghost-hostname` (info, analyst) needs a real NXDOMAIN, but Cloudflare-hosted zones such
+  as example.com answer NOERROR/NODATA with an NSEC `NXNAME` denial instead, so no ghost findings appear
+  there (known gap: the NXDOMAIN rules miss on such zones). `caa-missing` appears if the apex has no CAA record.
 - `verify` should pass every check, including `risks derivable` and `packs intact`. With `--replay`
   the NXDOMAIN, NODATA and CAA records should replay as `unchanged`, and `skipped` should be 0.
 - Any risk that looks wrong is a bug: open the evidence it cites, and file an issue with the evidence id.
