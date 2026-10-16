@@ -27,7 +27,10 @@ from scrutator.bundle.writer import create_bundle
 from scrutator.context import ai_client, open_context
 from scrutator.diff import diff_reports, render_diff
 from scrutator.model import Entity, EntityType
+from scrutator.packs import PackError, build_manifest, load_packs, validate_dir
 from scrutator.report import build_report, render_html, render_json
+from scrutator.report.sarif import to_sarif
+from scrutator.risk.model import Severity, severity_at_least
 from scrutator.scan import run_scan
 from scrutator.scope import ScopePolicy
 from scrutator.store import Store
@@ -37,6 +40,8 @@ from scrutator.watch import make_webhook_notifier, parse_interval, validate_webh
 app = typer.Typer(add_completion=False, no_args_is_help=True, help="Evidence-backed infrastructure OSINT.")
 ai_app = typer.Typer(no_args_is_help=True, help="Inspect and test the AI backends.")
 app.add_typer(ai_app, name="ai")
+packs_app = typer.Typer(no_args_is_help=True, help="Inspect and validate knowledge packs.")
+app.add_typer(packs_app, name="packs")
 
 _FORMATS = {"json", "html"}
 _sleep = asyncio.sleep
@@ -102,6 +107,13 @@ def _consent(config: AIConfig, mode: AIMode, yes_cloud: bool) -> None:
         raise _fail("cloud AI declined")
 
 
+def _load_packs(directories: list[Path]):
+    try:
+        return load_packs(directories)
+    except PackError as exc:
+        raise _fail(f"cannot load packs:\n{exc}") from exc
+
+
 def _signing_key(key_dir: Optional[Path]):
     path = private_key_path(key_dir)
     if not path.exists():
@@ -129,6 +141,7 @@ def scan(
     config_path: Optional[Path] = typer.Option(None, "--config", help="Config file (default: ~/.config/scrutator/config.toml)."),
     bundle: bool = typer.Option(False, "--bundle/--no-bundle", help="Also write a signed proof bundle to <out>/proof.scrutator."),
     key_dir: Optional[Path] = typer.Option(None, "--key-dir", help="Directory with signing.key (default: ~/.config/scrutator)."),
+    packs_dirs: list[Path] = typer.Option([], "--packs", help="Extra knowledge pack directory (repeatable); extends or overrides the bundled packs."),
 ) -> None:
     """Run a passive scan and write evidence-backed reports."""
     wanted = {f.strip() for f in formats.split(",") if f.strip()}
@@ -137,6 +150,7 @@ def scan(
     mode = _mode(ai)
     config = _config(config_path)
     signing_key = _signing_key(key_dir) if bundle else None
+    packs = _load_packs(packs_dirs)
     try:
         seed_entity = _parse_seed(seed)
     except ValueError as exc:
@@ -159,7 +173,7 @@ def scan(
             )
             scan_id, stats = await run_scan(
                 seed_entity, scope, store, ctx, ai=runtime,
-                max_steps=max_steps or config.max_steps, max_entities=max_entities,
+                max_steps=max_steps or config.max_steps, max_entities=max_entities, packs=packs,
             )
             verdict = await summarise(runtime, store, scan_id) if runtime is not None and summary else None
             return scan_id, stats, runtime, used, verdict
@@ -191,6 +205,7 @@ def scan(
         f"{counts['edges']} relations, {counts['findings']} findings "
         f"({stats.modules_run} module runs, {stats.rounds} rounds)."
     )
+    typer.echo(_risk_line(report["risks"]) + " Run `scrutator risk` for the list.")
     if stats.steps_exhausted:
         typer.echo("Step budget reached: some lookups were not run. Raise --max-steps to cover them.")
     failed = sum(h["error"] for h in report["sources"].values())
@@ -307,17 +322,19 @@ def verify(
     typer.echo("Changed and unavailable records are drift, not forgery: sources change and go down.")
 
 
-def _load_report(ref: str, db: Path) -> tuple[dict, str]:
+def _load_report(ref: str, db: Path, packs=None) -> tuple[dict, str]:
     if ref.isdigit():
         if not db.exists():
             raise _fail(f"no database at {db}")
         store = Store(db)
         try:
-            return build_report(store, int(ref)), f"scan {ref}"
+            return build_report(store, int(ref), packs=packs), f"scan {ref}"
         except KeyError as exc:
             raise _fail(f"no scan {ref} in {db}") from exc
         finally:
             store.close()
+    if packs is not None:
+        raise _fail("--packs re-evaluates a scan from the database; a bundle carries the packs it was made with")
     path = Path(ref)
     checked = verify_bundle(path)
     if not checked.ok:
@@ -391,6 +408,112 @@ def watch(
         typer.echo("Stopped.")
     finally:
         store.close()
+
+
+def _risk_line(risks: list[dict]) -> str:
+    counts = {name: sum(1 for r in risks if r["severity"] == name) for name in ("high", "medium", "low", "info")}
+    detail = ", ".join(f"{counts[name]} {name}" for name in ("high", "medium", "low", "info"))
+    return f"Risks: {len(risks)} ({detail})."
+
+
+@app.command()
+def risk(
+    scan_ref: Optional[str] = typer.Argument(None, metavar="[SCAN]", help="A scan id in --db, or a .scrutator bundle (default: the latest scan)."),
+    db: Path = typer.Option(Path("scrutator-out/scrutator.db"), "--db", help="SQLite database for scan ids."),
+    packs_dirs: list[Path] = typer.Option([], "--packs", help="Re-evaluate a database scan with extra knowledge pack directories."),
+    category: str = typer.Option("all", "--category", help="all, risk or analyst."),
+    as_json: bool = typer.Option(False, "--json", help="Machine-readable output."),
+    sarif: Optional[Path] = typer.Option(None, "--sarif", help="Also write the risks as SARIF 2.1.0 to this file."),
+    fail_on: Optional[str] = typer.Option(None, "--fail-on", help="Exit with status 1 if a risk at or above this severity exists: info, low, medium or high."),
+) -> None:
+    """List the risks of a scan: hygiene findings, provider concentration and analyst detectors.
+
+    Exit status: 0 on success (also when risks exist), 1 when --fail-on is set and a risk at or
+    above that severity exists, 2 for usage errors such as a missing database or a bad pack."""
+    if category not in ("all", "risk", "analyst"):
+        raise _fail("--category must be all, risk or analyst")
+    if fail_on is not None and fail_on not in [s.value for s in Severity]:
+        raise _fail(f"--fail-on must be one of {[s.value for s in Severity]}")
+    packs = _load_packs(packs_dirs) if packs_dirs else None
+    if scan_ref is None:
+        if not db.exists():
+            raise _fail(f"no database at {db}")
+        store = Store(db)
+        scans = store.scans()
+        store.close()
+        if not scans:
+            raise _fail("the database holds no scans")
+        scan_ref = str(scans[-1]["id"])
+    report, label = _load_report(scan_ref, db, packs)
+    if "risks" not in report:
+        raise _fail(f"{label} predates risk analysis: it has no risks section")
+    risks = [r for r in report["risks"] if category == "all" or r["category"] == category]
+
+    if sarif is not None:
+        sarif.write_text(json.dumps(to_sarif({**report, "risks": risks}), indent=2, sort_keys=True), encoding="utf-8")
+    if as_json:
+        typer.echo(json.dumps({"risks": risks, "dependencies": report["dependencies"]}, indent=2, sort_keys=True))
+    else:
+        typer.echo(f"{label} of {report['scan']['seed']}. {_risk_line(risks)}")
+        for item in risks:
+            typer.echo(f"[{item['severity'].upper():<6}] {item['rule_id']}  {', '.join(item['entity_ids'][:3])}")
+            typer.echo(f"         {item['title']}. {item['explanation']}")
+            typer.echo(f"         evidence: {len(item['evidence_ids'])} record(s), fingerprint {item['fingerprint']}")
+            typer.echo(f"         fix: {item['remediation']}")
+        if report["dependencies"]:
+            typer.echo("Provider dependencies:")
+            for dep in report["dependencies"]:
+                typer.echo(f"  {dep['category']:<8} {dep['provider']}  ({len(dep['hostnames'])} name(s) via {', '.join(dep['via'])})")
+    if sarif is not None:
+        typer.echo(f"Wrote {sarif}")
+    if fail_on is not None:
+        blocking = [r for r in risks if severity_at_least(r["severity"], fail_on)]
+        if blocking:
+            typer.echo(f"{len(blocking)} risk(s) at or above {fail_on}.", err=True)
+            raise typer.Exit(1)
+
+
+@packs_app.command("list")
+def packs_list(
+    packs_dirs: list[Path] = typer.Option([], "--packs", help="Extra knowledge pack directory (repeatable)."),
+) -> None:
+    """List the pack files in use and how many entries they hold."""
+    packs = _load_packs(packs_dirs)
+    typer.echo(f"{'file':<16}{'kind':<11}{'version':<12}{'origin':<9}{'entries':<8}sha256")
+    for item in packs.files:
+        typer.echo(f"{item['name']:<16}{item['kind']:<11}{item['version']:<12}{item['origin']:<9}{item['entries']:<8}{item['content_sha256'][:12]}")
+    verified = sum(1 for e in packs.providers if e.verified)
+    typer.echo(
+        f"{len(packs.providers)} provider entries ({verified} verified), {len(packs.takeover)} takeover fingerprints, "
+        f"{len(packs.signals)} signal frequencies. Merged content sha256 {packs.effective_sha256[:12]}."
+    )
+
+
+@packs_app.command("validate")
+def packs_validate(
+    directory: Optional[Path] = typer.Argument(None, help="A pack directory (default: the bundled packs)."),
+) -> None:
+    """Check pack files against the schema and the manifest. Exit status 1 if anything is wrong."""
+    problems = validate_dir(directory)
+    where = directory if directory is not None else "the bundled packs"
+    if problems:
+        for line in problems:
+            typer.echo(f"error: {line}", err=True)
+        typer.echo(f"{where}: {len(problems)} problem(s).", err=True)
+        raise typer.Exit(1)
+    typer.echo(f"{where}: valid.")
+
+
+@packs_app.command("manifest")
+def packs_manifest(
+    directory: Path = typer.Argument(..., help="A pack directory; its manifest.json is (re)written."),
+) -> None:
+    """Write manifest.json with the sha256 of every pack file (for pack maintainers)."""
+    if not directory.is_dir():
+        raise _fail(f"{directory} is not a directory")
+    manifest = build_manifest(directory)
+    (directory / "manifest.json").write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    typer.echo(f"Wrote {directory / 'manifest.json'} ({len(manifest['files'])} file(s)).")
 
 
 @ai_app.command("doctor")
