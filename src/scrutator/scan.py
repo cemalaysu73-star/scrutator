@@ -6,6 +6,7 @@ from scrutator.engine import Engine
 from scrutator.model import Entity
 from scrutator.modules.base import Module, ModuleContext
 from scrutator.modules.registry import load_builtin_modules
+from scrutator.packs import PackSet, load_packs
 from scrutator.scope import ScopePolicy
 from scrutator.store import Store
 
@@ -21,9 +22,13 @@ async def run_scan(
     max_steps: int = 60,
     max_entities: int = 5000,
     allow_active: bool = False,
+    packs: PackSet | None = None,
 ) -> tuple[int, AgentStats]:
     scan_id = store.create_scan(seed.value)
     store.set_meta(scan_id, "scope", json.dumps(scope.to_dict(), sort_keys=True))
+    # the knowledge the risk rules will use is recorded with the scan, so a report made months
+    # later (or on another machine) is built from the same data
+    store.set_meta(scan_id, "packs", json.dumps((packs or load_packs()).to_dict(), sort_keys=True))
     if ai is not None:
         ai.bind(store, scan_id)
     engine = Engine(store, scope, ctx, allow_active=allow_active)

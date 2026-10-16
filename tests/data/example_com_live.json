@@ -1,0 +1,379 @@
+{
+ "edges": [
+  {
+   "dst": "domain:dev.example.com",
+   "evidence_ids": [
+    "1e9dcdff735c18485646f96b3e586a1647b425920d8c75ca7c5ec1ead5356971"
+   ],
+   "rel": "has_subdomain",
+   "src": "domain:example.com"
+  },
+  {
+   "dst": "domain:m.example.com",
+   "evidence_ids": [
+    "3af9265925a99f20397fe0e237e2d5338534386fa56ec1b31089ce60c84a87d1"
+   ],
+   "rel": "has_subdomain",
+   "src": "domain:example.com"
+  },
+  {
+   "dst": "domain:products.example.com",
+   "evidence_ids": [
+    "1e9dcdff735c18485646f96b3e586a1647b425920d8c75ca7c5ec1ead5356971"
+   ],
+   "rel": "has_subdomain",
+   "src": "domain:example.com"
+  },
+  {
+   "dst": "domain:support.example.com",
+   "evidence_ids": [
+    "1e9dcdff735c18485646f96b3e586a1647b425920d8c75ca7c5ec1ead5356971"
+   ],
+   "rel": "has_subdomain",
+   "src": "domain:example.com"
+  },
+  {
+   "dst": "domain:www.example.com",
+   "evidence_ids": [
+    "d593500681c971ffb8e0a9cfab3997d0c84753c50b3cbf15d55b0665645edc2d"
+   ],
+   "rel": "has_subdomain",
+   "src": "domain:example.com"
+  },
+  {
+   "dst": "domain:elliott.ns.cloudflare.com",
+   "evidence_ids": [
+    "2fc8549d613b86b5fe5b92422d7927ffb576afd34df5d6f4ab7aca424445882b",
+    "aa2ad8d080dfffc12fc28c9868d1d4eb9ce79c8826b5da448bed87e939b4ba60"
+   ],
+   "rel": "ns",
+   "src": "domain:example.com"
+  },
+  {
+   "dst": "domain:hera.ns.cloudflare.com",
+   "evidence_ids": [
+    "2fc8549d613b86b5fe5b92422d7927ffb576afd34df5d6f4ab7aca424445882b",
+    "aa2ad8d080dfffc12fc28c9868d1d4eb9ce79c8826b5da448bed87e939b4ba60"
+   ],
+   "rel": "ns",
+   "src": "domain:example.com"
+  },
+  {
+   "dst": "org:RESERVED-Internet Assigned Numbers Authority",
+   "evidence_ids": [
+    "2fc8549d613b86b5fe5b92422d7927ffb576afd34df5d6f4ab7aca424445882b"
+   ],
+   "rel": "registrar",
+   "src": "domain:example.com"
+  },
+  {
+   "dst": "domain:m.testexample.com",
+   "evidence_ids": [
+    "ab8d8e1981319417882bbdf434ed69ad0c0c02f7daf5dab1a3aad12034c98b91"
+   ],
+   "rel": "related_host",
+   "src": "domain:example.com"
+  },
+  {
+   "dst": "ip:104.20.23.154",
+   "evidence_ids": [
+    "df056da070572864977dfa08576a4d2cbedbaa2d1aac6c3c4f8193a5032bddf9"
+   ],
+   "rel": "resolves_to",
+   "src": "domain:example.com"
+  },
+  {
+   "dst": "ip:172.66.147.243",
+   "evidence_ids": [
+    "df056da070572864977dfa08576a4d2cbedbaa2d1aac6c3c4f8193a5032bddf9"
+   ],
+   "rel": "resolves_to",
+   "src": "domain:example.com"
+  },
+  {
+   "dst": "ip:2606:4700:10::6814:179a",
+   "evidence_ids": [
+    "fe61d78c246e0ce5f16031dad8d2fa211713a17ade62b25a47e74964508fa3bc"
+   ],
+   "rel": "resolves_to",
+   "src": "domain:example.com"
+  },
+  {
+   "dst": "ip:2606:4700:10::ac42:93f3",
+   "evidence_ids": [
+    "fe61d78c246e0ce5f16031dad8d2fa211713a17ade62b25a47e74964508fa3bc"
+   ],
+   "rel": "resolves_to",
+   "src": "domain:example.com"
+  },
+  {
+   "dst": "domain:example.com",
+   "evidence_ids": [
+    "3ce9115e53bc3aa581ad2586ce28f7855e3fa39af8cdfb2db37528dee7c7f072"
+   ],
+   "rel": "related_host",
+   "src": "domain:www.example.com"
+  },
+  {
+   "dst": "ip:104.20.23.154",
+   "evidence_ids": [
+    "dea587afd2523e668c085394b064e8907a4a960357fe835fc3fd916e55af45fd"
+   ],
+   "rel": "resolves_to",
+   "src": "domain:www.example.com"
+  },
+  {
+   "dst": "ip:172.66.147.243",
+   "evidence_ids": [
+    "dea587afd2523e668c085394b064e8907a4a960357fe835fc3fd916e55af45fd"
+   ],
+   "rel": "resolves_to",
+   "src": "domain:www.example.com"
+  },
+  {
+   "dst": "ip:2606:4700:10::6814:179a",
+   "evidence_ids": [
+    "38cc2fdff29b1be20fe260fbda3058c049d560ed7b06d83be7001959934fcf2e"
+   ],
+   "rel": "resolves_to",
+   "src": "domain:www.example.com"
+  },
+  {
+   "dst": "ip:2606:4700:10::ac42:93f3",
+   "evidence_ids": [
+    "38cc2fdff29b1be20fe260fbda3058c049d560ed7b06d83be7001959934fcf2e"
+   ],
+   "rel": "resolves_to",
+   "src": "domain:www.example.com"
+  },
+  {
+   "dst": "asn:AS13335",
+   "evidence_ids": [
+    "26b364cdcd287fa619cc12ad0b984a33c92a013e390c5a2d37baa76b1dea08df"
+   ],
+   "rel": "announced_by",
+   "src": "ip:104.20.23.154"
+  },
+  {
+   "dst": "asn:AS13335",
+   "evidence_ids": [
+    "77e8b4572a3b900e9663adf9615f4940714150698598c21f21c325ec2dca9813"
+   ],
+   "rel": "announced_by",
+   "src": "ip:172.66.147.243"
+  },
+  {
+   "dst": "asn:AS13335",
+   "evidence_ids": [
+    "bf7abbc5a64cfb497f0411aa9a153f15117de4d4fa8855b98ddf222553f14429"
+   ],
+   "rel": "announced_by",
+   "src": "ip:2606:4700:10::6814:179a"
+  },
+  {
+   "dst": "asn:AS13335",
+   "evidence_ids": [
+    "2bca2ce893b45d24622fe540ce6b47a853f7713f7f7ea7444c347580f26fae2e"
+   ],
+   "rel": "announced_by",
+   "src": "ip:2606:4700:10::ac42:93f3"
+  }
+ ],
+ "entities": [
+  {
+   "id": "asn:AS13335",
+   "state": "out",
+   "type": "asn",
+   "value": "AS13335"
+  },
+  {
+   "id": "domain:dev.example.com",
+   "state": "in",
+   "type": "domain",
+   "value": "dev.example.com"
+  },
+  {
+   "id": "domain:elliott.ns.cloudflare.com",
+   "state": "out",
+   "type": "domain",
+   "value": "elliott.ns.cloudflare.com"
+  },
+  {
+   "id": "domain:example.com",
+   "state": "in",
+   "type": "domain",
+   "value": "example.com"
+  },
+  {
+   "id": "domain:hera.ns.cloudflare.com",
+   "state": "out",
+   "type": "domain",
+   "value": "hera.ns.cloudflare.com"
+  },
+  {
+   "id": "domain:m.example.com",
+   "state": "in",
+   "type": "domain",
+   "value": "m.example.com"
+  },
+  {
+   "id": "domain:m.testexample.com",
+   "state": "out",
+   "type": "domain",
+   "value": "m.testexample.com"
+  },
+  {
+   "id": "domain:products.example.com",
+   "state": "in",
+   "type": "domain",
+   "value": "products.example.com"
+  },
+  {
+   "id": "domain:support.example.com",
+   "state": "in",
+   "type": "domain",
+   "value": "support.example.com"
+  },
+  {
+   "id": "domain:www.example.com",
+   "state": "in",
+   "type": "domain",
+   "value": "www.example.com"
+  },
+  {
+   "id": "ip:104.20.23.154",
+   "state": "linked",
+   "type": "ip",
+   "value": "104.20.23.154"
+  },
+  {
+   "id": "ip:172.66.147.243",
+   "state": "linked",
+   "type": "ip",
+   "value": "172.66.147.243"
+  },
+  {
+   "id": "ip:2606:4700:10::6814:179a",
+   "state": "linked",
+   "type": "ip",
+   "value": "2606:4700:10::6814:179a"
+  },
+  {
+   "id": "ip:2606:4700:10::ac42:93f3",
+   "state": "linked",
+   "type": "ip",
+   "value": "2606:4700:10::ac42:93f3"
+  },
+  {
+   "id": "org:CLOUDFLARENET",
+   "state": "in",
+   "type": "org",
+   "value": "CLOUDFLARENET"
+  },
+  {
+   "id": "org:RESERVED-Internet Assigned Numbers Authority",
+   "state": "in",
+   "type": "org",
+   "value": "RESERVED-Internet Assigned Numbers Authority"
+  }
+ ],
+ "evidence": {
+  "1e9dcdff735c18485646f96b3e586a1647b425920d8c75ca7c5ec1ead5356971": {
+   "collected_at": "2026-10-15T19:40:52+00:00",
+   "payload": "[{\"id\": 24558997, \"issuer_name\": \"C=US, O=Symantec Corporation, OU=Symantec Trust Network, CN=Symantec Class 3 Secure Server CA - G4\", \"name_value\": \"dev.example.com\\nexample.com\\nproducts.example.com\\nsupport.example.com\\nwww.example.com\", \"not_after\": \"2018-07-14T23:59:59\", \"not_before\": \"2016-07-14T00:00:00\"}]",
+   "request": "GET https://crt.sh/?q=%25.example.com&output=json",
+   "source": "crtsh"
+  },
+  "26b364cdcd287fa619cc12ad0b984a33c92a013e390c5a2d37baa76b1dea08df": {
+   "collected_at": "2026-10-15T19:42:06+00:00",
+   "payload": "{\"messages\":[[\"warning\",\"Given resource is not announced but result has been aligned to first-level less-specific (104.20.16.0/20).\"]],\"see_also\":[],\"version\":\"1.3\",\"data_call_name\":\"prefix-overview\",\"data_call_status\":\"supported\",\"cached\":false,\"query_id\":\"20261015194203-de848474-e8d0-4a8a-b22a-2a730a2c9241\",\"process_time\":113,\"server_id\":\"app193\",\"build_version\":\"v0.11.23-2026.10.12\",\"pipeline\":\"1460464\",\"status\":\"ok\",\"status_code\":200,\"time\":\"2026-10-15T19:42:03.150304\",\"data\":{\"is_less_specific\":true,\"announced\":true,\"asns\":[{\"asn\":13335,\"holder\":\"CLOUDFLARENET - Cloudflare, Inc.\"}],\"related_prefixes\":[],\"resource\":\"104.20.16.0/20\",\"type\":\"prefix\",\"block\":{\"resource\":\"104.0.0.0/8\",\"desc\":\"ARIN (Status: ALLOCATED)\",\"name\":\"IANA IPv4 Address Space Registry\"},\"actual_num_related\":0,\"query_time\":\"2026-10-15T16:00:00\",\"num_filtered_out\":0}}",
+   "request": "GET https://stat.ripe.net/data/prefix-overview/data.json?resource=104.20.23.154",
+   "source": "asn"
+  },
+  "2bca2ce893b45d24622fe540ce6b47a853f7713f7f7ea7444c347580f26fae2e": {
+   "collected_at": "2026-10-15T19:42:06+00:00",
+   "payload": "{\"messages\":[[\"warning\",\"Given resource is not announced but result has been aligned to first-level less-specific (2606:4700:10::/44).\"]],\"see_also\":[],\"version\":\"1.3\",\"data_call_name\":\"prefix-overview\",\"data_call_status\":\"supported\",\"cached\":false,\"query_id\":\"20261015194203-59179a2b-b87c-48ec-9002-34c3ea42c307\",\"process_time\":89,\"server_id\":\"app199\",\"build_version\":\"v0.11.23-2026.10.12\",\"pipeline\":\"1460464\",\"status\":\"ok\",\"status_code\":200,\"time\":\"2026-10-15T19:42:03.348612\",\"data\":{\"is_less_specific\":true,\"announced\":true,\"asns\":[{\"asn\":13335,\"holder\":\"CLOUDFLARENET - Cloudflare, Inc.\"}],\"related_prefixes\":[],\"resource\":\"2606:4700:10::/44\",\"type\":\"prefix\",\"block\":{\"resource\":\"2600::/12\",\"desc\":\"Designated to ARIN on 03 October 2006 (Status: allocated; Note: 2600::/22, 2604::/22, 2608::/22 and 260c::/22 were allocated on 2005-04-19. The more recent allocation (2006-10-03) incorporates all these previous allocations.)\",\"name\":\"IANA IPv6 Global Unicast Address Assignments\"},\"actual_num_related\":0,\"query_time\":\"2026-10-15T16:00:00\",\"num_filtered_out\":0}}",
+   "request": "GET https://stat.ripe.net/data/prefix-overview/data.json?resource=2606%3A4700%3A10%3A%3Aac42%3A93f3",
+   "source": "asn"
+  },
+  "2fc8549d613b86b5fe5b92422d7927ffb576afd34df5d6f4ab7aca424445882b": {
+   "collected_at": "2026-10-15T19:40:52+00:00",
+   "payload": "{\"objectClassName\":\"domain\",\"handle\":\"2336799_DOMAIN_COM-VRSN\",\"ldhName\":\"EXAMPLE.COM\",\"links\":[{\"value\":\"https:\\/\\/rdap.verisign.com\\/com\\/v1\\/domain\\/example.com\",\"rel\":\"self\",\"href\":\"https:\\/\\/rdap.verisign.com\\/com\\/v1\\/domain\\/example.com\",\"type\":\"application\\/rdap+json\"}],\"status\":[\"client delete prohibited\",\"client transfer prohibited\",\"client update prohibited\"],\"entities\":[{\"objectClassName\":\"entity\",\"handle\":\"376\",\"roles\":[\"registrar\"],\"publicIds\":[{\"type\":\"IANA Registrar ID\",\"identifier\":\"376\"}],\"vcardArray\":[\"vcard\",[[\"version\",{},\"text\",\"4.0\"],[\"fn\",{},\"text\",\"RESERVED-Internet Assigned Numbers Authority\"]]],\"entities\":[{\"objectClassName\":\"entity\",\"roles\":[\"abuse\"],\"vcardArray\":[\"vcard\",[[\"version\",{},\"text\",\"4.0\"],[\"fn\",{},\"text\",\"\"],[\"tel\",{\"type\":\"voice\"},\"uri\",\"\"],[\"email\",{},\"text\",\"\"]]]}]}],\"events\":[{\"eventAction\":\"registration\",\"eventDate\":\"1995-08-14T04:00:00Z\"},{\"eventAction\":\"expiration\",\"eventDate\":\"2027-08-13T04:00:00Z\"},{\"eventAction\":\"last changed\",\"eventDate\":\"2026-08-14T08:01:43Z\"},{\"eventAction\":\"last update of RDAP database\",\"eventDate\":\"2026-10-15T19:40:40Z\"}],\"secureDNS\":{\"delegationSigned\":true,\"dsData\":[{\"keyTag\":2371,\"algorithm\":13,\"digestType\":2,\"digest\":\"C988EC423E3880EB8DD8A46FE06CA230EE23F35B578D64E78B29C3E1C83D245A\"}]},\"nameservers\":[{\"objectClassName\":\"nameserver\",\"ldhName\":\"ELLIOTT.NS.CLOUDFLARE.COM\"},{\"objectClassName\":\"nameserver\",\"ldhName\":\"HERA.NS.CLOUDFLARE.COM\"}],\"rdapConformance\":[\"rdap_level_0\",\"icann_rdap_technical_implementation_guide_1\",\"icann_rdap_response_profile_1\"],\"notices\":[{\"title\":\"Terms of Service\",\"description\":[\"Service subject to Terms of Use.\"],\"links\":[{\"href\":\"https:\\/\\/www.verisign.com\\/domain-names\\/registration-data-access-protocol\\/terms-service\\/index.xhtml\",\"type\":\"text\\/html\",\"value\":\"https:\\/\\/rdap.verisign.com\\/com\\/v1\\/domain\\/example.com\",\"rel\":\"terms-of-service\"}]},{\"title\":\"Status Codes\",\"description\":[\"For more information on domain status codes, please visit https:\\/\\/icann.org\\/epp\"],\"links\":[{\"href\":\"https:\\/\\/icann.org\\/epp\",\"type\":\"text\\/html\",\"value\":\"https:\\/\\/rdap.verisign.com\\/com\\/v1\\/domain\\/example.com\",\"rel\":\"glossary\"}]},{\"title\":\"RDDS Inaccuracy Complaint Form\",\"description\":[\"URL of the ICANN RDDS Inaccuracy Complaint Form: https:\\/\\/icann.org\\/wicf\"],\"links\":[{\"href\":\"https:\\/\\/icann.org\\/wicf\",\"type\":\"text\\/html\",\"value\":\"https:\\/\\/rdap.verisign.com\\/com\\/v1\\/domain\\/example.com\",\"rel\":\"help\"}]}]}",
+   "request": "GET https://rdap.org/domain/example.com",
+   "source": "rdap"
+  },
+  "38cc2fdff29b1be20fe260fbda3058c049d560ed7b06d83be7001959934fcf2e": {
+   "collected_at": "2026-10-15T19:42:10+00:00",
+   "payload": "2606:4700:10::ac42:93f3\n2606:4700:10::6814:179a",
+   "request": "DNS AAAA www.example.com",
+   "source": "dns"
+  },
+  "3af9265925a99f20397fe0e237e2d5338534386fa56ec1b31089ce60c84a87d1": {
+   "collected_at": "2026-10-15T19:40:52+00:00",
+   "payload": "[{\"id\": 24560621, \"issuer_name\": \"C=US, O=\\\"thawte, Inc.\\\", CN=thawte SSL CA - G2\", \"name_value\": \"*.example.com\\nexample.com\\nm.example.com\\nwww.example.com\", \"not_after\": \"2017-07-14T23:59:59\", \"not_before\": \"2016-07-14T00:00:00\"}]",
+   "request": "GET https://crt.sh/?q=%25.example.com&output=json",
+   "source": "crtsh"
+  },
+  "3ce9115e53bc3aa581ad2586ce28f7855e3fa39af8cdfb2db37528dee7c7f072": {
+   "collected_at": "2026-10-15T19:43:57+00:00",
+   "payload": "[\"http://example.com:80/\", \"http://example.com:80/!\", \"http://example.com:80/!!!!!!!!\", \"https://example.com/!$\", \"https://example.com/!$%27()*+./:;=?%40_~=&%2C-=\"]",
+   "request": "GET https://web.archive.org/cdx/search/cdx?url=%2A.www.example.com&output=json&fl=original&collapse=urlkey&limit=500",
+   "source": "wayback"
+  },
+  "77e8b4572a3b900e9663adf9615f4940714150698598c21f21c325ec2dca9813": {
+   "collected_at": "2026-10-15T19:42:06+00:00",
+   "payload": "{\"messages\":[[\"warning\",\"Given resource is not announced but result has been aligned to first-level less-specific (172.66.144.0/20).\"]],\"see_also\":[],\"version\":\"1.3\",\"data_call_name\":\"prefix-overview\",\"data_call_status\":\"supported\",\"cached\":false,\"query_id\":\"20261015194203-f8bdf82d-6320-4e16-bca1-fcf335e13117\",\"process_time\":93,\"server_id\":\"app199\",\"build_version\":\"v0.11.23-2026.10.12\",\"pipeline\":\"1460464\",\"status\":\"ok\",\"status_code\":200,\"time\":\"2026-10-15T19:42:03.141869\",\"data\":{\"is_less_specific\":true,\"announced\":true,\"asns\":[{\"asn\":13335,\"holder\":\"CLOUDFLARENET - Cloudflare, Inc.\"}],\"related_prefixes\":[],\"resource\":\"172.66.144.0/20\",\"type\":\"prefix\",\"block\":{\"resource\":\"172.0.0.0/8\",\"desc\":\"Administered by ARIN\",\"name\":\"IANA IPv4 Address Space Registry\"},\"actual_num_related\":0,\"query_time\":\"2026-10-15T16:00:00\",\"num_filtered_out\":0}}",
+   "request": "GET https://stat.ripe.net/data/prefix-overview/data.json?resource=172.66.147.243",
+   "source": "asn"
+  },
+  "aa2ad8d080dfffc12fc28c9868d1d4eb9ce79c8826b5da448bed87e939b4ba60": {
+   "collected_at": "2026-10-15T19:41:02+00:00",
+   "payload": "elliott.ns.cloudflare.com.\nhera.ns.cloudflare.com.",
+   "request": "DNS NS example.com",
+   "source": "dns"
+  },
+  "ab8d8e1981319417882bbdf434ed69ad0c0c02f7daf5dab1a3aad12034c98b91": {
+   "collected_at": "2026-10-15T19:40:52+00:00",
+   "payload": "[{\"id\": 24564717, \"issuer_name\": \"C=US, O=\\\"thawte, Inc.\\\", CN=thawte SSL CA - G2\", \"name_value\": \"example.com\\nm.testexample.com\\nwww.example.com\", \"not_after\": \"2017-07-14T23:59:59\", \"not_before\": \"2016-07-14T00:00:00\"}]",
+   "request": "GET https://crt.sh/?q=%25.example.com&output=json",
+   "source": "crtsh"
+  },
+  "bf7abbc5a64cfb497f0411aa9a153f15117de4d4fa8855b98ddf222553f14429": {
+   "collected_at": "2026-10-15T19:42:06+00:00",
+   "payload": "{\"messages\":[[\"warning\",\"Given resource is not announced but result has been aligned to first-level less-specific (2606:4700:10::/44).\"]],\"see_also\":[],\"version\":\"1.3\",\"data_call_name\":\"prefix-overview\",\"data_call_status\":\"supported\",\"cached\":false,\"query_id\":\"20261015194203-cf88f6c3-3c25-4a5b-a16f-148604bdb544\",\"process_time\":105,\"server_id\":\"app193\",\"build_version\":\"v0.11.23-2026.10.12\",\"pipeline\":\"1460464\",\"status\":\"ok\",\"status_code\":200,\"time\":\"2026-10-15T19:42:03.364495\",\"data\":{\"is_less_specific\":true,\"announced\":true,\"asns\":[{\"asn\":13335,\"holder\":\"CLOUDFLARENET - Cloudflare, Inc.\"}],\"related_prefixes\":[],\"resource\":\"2606:4700:10::/44\",\"type\":\"prefix\",\"block\":{\"resource\":\"2600::/12\",\"desc\":\"Designated to ARIN on 03 October 2006 (Status: allocated; Note: 2600::/22, 2604::/22, 2608::/22 and 260c::/22 were allocated on 2005-04-19. The more recent allocation (2006-10-03) incorporates all these previous allocations.)\",\"name\":\"IANA IPv6 Global Unicast Address Assignments\"},\"actual_num_related\":0,\"query_time\":\"2026-10-15T16:00:00\",\"num_filtered_out\":0}}",
+   "request": "GET https://stat.ripe.net/data/prefix-overview/data.json?resource=2606%3A4700%3A10%3A%3A6814%3A179a",
+   "source": "asn"
+  },
+  "d593500681c971ffb8e0a9cfab3997d0c84753c50b3cbf15d55b0665645edc2d": {
+   "collected_at": "2026-10-15T19:40:52+00:00",
+   "payload": "[{\"id\": 22853391369, \"issuer_name\": \"C=GB, O=Sectigo Limited, CN=Sectigo Public Server Authentication CA OV R36\", \"name_value\": \"example.com\\nwww.example.com\", \"not_after\": \"2026-12-02T23:59:59\", \"not_before\": \"2025-12-02T00:00:00\"}, {\"id\": 22853418213, \"issuer_name\": \"C=GB, O=Sectigo Limited, CN=Sectigo Public Server Authentication CA OV R36\", \"name_value\": \"example.com\\nwww.example.com\", \"not_after\": \"2026-12-02T23:59:59\", \"not_before\": \"2025-12-02T00:00:00\"}, {\"id\": 22648264889, \"issuer_name\": \"C=GB, O=Sectigo Limited, CN=Sectigo Public Server Authentication CA OV R36\", \"name_value\": \"example.com\\nwww.example.com\", \"not_after\": \"2026-11-21T23:59:59\", \"not_before\": \"2025-11-21T00:00:00\"}, {\"id\": 22648245559, \"issuer_name\": \"C=GB, O=Sectigo Limited, CN=Sectigo Public Server Authentication CA OV R36\", \"name_value\": \"example.com\\nwww.example.com\", \"not_after\": \"2026-11-21T23:59:59\", \"not_before\": \"2025-11-21T00:00:00\"}, {\"id\": 16488405764, \"issuer_name\": \"C=GB, ST=Greater Manchester, L=Salford, O=Sectigo Limited, CN=Sectigo RSA Domain Validation Secure Server CA\", \"name_value\": \"example.com\\nwww.example.com\", \"not_after\": \"2025-04-28T23:59:59\", \"not_before\": \"2025-01-27T00:00:00\"}, {\"id\": 16488405627, \"issuer_name\": \"C=GB, ST=Greater Manchester, L=Salford, O=Sectigo Limited, CN=Sectigo RSA Domain Validation Secure Server CA\", \"name_value\": \"example.com\\nwww.example.com\", \"not_after\": \"2025-04-28T23:59:59\", \"not_before\": \"2025-01-27T00:00:00\"}, {\"id\": 16228519060, \"issuer_name\": \"C=US, O=DigiCert Inc, CN=DigiCert Global G2 TLS RSA SHA256 2020 CA1\", \"name_value\": \"example.com\\nwww.example.com\", \"not_after\": \"2026-02-14T23:59:59\", \"not_before\": \"2025-01-14T00:00:00\"}, {\"id\": 16233306772, \"issuer_name\": \"C=US, O=DigiCert Inc, CN=DigiCert Global G2 TLS RSA SHA256 2020 CA1\", \"name_value\": \"example.com\\nwww.example.com\", \"not_after\": \"2026-02-14T23:59:59\", \"not_before\": \"2025-01-14T00:00:00\"}, {\"id\": 11920382870, \"issuer_name\": \"C=US, O=DigiCert Inc, CN=DigiCert Global G2 TLS RSA SHA256 2020 CA1\", \"name_value\": \"example.com\\nwww.example.com\", \"not_after\": \"2025-03-01T23:59:59\", \"not_before\": \"2024-01-30T00:00:00\"}, {\"id\": 12337892544, \"issuer_name\": \"C=US, O=DigiCert Inc, CN=DigiCert Global G2 TLS RSA SHA256 2020 CA1\", \"name_value\": \"example.com\\nwww.example.com\", \"not_after\": \"2025-03-01T23:59:59\", \"not_before\": \"2024-01-30T00:00:00\"}, {\"id\": 8396709327, \"issuer_name\": \"C=US, O=DigiCert Inc, CN=DigiCert TLS RSA SHA256 2020 CA1\", \"name_value\": \"example.com\\nwww.example.com\", \"not_after\": \"2024-02-13T23:59:59\", \"not_before\": \"2023-01-13T00:00:00\"}, {\"id\": 8913351873, \"issuer_name\": \"C=US, O=DigiCert Inc, CN=DigiCert TLS RSA SHA256 2020 CA1\", \"name_value\": \"example.com\\nwww.example.com\", \"not_after\": \"2024-02-13T23:59:59\", \"not_before\": \"2023-01-13T00:00:00\"}, {\"id\": 6359075900, \"issuer_name\": \"C=US, O=DigiCert Inc, CN=DigiCert TLS RSA SHA256 2020 CA1\", \"name_value\": \"example.com\\nwww.example.com\", \"not_after\": \"2023-03-14T23:59:59\", \"not_before\": \"2022-03-14T00:00:00\"}, {\"id\": 6342480680, \"issuer_name\": \"C=US, O=DigiCert Inc, CN=DigiCert TLS RSA SHA256 2020 CA1\", \"name_value\": \"example.com\\nwww.example.com\", \"not_after\": \"2023-03-14T23:59:59\", \"not_before\": \"2022-03-14T00:00:00\"}, {\"id\": 5771467708, \"issuer_name\": \"C=US, O=DigiCert Inc, CN=DigiCert TLS RSA SHA256 2020 CA1\", \"name_value\": \"example.com\\nwww.example.com\", \"not_after\": \"2022-12-09T23:59:59\", \"not_before\": \"2021-12-10T00:00:00\"}, {\"id\": 5813209289, \"issuer_name\": \"C=US, O=DigiCert Inc, CN=DigiCert TLS RSA SHA256 2020 CA1\", \"name_value\": \"example.com\\nwww.example.com\", \"not_after\": \"2022-12-09T23:59:59\", \"not_before\": \"2021-12-10T00:00:00\"}, {\"id\": 3692510597, \"issuer_name\": \"C=US, O=DigiCert Inc, CN=DigiCert TLS RSA SHA256 2020 CA1\", \"name_value\": \"example.com\\nwww.example.com\", \"not_after\": \"2021-12-25T23:59:59\", \"not_before\": \"2020-11-24T00:00:00\"}, {\"id\": 3704614715, \"issuer_name\": \"C=US, O=DigiCert Inc, CN=DigiCert TLS RSA SHA256 2020 CA1\", \"name_value\": \"example.com\\nwww.example.com\", \"not_after\": \"2021-12-25T23:59:59\", \"not_before\": \"2020-11-24T00:00:00\"}, {\"id\": 2854374595, \"issuer_name\": \"C=US, O=DigiCert Inc, CN=DigiCert SHA2 Secure Server CA\", \"name_value\": \"example.com\\nwww.example.com\", \"not_after\": \"2020-12-02T12:00:00\", \"not_before\": \"2018-11-28T00:00:00\"}, {\"id\": 984858191, \"issuer_name\": \"C=US, O=DigiCert Inc, CN=DigiCert SHA2 Secure Server CA\", \"name_value\": \"example.com\\nwww.example.com\", \"not_after\": \"2020-12-02T12:00:00\", \"not_before\": \"2018-11-28T00:00:00\"}, {\"id\": 987119772, \"issuer_name\": \"C=US, O=DigiCert Inc, CN=DigiCert SHA2 Secure Server CA\", \"name_value\": \"example.com\\nwww.example.com\", \"not_after\": \"2020-12-02T12:00:00\", \"not_before\": \"2018-11-28T00:00:00\"}, {\"id\": 2854376823, \"issuer_name\": \"C=US, O=DigiCert Inc, CN=DigiCert SHA2 Secure Server CA\", \"name_value\": \"example.com\\nwww.example.com\", \"not_after\": \"2020-12-02T12:00:00\", \"not_before\": \"2018-11-28T00:00:00\"}, {\"id\": 2854374664, \"issuer_name\": \"C=US, O=DigiCert Inc, CN=DigiCert SHA2 Secure Server CA\", \"name_value\": \"example.com\\nwww.example.com\", \"not_after\": \"2020-12-02T12:00:00\", \"not_before\": \"2018-11-28T00:00:00\"}, {\"id\": 24558997, \"issuer_name\": \"C=US, O=Symantec Corporation, OU=Symantec Trust Network, CN=Symantec Class 3 Secure Server CA - G4\", \"name_value\": \"dev.example.com\\nexample.com\\nproducts.example.com\\nsupport.example.com\\nwww.example.com\", \"not_after\": \"2018-07-14T23:59:59\", \"not_before\": \"2016-07-14T00:00:00\"}, {\"id\": 24560621, \"issuer_name\": \"C=US, O=\\\"thawte, Inc.\\\", CN=thawte SSL CA - G2\", \"name_value\": \"*.example.com\\nexample.com\\nm.example.com\\nwww.example.com\", \"not_after\": \"2017-07-14T23:59:59\", \"not_before\": \"2016-07-14T00:00:00\"}, {\"id\": 24564717, \"issuer_name\": \"C=US, O=\\\"thawte, Inc.\\\", CN=thawte SSL CA - G2\", \"name_value\": \"example.com\\nm.testexample.com\\nwww.example.com\", \"not_after\": \"2017-07-14T23:59:59\", \"not_before\": \"2016-07-14T00:00:00\"}, {\"id\": 10557607, \"issuer_name\": \"C=US, O=DigiCert Inc, OU=www.digicert.com, CN=DigiCert SHA2 High Assurance Server CA\", \"name_value\": \"example.com\\nwww.example.com\", \"not_after\": \"2018-11-28T12:00:00\", \"not_before\": \"2015-11-03T00:00:00\"}, {\"id\": 5857507, \"issuer_name\": \"C=US, O=DigiCert Inc, OU=www.digicert.com, CN=DigiCert SHA2 High Assurance Server CA\", \"name_value\": \"example.com\\nwww.example.com\", \"not_after\": \"2015-11-13T12:00:00\", \"not_before\": \"2014-11-06T00:00:00\"}]",
+   "request": "GET https://crt.sh/?q=%25.example.com&output=json",
+   "source": "crtsh"
+  },
+  "dea587afd2523e668c085394b064e8907a4a960357fe835fc3fd916e55af45fd": {
+   "collected_at": "2026-10-15T19:42:08+00:00",
+   "payload": "104.20.23.154\n172.66.147.243",
+   "request": "DNS A www.example.com",
+   "source": "dns"
+  },
+  "df056da070572864977dfa08576a4d2cbedbaa2d1aac6c3c4f8193a5032bddf9": {
+   "collected_at": "2026-10-15T19:40:54+00:00",
+   "payload": "104.20.23.154\n172.66.147.243",
+   "request": "DNS A example.com",
+   "source": "dns"
+  },
+  "fe61d78c246e0ce5f16031dad8d2fa211713a17ade62b25a47e74964508fa3bc": {
+   "collected_at": "2026-10-15T19:40:56+00:00",
+   "payload": "2606:4700:10::ac42:93f3\n2606:4700:10::6814:179a",
+   "request": "DNS AAAA example.com",
+   "source": "dns"
+  }
+ },
+ "scope": {
+  "asns": [],
+  "cidrs": [],
+  "domains": [
+   "example.com"
+  ]
+ }
+}
