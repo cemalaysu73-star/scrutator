@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from scrutator import __version__
+from scrutator.attribution import attribute
 from scrutator.findings import build_findings
 from scrutator.packs import PackSet, load_packs
 from scrutator.risk.engine import analyze
@@ -41,6 +42,34 @@ def scan_packs(store: Store, scan_id: int) -> PackSet:
     return PackSet.from_dict(recorded) if recorded else load_packs()
 
 
+def promotions(records: list[dict]) -> list[dict]:
+    """The promotions an audit log records, in order: a candidate the user accepted into scope.
+    Reports carry them, and `verify` checks the report against the signed audit log."""
+    return [
+        {key: record.get(key) for key in ("entity", "score", "band", "evidence_ids", "via", "at", "scope_file")}
+        for record in records
+        if record.get("event") == "promoted"
+    ]
+
+
+def core_report(store: Store, scan_id: int) -> dict:
+    """The part of a report the analyses read: scope, entities, relations and evidence."""
+    return {
+        "scope": _meta_json(store, scan_id, "scope"),
+        "entities": [
+            {"id": s.entity.id, "type": s.entity.type.value, "value": s.entity.value, "state": s.state.value}
+            for s in store.entities(scan_id)
+        ],
+        "edges": [
+            {"src": e.src, "rel": e.rel, "dst": e.dst, "evidence_ids": list(e.evidence_ids)} for e in store.edges(scan_id)
+        ],
+        "evidence": {
+            ev.id: {"source": ev.source, "request": ev.request, "payload": ev.payload, "collected_at": ev.collected_at}
+            for ev in store.evidence_for_scan(scan_id)
+        },
+    }
+
+
 def build_report(
     store: Store,
     scan_id: int,
@@ -50,25 +79,18 @@ def build_report(
     packs: PackSet | None = None,
 ) -> dict:
     seed, started_at = store.get_scan(scan_id)
+    core = core_report(store, scan_id)
     entities = store.entities(scan_id)
     edges = store.edges(scan_id)
     findings = build_findings(store, scan_id)
-    evidence = {
-        ev.id: {
-            "source": ev.source,
-            "request": ev.request,
-            "payload": ev.payload,
-            "collected_at": ev.collected_at,
-        }
-        for ev in store.evidence_for_scan(scan_id)
-    }
+    evidence = core["evidence"]
     if ai_info is None:
         ai_info = _meta_json(store, scan_id, "ai")
     packs = packs if packs is not None else scan_packs(store, scan_id)
     report = {
         "tool": {"name": "scrutator", "version": __version__},
         "scan": {"id": scan_id, "seed": seed, "started_at": started_at},
-        "scope": _meta_json(store, scan_id, "scope"),
+        "scope": core["scope"],
         "generated_at": generated_at or datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "summary": {
             "entities": len(entities),
@@ -77,14 +99,10 @@ def build_report(
             "edges": len(edges),
             "findings": len(findings),
             "risks": 0,
+            "candidates": 0,
         },
-        "entities": [
-            {"id": s.entity.id, "type": s.entity.type.value, "value": s.entity.value, "state": s.state.value}
-            for s in entities
-        ],
-        "edges": [
-            {"src": e.src, "rel": e.rel, "dst": e.dst, "evidence_ids": list(e.evidence_ids)} for e in edges
-        ],
+        "entities": core["entities"],
+        "edges": core["edges"],
         "findings": [
             {
                 "claim": f.claim,
@@ -107,11 +125,14 @@ def build_report(
         "egress": store.egress_log(scan_id),
         "ai": ai_info,
         "packs": packs.to_dict(),
+        "promotions": promotions(store.audit_log(scan_id)),
     }
     analysis = analyze(report, packs)
     report["risks"] = analysis["risks"]
     report["dependencies"] = analysis["dependencies"]
     report["summary"]["risks"] = len(analysis["risks"])
+    report["attribution"] = attribute(report, packs)
+    report["summary"]["candidates"] = sum(1 for c in report["attribution"]["candidates"] if c["band"] != "unlikely")
     return report
 
 

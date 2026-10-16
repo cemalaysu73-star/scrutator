@@ -18,6 +18,7 @@ from scrutator.attribution.signals import signals_for
 from scrutator.packs import PackSet
 
 _NETWORK = {"ns_in_scope", "mx_in_scope", "spf_in_scope", "shared_ns", "shared_mx", "network_owner"}
+MAX_UNLIKELY = 50  # a shared service's certificate can name hundreds of strangers; the strongest 50 are listed
 
 
 def _measured(packs: PackSet) -> dict[str, tuple[float, int]]:
@@ -104,8 +105,17 @@ def attribute(report: dict, packs: PackSet | None = None) -> dict:
             }
         )
     candidates.sort(key=lambda c: (-c["score"], c["entity_id"]))
+    listed, omitted, unlikely = [], 0, 0
+    for item in candidates:
+        if item["band"] == "unlikely":
+            if unlikely >= MAX_UNLIKELY:
+                omitted += 1
+                continue
+            unlikely += 1
+        listed.append(item)
     return {
         "ruleset": RULESET_VERSION,
-        "bands": {band: sum(1 for c in candidates if c["band"] == band) for band in BANDS},
-        "candidates": candidates,
+        "bands": {band: sum(1 for c in listed if c["band"] == band) for band in BANDS},
+        "omitted_unlikely": omitted,
+        "candidates": listed,
     }

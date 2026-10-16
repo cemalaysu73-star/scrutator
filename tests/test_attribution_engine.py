@@ -1,4 +1,5 @@
 import json
+import time
 from pathlib import Path
 
 from attrfix import AttrZone
@@ -51,7 +52,7 @@ def test_candidates_come_out_strongest_first_with_the_band_counts():
     result = attribute(zone.report(PACKS), PACKS)
     assert [c["entity_id"] for c in result["candidates"]] == ["domain:a.test", "domain:b.test", "domain:c.test"]
     assert result["bands"] == {"confirmed": 0, "probable": 2, "possible": 1, "unlikely": 0}
-    assert result["ruleset"] == 1
+    assert result["ruleset"] == 1 and result["omitted_unlikely"] == 0
 
 
 def test_a_name_with_only_provider_evidence_is_not_a_candidate():
@@ -61,6 +62,35 @@ def test_a_name_with_only_provider_evidence_is_not_a_candidate():
     zone.candidate("partner.test")
     zone.ns("partner.test", ["hera.ns.cloudflare.com", "elliott.ns.cloudflare.com"])
     assert attribute(zone.report(PACKS), PACKS)["candidates"] == []
+
+
+def test_a_certificate_naming_hundreds_of_strangers_lists_only_the_strongest_unlikely_ones():
+    zone = scope_zone()
+    zone.cert("example.com", *[f"tenant{n:03}.test" for n in range(60)], cert_id=9)
+    result = attribute(zone.report(PACKS), PACKS)
+    assert len(result["candidates"]) == 50 and result["omitted_unlikely"] == 10
+    assert result["bands"]["unlikely"] == 50 and {c["band"] for c in result["candidates"]} == {"unlikely"}
+    assert [c["entity_id"] for c in result["candidates"]] == sorted(c["entity_id"] for c in result["candidates"])
+
+
+def test_a_scan_with_a_thousand_candidates_is_scored_in_seconds():
+    """Every signal compares a candidate with the scope, so a naive loop is quadratic: with 80 names in
+    scope and 1,500 outside it, one pass took close to a minute before the scope was indexed once."""
+    zone = AttrZone()
+    zone.host("example.com", ["192.0.2.1"])
+    zone.ns("example.com", ["ns1.tinydns.test", "ns2.tinydns.test"])
+    for n in range(80):
+        zone.host(f"h{n}.example.com", [f"192.0.2.{n + 2}"])
+        zone.announced(f"192.0.2.{n + 2}", "AS64510")
+        zone.mx(f"h{n}.example.com", ["mx.mailhost.test"])
+    for n in range(1500):
+        zone.outside(f"o{n}.stranger.test")
+        zone.cert("example.com", f"h{n % 80}.example.com", f"o{n}.stranger.test", cert_id=n, issuer=f"CN=Issuer {n % 7}")
+    report = zone.report(PACKS)
+    started = time.monotonic()
+    result = attribute(report, PACKS)
+    assert time.monotonic() - started < 10
+    assert result["bands"]["possible"] == 1500 and result["omitted_unlikely"] == 0
 
 
 def test_every_candidate_cites_evidence_that_exists_and_explains_itself():
