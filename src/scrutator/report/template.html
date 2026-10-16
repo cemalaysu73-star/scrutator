@@ -29,6 +29,8 @@ ul.statements{padding-left:20px}
 .remedy{margin-top:4px}
 td.sev{white-space:nowrap;word-break:normal;width:1%}
 .tag{font-size:12px;border:1px solid var(--line);border-radius:4px;padding:0 4px;margin-left:6px}
+.band-confirmed{color:var(--high)}.band-probable{color:var(--medium)}.band-possible{color:var(--low)}.band-unlikely{color:var(--muted)}
+ul.signals{margin:4px 0;padding-left:18px}
 ul.statements li{margin:6px 0}
 </style>
 </head>
@@ -39,6 +41,7 @@ ul.statements li{margin:6px 0}
 <div class="cards" id="cards"></div>
 <div id="extra"></div>
 <div id="risks"></div>
+<div id="attribution"></div>
 <h2>Findings</h2>
 <div id="findings"></div>
 <h2>Graph</h2>
@@ -71,6 +74,7 @@ const counts = {
   "Entities": D.summary.entities,
   "In scope": D.summary.by_scope.in || 0,
   "Linked": D.summary.by_scope.linked || 0,
+  "Candidates": D.summary.by_scope.candidate || 0,
   "Out of scope": D.summary.by_scope.out || 0,
   "Edges": D.summary.edges,
   "Findings": D.summary.findings,
@@ -115,8 +119,67 @@ function renderSources() {
   section("extra", "Source coverage", el("div", {}, note, table));
 }
 
+function renderAttribution() {
+  const att = D.attribution;
+  if (!att) return;
+  const all = att.candidates || [];
+  const promoted = new Set((D.promotions || []).map(p => p.entity));
+  const host = el("div");
+  const bands = att.bands || {};
+  host.append(el("p", {className: "muted", textContent: all.length
+    ? `Names outside the scope with evidence tying them to the organisation: ${bands.confirmed || 0} confirmed, ${bands.probable || 0} probable, ${bands.possible || 0} possible, ${bands.unlikely || 0} unlikely` + (att.omitted_unlikely ? ` (${att.omitted_unlikely} more unlikely not listed)` : "") + ". Scores are heuristic and each signal cites its evidence. A candidate is only looked at passively until you promote it with scrutator promote."
+    : "No name outside the scope has evidence tying it to the organisation. That is not proof that none exists: a name no certificate, record or registration links to the scope cannot be found this way."}));
+  if (all.length) {
+    const filter = el("select", {}, ...[["", "possible or better"], ["all", "all bands"], ["confirmed", "confirmed"], ["probable", "probable"], ["possible", "possible"], ["unlikely", "unlikely"]].map(([value, label]) => el("option", {value, textContent: label})));
+    const body = el("tbody");
+    const wanted = (band) => filter.value === "all" || (filter.value === "" ? band !== "unlikely" : band === filter.value);
+    const draw = () => {
+      body.replaceChildren();
+      for (const c of all) {
+        if (!wanted(c.band)) continue;
+        const signals = el("ul", {className: "signals"});
+        for (const s of c.signals) {
+          const item = el("li", {}, el("b", {textContent: `${s.kind} ${s.weight.toFixed(2)}`}), el("span", {textContent: " " + s.detail}));
+          if (s.note) item.append(el("div", {className: "muted", textContent: s.note}));
+          item.append(evidenceDetails(s.evidence_ids));
+          signals.append(item);
+        }
+        const name = el("td", {}, el("b", {textContent: c.value}), el("span", {className: "tag", textContent: c.state}));
+        if (promoted.has(c.entity_id)) name.append(el("span", {className: "tag", textContent: "promoted"}));
+        name.append(el("div", {className: "muted", textContent: c.explanation}));
+        const doubts = el("td");
+        if (!c.premortem.length) doubts.append(el("span", {className: "muted", textContent: "none found by the rules"}));
+        for (const note of c.premortem) doubts.append(el("div", {}, el("span", {textContent: note.text}), evidenceDetails(note.evidence_ids)));
+        body.append(el("tr", {},
+          name,
+          el("td", {className: "sev"}, el("span", {className: `badge band-${c.band}`, textContent: c.band}), el("div", {className: "muted", textContent: `score ${c.score.toFixed(2)}`})),
+          el("td", {}, signals),
+          doubts));
+      }
+    };
+    filter.addEventListener("input", draw);
+    host.append(filter, el("table", {}, el("thead", {}, el("tr", {}, ...["Name", "Band", "Why it may be ours", "What could make it wrong"].map(t => el("th", {textContent: t})))), body));
+    draw();
+  }
+  section("attribution", "Attribution (candidates for the scope)", host);
+}
+
+function renderAnalystLeads() {
+  const verified = (D.leads || {}).verified || [];
+  if (!verified.length) return;
+  const list = el("ul", {className: "statements"});
+  for (const lead of verified) {
+    const item = el("li", {}, el("span", {className: "tag", textContent: lead.kind === "premortem" ? "pre-mortem" : "lead"}), el("span", {textContent: " " + lead.claim}));
+    if (lead.check) item.append(el("div", {className: "muted", textContent: "Suggested check (not run): " + lead.check}));
+    item.append(evidenceDetails(lead.evidence_ids));
+    list.append(item);
+  }
+  section("attribution", "Analyst leads (written by the AI, each checked against the evidence it cites)", list);
+}
+
 function renderLeads() {
-  const leads = D.unverified_leads || [];
+  const rejected = ((D.leads || {}).rejected || []).map(l => ({text: l.claim, reason: l.reason}));
+  const leads = [...(D.unverified_leads || []), ...rejected];
   if (!leads.length) return;
   const list = el("ul", {className: "statements"});
   for (const l of leads) list.append(el("li", {}, el("span", {textContent: l.text + " "}), el("span", {className: "muted", textContent: `(rejected: ${l.reason})`})));
@@ -207,7 +270,7 @@ function renderEntities() {
   const typeSelect = el("select", {}, el("option", {value: "", textContent: "all types"}));
   for (const t of Object.keys(D.summary.by_type)) typeSelect.append(el("option", {value: t, textContent: t}));
   const scopeSelect = el("select", {}, el("option", {value: "", textContent: "all scopes"}));
-  for (const s of ["in", "linked", "out"]) scopeSelect.append(el("option", {value: s, textContent: s}));
+  for (const s of ["in", "candidate", "linked", "out"]) scopeSelect.append(el("option", {value: s, textContent: s}));
   const search = el("input", {type: "search", placeholder: "filter"});
   const body = el("tbody");
   const draw = () => {
@@ -229,7 +292,7 @@ function drawGraph() {
   const svg = document.getElementById("graph");
   const W = 1000, H = 520;
   svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
-  const rank = {in: 0, linked: 1, out: 2};
+  const rank = {in: 0, candidate: 1, linked: 2, out: 3};
   const ents = [...D.entities].sort((a, b) => rank[a.state] - rank[b.state]).slice(0, 300);
   const index = new Map(ents.map((e, i) => [e.id, i]));
   const nodes = ents.map((e, i) => ({
@@ -287,6 +350,8 @@ renderNarrative();
 renderSources();
 renderRisks();
 renderDependencies();
+renderAttribution();
+renderAnalystLeads();
 renderFindings();
 renderEntities();
 drawGraph();
