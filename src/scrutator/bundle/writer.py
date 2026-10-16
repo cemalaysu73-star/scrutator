@@ -31,6 +31,7 @@ def analysis_record(report: dict) -> dict:
     return {
         "ruleset": RULESET_VERSION,
         "risks": len(report["risks"]),
+        "attribution": {"ruleset": report["attribution"]["ruleset"], "candidates": len(report["attribution"]["candidates"])},
         "packs": [
             {key: item[key] for key in ("name", "kind", "version", "origin", "content_sha256")}
             for item in report["packs"]["files"]

@@ -4,10 +4,13 @@ import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from scrutator.attribution import RULESET_VERSION as ATTRIBUTION_RULESET
+from scrutator.attribution import attribute
 from scrutator.bundle.keys import fingerprint, verify_signature
 from scrutator.bundle.reader import BundleError, read_raw
 from scrutator.findings import findings_from_report
 from scrutator.packs import KINDS, PackSet, load_packs
+from scrutator.report.build import promotions
 from scrutator.risk.engine import RULESET_VERSION, analyze
 from scrutator.store import GENESIS_HASH, chain_hash
 
@@ -113,6 +116,12 @@ def _analysis_problem(manifest: dict, report: dict, warnings: list[str]) -> tupl
         problem = "the manifest and the report disagree about the packs used"
     elif analysis.get("risks") != len(report["risks"]):
         problem = "the manifest and the report disagree about the number of risks"
+    if "attribution" in report:
+        recorded_attribution = analysis.get("attribution")
+        if not isinstance(recorded_attribution, dict):
+            problem = problem or "the report has an attribution but the manifest records none"
+        elif recorded_attribution.get("candidates") != len(report["attribution"]["candidates"]) or recorded_attribution.get("ruleset") != report["attribution"].get("ruleset"):
+            problem = problem or "the manifest and the report disagree about the attribution"
     comparable = analysis.get("ruleset") == RULESET_VERSION
     if not comparable:
         warnings.append(
@@ -180,6 +189,7 @@ def verify_bundle(path: str | Path, *, pinned_fingerprint: str | None = None) ->
         )
 
     # audit chain
+    audit_records: list[dict] = []
     try:
         previous, expected, bad = GENESIS_HASH, 1, ""
         for row in _jsonl(raw.files["audit.jsonl"]):
@@ -189,6 +199,7 @@ def verify_bundle(path: str | Path, *, pinned_fingerprint: str | None = None) ->
             if chain_hash(previous, row["record"]) != row["hash"]:
                 bad = f"record {expected} was altered"
                 break
+            audit_records.append(json.loads(row["record"]))
             previous, expected = row["hash"], expected + 1
         add("audit chain", not bad, bad)
     except (ValueError, KeyError, TypeError) as exc:
@@ -219,13 +230,25 @@ def verify_bundle(path: str | Path, *, pinned_fingerprint: str | None = None) ->
             cited.update(statement["evidence_ids"])
         for risk in report.get("risks", []):
             cited.update(risk["evidence_ids"])
+        for candidate in report.get("attribution", {}).get("candidates", []):
+            cited.update(candidate["evidence_ids"])
+            for signal in candidate["signals"]:
+                cited.update(signal["evidence_ids"])
+            for note in candidate["premortem"]:
+                cited.update(note["evidence_ids"])
+        leads = [*report.get("leads", {}).get("verified", []), *report.get("leads", {}).get("rejected", [])]
+        unknown_entities = sorted({e for lead in leads for e in lead["entity_ids"]} - {e["id"] for e in report["entities"]})
+        for lead in leads:
+            cited.update(lead["evidence_ids"])
         missing = sorted(cited - evidence_ids)
         also_missing = sorted(cited - set(report["evidence"]))
-        add(
-            "report references",
-            not missing and not also_missing,
-            f"{len(set(missing + also_missing))} cited evidence record(s) are not in the bundle" if missing or also_missing else "",
-        )
+        if missing or also_missing:
+            detail = f"{len(set(missing + also_missing))} cited evidence record(s) are not in the bundle"
+        elif unknown_entities:
+            detail = f"a lead is about an entity the report does not have ({unknown_entities[0]})"
+        else:
+            detail = ""
+        add("report references", not detail, detail)
         derivable = findings_from_report(report) == report["findings"]
         add("findings derivable", derivable, "" if derivable else "the findings are not what the cited evidence implies")
         same_scan = report["scan"]["seed"] == manifest["scan"]["seed"]
@@ -248,4 +271,29 @@ def verify_bundle(path: str | Path, *, pinned_fingerprint: str | None = None) ->
             add("risks derivable", True, "bundle predates risk analysis")
     except Exception as exc:  # noqa: BLE001 - a bundle is untrusted input; whatever it breaks, the check fails
         add("risks derivable", False, f"malformed risk analysis: {type(exc).__name__}: {exc}")
+
+    # attribution: re-derived from the report's own evidence, like the risks
+    try:
+        if "attribution" in report and "packs" in report:
+            recorded = (manifest.get("analysis") or {}).get("attribution") or {}
+            if recorded.get("ruleset", ATTRIBUTION_RULESET) != ATTRIBUTION_RULESET:
+                result.warnings.append(
+                    f"the attribution was made by rule set {recorded.get('ruleset')}; this tool implements "
+                    f"{ATTRIBUTION_RULESET}, so it was not re-derived."
+                )
+            else:
+                same = attribute(report) == report["attribution"]
+                add("attribution derivable", same, "" if same else "the attribution is not what the cited evidence and the packs imply")
+        elif "attribution" not in report:
+            add("attribution derivable", True, "bundle predates attribution")
+        if "promotions" in report:
+            problem = ""
+            states = {e["id"]: e["state"] for e in report["entities"]}
+            if report["promotions"] != promotions(audit_records):
+                problem = "the report's promotions are not the ones recorded in the signed audit log"
+            elif any(states.get(p["entity"]) != "in" for p in report["promotions"]):
+                problem = "a promoted entity is not in scope in the report"
+            add("promotions recorded", not problem, problem)
+    except Exception as exc:  # noqa: BLE001
+        add("attribution derivable", False, f"malformed attribution: {type(exc).__name__}: {exc}")
     return result
