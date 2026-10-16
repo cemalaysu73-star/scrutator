@@ -7,12 +7,15 @@ from scrutator.ai.runtime import AIRuntime
 from scrutator.ai.types import AIError
 from scrutator.findings import build_findings
 from scrutator.model import Confidence, EntityType, Finding
+from scrutator.report.build import build_report
+from scrutator.risk.engine import findings_from_risks
 from scrutator.store import Store
 from scrutator.verify.entail import judge_entailment
 
 _ORDER = {Confidence.LOW: 0, Confidence.MEDIUM: 1, Confidence.HIGH: 2}
 _RANK = {Confidence.HIGH: 0, Confidence.MEDIUM: 1, Confidence.LOW: 2}
 MAX_FINDINGS = 40
+MAX_RISKS = 15
 MAX_EXCERPT = 600
 
 WRITER_SYSTEM = (
@@ -55,9 +58,13 @@ class SummaryResult:
     same_model: bool = False
 
 
-def _select(findings: list[Finding]) -> list[Finding]:
+def _select(findings: list[Finding], risks: list[Finding] | None = None) -> list[Finding]:
+    """Risk findings first (they arrive most severe first), then the relations by confidence.
+    Risks are findings in every respect that matters: the writer may cite them and the verifier
+    checks each statement about them against the same cited evidence."""
+    leading = list(risks or [])[:MAX_RISKS]
     ranked = sorted(findings, key=lambda f: (_RANK[f.confidence], f.claim))
-    return ranked[:MAX_FINDINGS]
+    return (leading + ranked)[:MAX_FINDINGS]
 
 
 async def summarise(ai: AIRuntime | None, store: Store, scan_id: int) -> SummaryResult:
@@ -69,7 +76,7 @@ async def summarise(ai: AIRuntime | None, store: Store, scan_id: int) -> Summary
     if not ai.has("verifier"):
         return SummaryResult(skipped_reason="no verifier model configured: nothing is published unverified")
 
-    findings = _select(build_findings(store, scan_id))
+    findings = _select(build_findings(store, scan_id), findings_from_risks(build_report(store, scan_id)["risks"]))
     if not findings:
         return SummaryResult(skipped_reason="no findings to summarise")
     if ai.redactor is not None:
