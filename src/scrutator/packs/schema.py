@@ -14,12 +14,18 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from scrutator.model.canonical import canonical_host
 
 SCHEMA_VERSION = 1
+# KINDS are the files the risk and attribution results are derived from: the report embeds them and
+# `verify` re-derives from them, so they are hashed together. Playbooks only guide the agent; no
+# result depends on them, so they are loaded and validated like the rest but kept out of that hash.
 KINDS = ("providers", "takeover", "signals")
+ALL_KINDS = (*KINDS, "playbooks")
+SITUATIONS = ("cname_out", "san_cohabitants", "mail", "delegated", "ip_without_network", "candidates", "spf_includes")
 CATEGORIES = ("dns", "mail", "cdn", "hosting", "ca")
 
 _ID = re.compile(r"^[a-z0-9][a-z0-9-]{0,62}$")
 _VERSION = re.compile(r"^\d{4}\.\d{1,2}\.\d{1,3}$")
 _SIGNAL = re.compile(r"^[a-z0-9][a-z0-9_.:-]{0,80}$")
+_MODULE = re.compile(r"^[a-z][a-z0-9_]{0,30}$")
 
 # which match lists make sense for which category: a mail entry has no business listing
 # an ASN, and an ns pattern in a CDN entry is a mistake worth catching in review
@@ -148,6 +154,43 @@ class SignalEntry(Entry):
         return value
 
 
+class PlaybookEntry(Entry):
+    """A short recipe the agent is offered when the investigation is in a situation it describes.
+
+    `when` lists situations that must all hold (see agent/playbooks.py for how each is decided from
+    the graph), `steps` are the recipe, `prefer` names the modules whose lookups the recipe is about.
+    It guides which lookups the planner ranks first; it can never add an option or widen the scope."""
+
+    title: str = Field(min_length=1, max_length=80)
+    when: tuple[str, ...] = Field(min_length=1, max_length=4)
+    steps: tuple[str, ...] = Field(min_length=1, max_length=6)
+    prefer: tuple[str, ...] = Field(default=(), max_length=4)
+
+    @field_validator("when")
+    @classmethod
+    def _situations(cls, values: tuple[str, ...]) -> tuple[str, ...]:
+        unknown = [v for v in values if v not in SITUATIONS]
+        if unknown:
+            raise ValueError(f"unknown situation {unknown[0]!r}; known: {list(SITUATIONS)}")
+        return values
+
+    @field_validator("steps")
+    @classmethod
+    def _steps(cls, values: tuple[str, ...]) -> tuple[str, ...]:
+        for value in values:
+            if not value.strip() or len(value) > 200:
+                raise ValueError("a step is one sentence of at most 200 characters")
+        return values
+
+    @field_validator("prefer")
+    @classmethod
+    def _modules(cls, values: tuple[str, ...]) -> tuple[str, ...]:
+        for value in values:
+            if not _MODULE.match(value):
+                raise ValueError(f"not a module name: {value!r}")
+        return values
+
+
 class _Envelope(BaseModel):
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
@@ -179,5 +222,10 @@ class SignalsFile(_Envelope):
     entries: list[SignalEntry]
 
 
-FILE_MODELS = {"providers": ProvidersFile, "takeover": TakeoverFile, "signals": SignalsFile}
-ENTRY_MODELS = {"providers": ProviderEntry, "takeover": TakeoverEntry, "signals": SignalEntry}
+class PlaybooksFile(_Envelope):
+    kind: Literal["playbooks"]
+    entries: list[PlaybookEntry]
+
+
+FILE_MODELS = {"providers": ProvidersFile, "takeover": TakeoverFile, "signals": SignalsFile, "playbooks": PlaybooksFile}
+ENTRY_MODELS = {"providers": ProviderEntry, "takeover": TakeoverEntry, "signals": SignalEntry, "playbooks": PlaybookEntry}

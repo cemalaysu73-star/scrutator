@@ -19,7 +19,16 @@ from typing import Any
 import yaml
 from pydantic import ValidationError
 
-from scrutator.packs.schema import ENTRY_MODELS, FILE_MODELS, KINDS, ProviderEntry, SignalEntry, TakeoverEntry
+from scrutator.packs.schema import (
+    ALL_KINDS,
+    ENTRY_MODELS,
+    FILE_MODELS,
+    KINDS,
+    PlaybookEntry,
+    ProviderEntry,
+    SignalEntry,
+    TakeoverEntry,
+)
 
 MANIFEST = "manifest.json"
 
@@ -89,7 +98,7 @@ def parse_file(name: str, data: bytes, origin: str) -> tuple[PackFileInfo, tuple
         raise PackError(f"{name}: a pack file must be a mapping")
     kind = document.get("kind")
     if kind not in FILE_MODELS:
-        raise PackError(f"{name}: kind must be one of {list(KINDS)}, not {kind!r}")
+        raise PackError(f"{name}: kind must be one of {list(ALL_KINDS)}, not {kind!r}")
     try:
         parsed = FILE_MODELS[kind].model_validate(document)
     except ValidationError as exc:
@@ -170,11 +179,13 @@ def validate_dir(directory=None) -> list[str]:
 class PackSet:
     """The merged content of the bundled packs and any user packs, with matching helpers."""
 
-    def __init__(self, files: Sequence[dict], providers=(), takeover=(), signals=()) -> None:
+    def __init__(self, files: Sequence[dict], providers=(), takeover=(), signals=(), playbooks=()) -> None:
         self.files = tuple(files)
         self.providers: tuple[ProviderEntry, ...] = tuple(sorted(providers, key=lambda e: e.id))
         self.takeover: tuple[TakeoverEntry, ...] = tuple(sorted(takeover, key=lambda e: e.id))
         self.signals: tuple[SignalEntry, ...] = tuple(sorted(signals, key=lambda e: e.id))
+        # not part of effective(): playbooks guide the agent, no derived result depends on them
+        self.playbooks: tuple[PlaybookEntry, ...] = tuple(sorted(playbooks, key=lambda e: e.id))
 
     # description
 
@@ -271,10 +282,10 @@ def load_packs(extra_dirs: Sequence[Path] = (), *, bundled=True) -> PackSet:
     sources = [(bundled_dir(), "bundled")] if bundled else []
     sources += [(Path(d), "user") for d in extra_dirs]
     infos: list[dict] = []
-    merged: dict[str, dict[str, Any]] = {kind: {} for kind in KINDS}
+    merged: dict[str, dict[str, Any]] = {kind: {} for kind in ALL_KINDS}
     for directory, origin in sources:
         for info, entries in read_dir(directory, origin):
             infos.append(info.to_dict())
             for entry in entries:
                 merged[info.kind][entry.id] = entry
-    return PackSet(infos, merged["providers"].values(), merged["takeover"].values(), merged["signals"].values())
+    return PackSet(infos, merged["providers"].values(), merged["takeover"].values(), merged["signals"].values(), merged["playbooks"].values())

@@ -1,0 +1,85 @@
+# Pivot playbooks (spec section 13): short recipes the agent is offered when the investigation is in
+# the situation they describe. They guide which passive lookups the planner ranks first; they cannot
+# add an option, widen the scope or write evidence.
+#
+# `when` lists situations that must all hold (agent/playbooks.py decides each from the graph),
+# `steps` are the recipe, `prefer` names the modules the recipe is about. The procedures are written
+# for Scrutator; `source` is background reading, so every entry is marked verified: false until a
+# maintainer has checked the steps against it.
+schema: 1
+kind: playbooks
+version: 2026.10.1
+updated: 2026-10-17
+description: Recipes for the situations an infrastructure investigation keeps meeting.
+entries:
+  - id: dangling-alias
+    title: An alias points outside the scope
+    when: [cname_out]
+    steps:
+      - "Look up the address records of the alias target itself: a target that does not exist means the alias dangles."
+      - "Compare the target's host name with the takeover fingerprints in the packs; only a listed service can be claimed."
+      - "A passive lookup is enough to record the state; never contact the target."
+    prefer: [dns]
+    source: "https://github.com/EdOverflow/can-i-take-over-xyz"
+    verified: false
+    note: Procedure written for Scrutator; the source is background reading on subdomain takeover.
+  - id: certificate-neighbours
+    title: Names that share a certificate with the scope
+    when: [san_cohabitants]
+    steps:
+      - "Read the other names on the certificate; a short list that mixes the scope with one outside name is the strongest certificate evidence."
+      - "A certificate naming many unrelated organisations belongs to a shared service and says little."
+      - "Look at the outside name's own name servers and registration before judging it."
+    prefer: [dns, rdap]
+    source: "https://www.rfc-editor.org/rfc/rfc6962"
+    verified: false
+    note: Procedure written for Scrutator; RFC 6962 describes the certificate logs the names come from.
+  - id: mail-records
+    title: A name receives mail
+    when: [mail]
+    steps:
+      - "Look up the DMARC record at _dmarc.<name> and the SPF record on the same name."
+      - "A name that receives mail and has no DMARC record is worth a lookup before anything else."
+    prefer: [dns]
+    source: "https://www.rfc-editor.org/rfc/rfc7489"
+    verified: false
+    note: Procedure written for Scrutator; RFC 7489 defines DMARC.
+  - id: delegated-zone
+    title: A zone is delegated to name servers
+    when: [delegated]
+    steps:
+      - "Compare the zone's name servers with the registry's list (RDAP); a difference is an oddity worth recording."
+      - "A name server under the scope's own domain is the strongest ownership evidence for a name outside it."
+    prefer: [rdap, dns]
+    source: "https://www.rfc-editor.org/rfc/rfc7483"
+    verified: false
+    note: Procedure written for Scrutator; RFC 7483 defines the RDAP responses.
+  - id: network-of-an-address
+    title: An address has not been placed in a network yet
+    when: [ip_without_network]
+    steps:
+      - "Find which AS announces the address and who owns its netblock before deciding whether two names share a network."
+      - "A cloud or CDN network says nothing about who owns a name hosted in it."
+    prefer: [asn, rdap]
+    source: "https://stat.ripe.net/docs/"
+    verified: false
+    note: Procedure written for Scrutator; the source documents the routing data the asn module reads.
+  - id: candidate-look
+    title: Candidates are waiting for a first look
+    when: [candidates]
+    steps:
+      - "Look at each candidate once and passively, through its DNS, registration and certificate records."
+      - "Follow nothing a candidate points at; names found through a candidate are only recorded."
+    prefer: [dns, rdap, crtsh]
+    source: "https://www.rfc-editor.org/rfc/rfc1034"
+    verified: false
+    note: Procedure written for Scrutator; RFC 1034 describes the name system the lookups use.
+  - id: spf-senders
+    title: An SPF record names other senders
+    when: [spf_includes]
+    steps:
+      - "An include names a sender the organisation authorises; look up that name's own records, since an unmaintained include can be taken over."
+    prefer: [dns]
+    source: "https://www.rfc-editor.org/rfc/rfc7208"
+    verified: false
+    note: Procedure written for Scrutator; RFC 7208 defines SPF.

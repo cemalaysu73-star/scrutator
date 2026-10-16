@@ -8,13 +8,16 @@ from scrutator.packs.loader import (
     load_packs,
     validate_dir,
 )
-from scrutator.packs.schema import KINDS, ProviderEntry, SignalEntry, TakeoverEntry
+from scrutator.packs.schema import ALL_KINDS, KINDS, SITUATIONS, PlaybookEntry, ProviderEntry, SignalEntry, TakeoverEntry
 
 __all__ = [
+    "ALL_KINDS",
     "KINDS",
     "PackError",
     "PackSet",
+    "PlaybookEntry",
     "ProviderEntry",
+    "SITUATIONS",
     "SignalEntry",
     "TakeoverEntry",
     "build_manifest",

@@ -70,7 +70,7 @@ def test_bad_signal_entries_are_rejected(bad):
 
 def test_file_level_problems_are_reported_by_name():
     with pytest.raises(PackError, match="kind must be one of"):
-        parse({"schema": 1, "kind": "playbooks", "version": "2026.10.1", "updated": "2026-10-16", "entries": []})
+        parse({"schema": 1, "kind": "recipes", "version": "2026.10.1", "updated": "2026-10-16", "entries": []})
     with pytest.raises(PackError, match="version"):
         parse(document("providers", [provider()], version="v1"))
     with pytest.raises(PackError, match="schema"):
