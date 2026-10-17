@@ -11,3 +11,5 @@ design/
 keys/
 out/
 *.scrutator
+live*/
+*-scan.log
