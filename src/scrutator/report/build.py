@@ -5,6 +5,7 @@ from typing import Any
 
 from scrutator import __version__
 from scrutator.attribution import attribute
+from scrutator.exposure import exposure
 from scrutator.findings import build_findings
 from scrutator.packs import PackSet, load_packs
 from scrutator.risk.engine import analyze
@@ -167,6 +168,7 @@ def build_report(
     report["risks"] = analysis["risks"]
     report["dependencies"] = analysis["dependencies"]
     report["summary"]["risks"] = len(analysis["risks"])
+    report["exposure"] = exposure(report)
     report["attribution"] = attribute(report, packs)
     report["summary"]["leads"] = len(report["leads"]["verified"])
     report["summary"]["candidates"] = sum(1 for c in report["attribution"]["candidates"] if c["band"] != "unlikely")

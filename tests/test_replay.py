@@ -43,7 +43,7 @@ def test_parse_request_refuses_everything_else(request_text):
 def test_allowlist_is_exactly_the_sources_the_modules_use():
     assert ALLOWED_HTTP_HOSTS == {
         "crt.sh", "rdap.org", "stat.ripe.net", "web.archive.org", "index.commoncrawl.org", "api.certspotter.com",
-        "api.hackertarget.com", "api.subdomain.center", "urlscan.io", "api.mnemonic.no",
+        "api.hackertarget.com", "api.subdomain.center", "urlscan.io", "api.mnemonic.no", "internetdb.shodan.io",
     }
 
 

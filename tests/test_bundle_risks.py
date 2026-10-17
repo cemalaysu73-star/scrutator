@@ -8,7 +8,7 @@ from scrutator.bundle import verify as verify_module
 from scrutator.bundle.reader import read_raw
 from scrutator.bundle.verify import verify_bundle
 from scrutator.packs import PackSet, load_packs
-from scrutator.risk.engine import analyze
+from scrutator.risk.engine import RULESET_VERSION, analyze
 
 
 def check(report, name):
@@ -32,7 +32,7 @@ def test_a_genuine_bundle_carries_risks_and_passes_every_check(tmp_path):
     assert [r["rule_id"] for r in data["risks"]] == ["dangling-cname-claimable", "spf-allows-all", "ghost-hostname"]
     manifest = json.loads(read_raw(fx.path).files["manifest.json"])
     analysis = manifest["analysis"]
-    assert analysis["ruleset"] == 1 and analysis["risks"] == 3
+    assert analysis["ruleset"] == RULESET_VERSION and analysis["risks"] == 3
     assert analysis["effective_sha256"] == data["packs"]["effective_sha256"]
     assert {p["name"] for p in analysis["packs"]} == {"providers.yaml", "takeover.yaml", "signals.yaml", "playbooks.yaml"}
     assert len(report.warnings) == 1 and "not pinned" in report.warnings[0]

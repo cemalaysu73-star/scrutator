@@ -19,7 +19,7 @@ from scrutator.scope import ScopePolicy
 _DNS = re.compile(r"DNS (A|AAAA|CNAME|MX|NS|TXT|CAA) (\S+)")
 _RDAP_DOMAIN = re.compile(r"GET https://rdap\.org/domain/(\S+)")
 _NAMING_RELS = frozenset({"has_subdomain", "related_host"})
-NAMING_SOURCES = frozenset({"crtsh", "wayback", "commoncrawl"})
+NAMING_SOURCES = frozenset({"crtsh", "certspotter", "wayback", "commoncrawl"})
 _QUOTED = re.compile(r'"((?:[^"\\]|\\.)*)"')
 
 

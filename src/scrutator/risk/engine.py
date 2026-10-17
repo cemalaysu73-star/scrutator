@@ -12,10 +12,11 @@ from scrutator.risk.analyst import ANALYST_RULES
 from scrutator.risk.concentration import concentration_risks
 from scrutator.risk.dependency import build_dependency_map
 from scrutator.risk.hygiene import HYGIENE_RULES
+from scrutator.risk.services import exposed_services
 from scrutator.risk.model import Risk
 from scrutator.risk.view import View
 
-RULESET_VERSION = 1
+RULESET_VERSION = 2  # 2: exposed-risky-service; certspotter counts as a certificate source
 
 
 def analyze(report: dict, packs: PackSet | None = None) -> dict:
@@ -27,6 +28,7 @@ def analyze(report: dict, packs: PackSet | None = None) -> dict:
     for rule in HYGIENE_RULES:
         risks.extend(rule(view))
     risks.extend(concentration_risks(view, deps))
+    risks.extend(exposed_services(report))
     for rule in ANALYST_RULES:
         risks.extend(rule(view))
     risks.sort(key=lambda r: (*r.sort_key, r.fingerprint))

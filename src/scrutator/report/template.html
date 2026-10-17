@@ -252,6 +252,25 @@ function renderDependencies() {
   section("risks", "Provider dependencies", el("div", {}, el("p", {className: "muted", textContent: "Which third parties stand behind the in-scope names, recognised from the knowledge packs."}), table));
 }
 
+function renderExposure() {
+  const rows = D.exposure || [];
+  if (!rows.length) return;
+  const table = el("table", {}, el("thead", {}, el("tr", {}, ...["Address", "Open ports (Shodan)", "Products", "CVEs listed", "Network", "Abuse contact", "Evidence"].map(t => el("th", {textContent: t})))));
+  const body = el("tbody");
+  for (const r of rows) {
+    body.append(el("tr", {},
+      el("td", {textContent: `${r.ip} (${r.state})`}),
+      el("td", {textContent: r.ports.join(", ")}),
+      el("td", {textContent: r.cpes.join(", ")}),
+      el("td", {textContent: r.vulns.join(", ")}),
+      el("td", {textContent: [r.netname, r.country, r.description].filter(Boolean).join(" · ")}),
+      el("td", {textContent: r.abuse_contacts.join(", ")}),
+      el("td", {}, evidenceDetails(r.evidence_ids))));
+  }
+  table.append(body);
+  section("risks", "Exposure of the addresses (Shodan InternetDB and RIPEstat)", el("div", {}, el("p", {className: "muted", textContent: "What Shodan saw open on the addresses the in-scope names resolve to, an earlier scan by Shodan and not a check made now; CVE ids are Shodan's guesses from product versions. Abuse contact and network name are from RIPEstat. Non-commercial data: see the README."}), table));
+}
+
 function renderFindings() {
   const table = el("table", {}, el("tr", {}, el("th", {textContent: "Claim"}), el("th", {textContent: "Confidence"}), el("th", {textContent: "Evidence"})));
   for (const f of D.findings) {
@@ -356,6 +375,7 @@ renderNarrative();
 renderSources();
 renderRisks();
 renderDependencies();
+renderExposure();
 renderAttribution();
 renderAnalystLeads();
 renderFindings();

@@ -10,11 +10,17 @@ class Asn(Module):
     name = "asn"
     accepts = frozenset({EntityType.IP})
     priority = 20
-    concurrency = 4  # RIPEstat allows 8 at a time per client
+    concurrency = 4  # RIPEstat allows 8 at a time per client, shared with the ripestat module
+    rate_group = "ripestat"
+    licence_note = (
+        "RIPEstat's terms allow non-commercial use only, forbid redistributing its data without permission and "
+        "ask you to credit RIPE NCC and the original source. Bundles that embed RIPEstat responses inherit this."
+    )
 
     async def run(self, entity: Entity, ctx: ModuleContext) -> list[Observation]:
         resp = await ctx.http.get(
-            "https://stat.ripe.net/data/prefix-overview/data.json", params={"resource": entity.value}
+            "https://stat.ripe.net/data/prefix-overview/data.json",
+            params={"resource": entity.value, "sourceapp": "scrutator"},
         )
         if resp.status_code != 200:
             raise http_failure("ripestat", resp.status_code)

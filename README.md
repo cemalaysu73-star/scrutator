@@ -60,7 +60,8 @@ source in a commercial engagement.
 | mnemonic passive DNS (`api.mnemonic.no`) | DNS history of the apex with first and last seen: old addresses, name servers, mail servers, aliases | TLP:white rows; terms of use could not be retrieved, so best effort. It answers for one exact name and cannot list subdomains. History is recorded under its own relations and is never scanned. |
 | DNS | A, AAAA, CNAME, MX, NS, TXT, CAA, with NXDOMAIN/NODATA as evidence | Your resolver. |
 | RDAP (`rdap.org`) | Registrar, name servers, network owner | Public redirector to the registries' RDAP servers. |
-| RIPEstat | IP to ASN | RIPE NCC terms: non-commercial use, no redistribution of the data without permission, credit RIPE NCC and the original source. Bundles that embed RIPEstat responses inherit this. |
+| RIPEstat (`stat.ripe.net`) | IP to ASN, the abuse contact and the network name, description and country of an address | RIPE NCC terms: non-commercial use, no redistribution of the data without permission, credit RIPE NCC and the original source. Requests identify the application (`sourceapp=scrutator`). Bundles that embed RIPEstat responses inherit this. |
+| Shodan InternetDB (`internetdb.shodan.io`) | For in-scope and linked addresses only: open ports, product names (CPE), CVE ids Shodan associates with them, host names it has seen | **Free for non-commercial use only**; revenue-generating use needs a Shodan enterprise licence. It is Shodan's earlier scan, nothing is sent to the address. Bundles that embed its data inherit this. |
 | Wayback Machine | Hostnames seen in the Internet Archive | Public CDX API; fair use. |
 | Common Crawl | Hostnames seen in the latest crawl | Public index; fair use. |
 
@@ -137,6 +138,7 @@ to its raw evidence.
 | `dmarc-monitoring-only` | low | A DMARC record with `p=none`. |
 | `caa-missing` | low | A zone apex whose CAA lookup returned nothing, and no parent zone has CAA. |
 | `domain-expired`, `domain-expiring` | high; medium or high | The RDAP expiration is past, or within 30 days (14 days is high), measured against the time the data was **collected**, not today. |
+| `exposed-risky-service` | medium (low confidence) | Shodan InternetDB lists a database, remote-desktop, file-share or cache port (Redis 6379, SMB 445, RDP 3389, ...) open on an address the in-scope names resolve to. It is Shodan's earlier scan, not a check made now. |
 | `forgotten-name` | low | A name with a label such as `dev`, `staging`, `test`, `old`, `backup` that still resolves. A heuristic, low confidence. |
 | `concentration-dns`, `concentration-edge` | info (low from ten names) | Every name server of every zone belongs to one provider; three or more names sit behind one CDN or host. Silent unless every host is recognised. |
 | `ghost-hostname` (analyst) | info | A certificate or archive names an in-scope host and DNS says NXDOMAIN. |

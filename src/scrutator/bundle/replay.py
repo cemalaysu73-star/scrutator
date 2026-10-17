@@ -26,6 +26,7 @@ ALLOWED_HTTP_HOSTS = frozenset(
         "api.subdomain.center",
         "urlscan.io",
         "api.mnemonic.no",
+        "internetdb.shodan.io",
     }
 )
 _DNS = re.compile(r"DNS (A|AAAA|CNAME|MX|NS|TXT|CAA) (\S+)")

@@ -37,6 +37,7 @@ PLANTED = {
     ("domain-expired", "domain:example.net"),
     ("forgotten-name", "domain:dev.example.com"),
     ("concentration-dns", "domain:example.com"),
+    ("exposed-risky-service", "ip:192.0.2.50"),
     ("ghost-hostname", "domain:ghost.example.com"),
     ("numbering-gap", "domain:app1.example.com"),
     ("source-disagreement", "domain:example.com"),
@@ -128,7 +129,7 @@ def stamp(moment):
     return moment.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def mock_sources(router, *, expiry_com, expiry_net=None, rdap_com_servers=("NS1.DNS.EXAMPLE.NET",), names=(), archived=()):
+def mock_sources(router, *, expiry_com, expiry_net=None, rdap_com_servers=("NS1.DNS.EXAMPLE.NET",), names=(), archived=(), exposed=None):
     """Answer every source the built-in modules ask, the way the real ones do."""
     now = datetime.now(timezone.utc)
     rows = [
@@ -160,6 +161,22 @@ def mock_sources(router, *, expiry_com, expiry_net=None, rdap_com_servers=("NS1.
     def ripe(request):
         return httpx.Response(200, json={"data": {"asns": [{"asn": 64500, "holder": "EXAMPLE-EDGE"}]}})
 
+    def internetdb(request):
+        ip = request.url.path.lstrip("/")
+        if exposed and ip == exposed[0]:
+            return httpx.Response(200, json={"ip": ip, "ports": exposed[1], "cpes": [], "vulns": [], "hostnames": [], "tags": []})
+        return httpx.Response(404, json={"detail": "No information available"})
+
+    # the other sources have nothing to add in the lab
+    router.get("https://api.certspotter.com/v1/issuances").mock(return_value=httpx.Response(200, json=[]))
+    router.get("https://api.hackertarget.com/hostsearch/").mock(return_value=httpx.Response(200, text="No records found"))
+    router.get("https://api.subdomain.center/").mock(return_value=httpx.Response(200, json=[]))
+    router.get("https://urlscan.io/api/v1/search/").mock(return_value=httpx.Response(200, json={"results": []}))
+    router.get(url__regex=r"https://api\.mnemonic\.no/pdns/v3/.*").mock(return_value=httpx.Response(200, json={"responseCode": 200, "count": 0, "data": []}))
+    router.get(url__regex=r"https://stat\.ripe\.net/data/(abuse-contact-finder|whois)/data\.json.*").mock(
+        return_value=httpx.Response(404)
+    )
+    router.get(url__regex=r"https://internetdb\.shodan\.io/.*").mock(side_effect=internetdb)
     router.get("https://crt.sh/").mock(side_effect=crt)
     router.get(url__regex=r"https://rdap\.org/domain/.*").mock(side_effect=rdap)
     router.get(url__regex=r"https://rdap\.org/ip/.*").mock(return_value=httpx.Response(404))
@@ -198,6 +215,7 @@ def lab_sources(router):
             "neutral", "soft", "noall", "multi", "bulk", "sales", "oldmail",
         )],
         archived=["ghost.example.com"],
+        exposed=("192.0.2.50", [80, 443, 6379]),
     )
 
 

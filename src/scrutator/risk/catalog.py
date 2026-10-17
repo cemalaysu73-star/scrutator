@@ -117,6 +117,12 @@ _RULES = [
         "Confirm the system is still needed and maintained; otherwise remove the DNS record and the system.",
     ),
     _rule(
+        "exposed-risky-service", "risk", "medium",
+        "A database, remote-administration or file-sharing port is open to the internet",
+        "Shodan's InternetDB lists an open port on an address of the scan that is usually not meant to be reachable from the whole internet (a database, a remote desktop or shell, a file share, a cache). The data is Shodan's earlier scan, not a check made now, so it may be out of date.",
+        "Confirm with the owner whether the port is open now; if it is, close it at the firewall or restrict it to known addresses, and require authentication.",
+    ),
+    _rule(
         "concentration-dns", "risk", "info",
         "All names depend on one DNS provider",
         "Every name server of every zone belongs to a single provider, so an outage or compromise there affects all of the names.",
