@@ -5,6 +5,7 @@ from scrutator.model import Entity, EntityType, Evidence
 from scrutator.modules._names import host_entity, usable_org
 from scrutator.modules.base import Fact, Module, ModuleContext, ModuleError, Observation, http_failure
 from scrutator.modules.registry import register
+from scrutator.pacing import Pacer
 
 
 def _vcard_value(entity: dict, properties: tuple[str, ...] = ("fn",)) -> str | None:
@@ -71,6 +72,8 @@ class Rdap(Module):
         kind = "ip" if entity.type is EntityType.IP else "domain"
         networks: list = ctx.cache.setdefault("rdap-networks", [])
         url = f"https://rdap.org/{kind}/{entity.value}"
+        # rdap.org refuses a burst of more than about ten requests (HTTP 429, retry after ~10 s): eight at once, then one a second
+        await ctx.cache.setdefault("rdap-pace", Pacer(burst=8, per_second=1.0)).take()
         resp = await ctx.http.get(url)
         if resp.status_code == 404:
             return []

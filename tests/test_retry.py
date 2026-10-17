@@ -99,4 +99,4 @@ async def test_the_scan_context_gives_up_on_long_waits():
     from scrutator.context import GIVE_UP_AFTER_S, open_context
 
     async with open_context() as ctx:
-        assert ctx.http._transport.give_up_after == GIVE_UP_AFTER_S == 8.0
+        assert ctx.http._transport.give_up_after == GIVE_UP_AFTER_S == 12.0

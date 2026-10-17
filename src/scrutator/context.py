@@ -8,7 +8,7 @@ from scrutator.modules.base import ModuleContext
 from scrutator.resolver import DnsResolver
 from scrutator.retry import RetryingTransport
 
-GIVE_UP_AFTER_S = 8.0  # a source asking for a longer wait than this is not waited for (see RetryingTransport)
+GIVE_UP_AFTER_S = 12.0  # a source asking for a longer wait than this is not waited for (see RetryingTransport)
 
 
 @asynccontextmanager

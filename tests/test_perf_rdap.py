@@ -123,3 +123,62 @@ async def test_addresses_in_different_ranges_are_not_held_up_by_each_other(http)
         begun = time.monotonic()
         await asyncio.gather(*(Rdap().run(ip(f"10.{n}.0.1"), ctx) for n in range(1, 7)))
     assert time.monotonic() - begun < 0.6  # six lookups in parallel, not 1.2 s one after the other
+
+
+# ------------------------------------------------------------------------------------------ pacing
+
+
+async def test_a_pacer_lets_a_burst_through_then_spaces_the_rest():
+    from scrutator.pacing import Pacer
+
+    now = [0.0]
+    slept = []
+
+    async def sleep(seconds):
+        slept.append(seconds)
+        now[0] += seconds
+
+    pacer = Pacer(burst=3, per_second=2.0, clock=lambda: now[0], sleep=sleep)
+    for _ in range(10):
+        await pacer.take()
+    assert slept and abs(sum(slept) - 3.5) < 1e-6  # three free, then seven at two a second
+    assert abs(now[0] - 3.5) < 1e-6
+
+
+async def test_a_pacer_that_has_rested_allows_a_new_burst():
+    from scrutator.pacing import Pacer
+
+    now = [0.0]
+
+    async def sleep(seconds):
+        now[0] += seconds
+
+    pacer = Pacer(burst=2, per_second=1.0, clock=lambda: now[0], sleep=sleep)
+    for _ in range(4):
+        await pacer.take()
+    start = now[0]
+    now[0] += 10.0  # a quiet spell refills the bucket, but never beyond the burst
+    for _ in range(2):
+        await pacer.take()
+    assert now[0] == start + 10.0
+
+
+async def test_every_rdap_request_waits_for_the_pacer(http):
+    taken = []
+
+    class Counting:
+        async def take(self):
+            taken.append(1)
+
+    ctx = ModuleContext(http=http, resolver=None)
+    ctx.cache["rdap-pace"] = Counting()
+    with respx.mock(assert_all_called=False) as router:
+        router.get(url__regex=r"https://rdap.org/ip/.*").mock(
+            side_effect=lambda request: httpx.Response(200, json=network(*(["10.%s.0.0" % request.url.path.split(".")[1], "10.%s.255.255" % request.url.path.split(".")[1]])))
+        )
+        router.get("https://rdap.org/domain/example.com").mock(return_value=httpx.Response(404))
+        for n in (1, 2, 3):
+            await Rdap().run(ip(f"10.{n}.0.7"), ctx)
+        await Rdap().run(Entity(type=EntityType.DOMAIN, value="example.com"), ctx)
+        await Rdap().run(ip("10.1.0.99"), ctx)  # inside a network already known: no request, no wait
+    assert len(taken) == 4
