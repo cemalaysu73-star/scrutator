@@ -31,6 +31,7 @@ from scrutator.bundle.verify import verify_bundle
 from scrutator.bundle.writer import create_bundle
 from scrutator.context import ai_client, open_context
 from scrutator.diff import diff_reports, render_diff
+from scrutator.mcp_tools import ToolSet
 from scrutator.model import Entity, EntityType
 from scrutator.packs import PackError, build_manifest, load_packs, validate_dir
 from scrutator.report import build_report, render_html, render_json
@@ -621,6 +622,30 @@ def promote_cmd(
         store.close()
     typer.echo(f"Promoted {entity_id} at {record['at']}; recorded in the audit log of scan #{chosen}.")
     typer.echo(f"{scope_file} now lists it (the previous file is kept as {scope_file.name}.bak). Scan again to investigate it fully.")
+
+
+@app.command("mcp")
+def mcp_cmd(
+    db: Path = typer.Option(Path("scrutator-out/scrutator.db"), "--db", help="SQLite database the tools read (and, with --allow-scan, write)."),
+    scope_file: Optional[Path] = typer.Option(None, "--scope", help="The scope file. Needed by --allow-scan and --allow-promote; it alone defines what may be investigated."),
+    allow_scan: bool = typer.Option(False, "--allow-scan", help="Also offer the passive `scan` tool, inside the scope file."),
+    allow_promote: bool = typer.Option(False, "--allow-promote", help="Also offer `promote_candidate`, which edits the scope file when called with confirm=true."),
+) -> None:
+    """Serve Scrutator to an MCP client such as Claude Desktop over stdio. Read-only tools by default."""
+    if (allow_scan or allow_promote) and scope_file is None:
+        raise _fail("--allow-scan and --allow-promote need --scope: the scope file is what keeps a client inside what you allowed")
+    if scope_file is not None:
+        try:
+            ScopePolicy.from_file(scope_file)
+        except (OSError, ValueError) as exc:
+            raise _fail(f"cannot load scope: {exc}") from exc
+    tools = ToolSet(db, scope_file=scope_file, allow_scan=allow_scan, allow_promote=allow_promote)
+    try:
+        from scrutator.mcp_server import serve
+
+        serve(tools)
+    except ImportError as exc:
+        raise _fail("the MCP SDK is not installed: run `pip install \"scrutator[mcp]\"`") from exc
 
 
 @packs_app.command("list")
