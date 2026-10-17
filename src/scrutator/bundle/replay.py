@@ -2,6 +2,7 @@ import asyncio
 import json
 import re
 from dataclasses import dataclass
+from functools import lru_cache
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -21,6 +22,10 @@ ALLOWED_HTTP_HOSTS = frozenset(
         "web.archive.org",
         "index.commoncrawl.org",
         "api.certspotter.com",
+        "api.hackertarget.com",
+        "api.subdomain.center",
+        "urlscan.io",
+        "api.mnemonic.no",
     }
 )
 _DNS = re.compile(r"DNS (A|AAAA|CNAME|MX|NS|TXT|CAA) (\S+)")
@@ -71,6 +76,7 @@ def parse_request(request: str) -> tuple[str, ...] | None:
     return None
 
 
+@lru_cache(maxsize=8)
 def _loads_any(text: str) -> Any:
     """A JSON document, or newline-delimited JSON as a list, or None."""
     try:
@@ -101,26 +107,52 @@ def _denoise(value: Any) -> Any:
     return value
 
 
+# Counters and clocks that move on every call for a record that is still true: a passive-DNS row
+# that was seen again has a later "last seen" and a higher count. They are kept in the evidence as
+# information, but a replay does not read their change as the fact having changed.
+_ROW_VOLATILE = frozenset({"lastSeenTimestamp", "lastUpdatedTimestamp", "times"})
+
+
 def _members(value: Any) -> list[Any]:
-    """The elements of a live response plus the members of its rows, so a recorded URL string
-    matches a live row such as ["http://..."] (Wayback) or {"url": "http://..."} (Common Crawl)."""
-    items = value if isinstance(value, list) else [value]
+    """Every node of a live response, at any depth, so a recorded URL string matches a live row such
+    as ["http://..."] (Wayback) or {"url": "http://..."} (Common Crawl), and a recorded slice of a
+    nested row (urlscan, passive DNS) matches the row inside the envelope it came in."""
     found: list[Any] = []
-    for item in items:
-        found.append(item)
-        if isinstance(item, list):
-            found.extend(item)
-        elif isinstance(item, dict):
-            found.extend(item.values())
+
+    def walk(node: Any) -> None:
+        found.append(node)
+        if isinstance(node, list):
+            for item in node:
+                walk(item)
+        elif isinstance(node, dict):
+            for item in node.values():
+                walk(item)
+
+    walk(value)
     return found
+
+
+@lru_cache(maxsize=8)
+def _live_members(text: str) -> list[Any]:
+    """The nodes of one live response, computed once however many records are checked against it."""
+    return _members(_loads_any(text))
+
+
+def _subset(recorded: Any, live: Any) -> bool:
+    """Is everything the evidence says still in this live node? A recorded dict is a slice: its keys
+    must be present with the same values (nested slices recursively); extra live keys are fine."""
+    if isinstance(recorded, dict):
+        return isinstance(live, dict) and all(
+            k in live and _subset(v, live[k]) for k, v in recorded.items() if k not in _ROW_VOLATILE
+        )
+    if isinstance(recorded, list):
+        return isinstance(live, list) and all(any(_subset(r, item) for item in live) for r in recorded)
+    return recorded == live
 
 
 def _contains(recorded: Any, live: list[Any]) -> bool:
     if isinstance(recorded, dict):
-        return any(
-            isinstance(row, dict) and all(k in row and row[k] == v for k, v in recorded.items())
-            for row in live
-        )
+        return any(_subset(recorded, row) for row in live if isinstance(row, dict))
     return recorded in live
 
 
@@ -141,7 +173,7 @@ def supports(old: str, new: str) -> bool:
     if isinstance(old_json, list):
         if not old_json:
             return new_json == old_json
-        live = _members(new_json)
+        live = _live_members(new)
         return all(_contains(item, live) for item in old_json)
     return old_json == new_json
 
@@ -156,6 +188,17 @@ async def replay_evidence(
     """Re-issue each replayable request and say whether the source still supports the
     recorded evidence. Drift is information, not failure: sources change and go down."""
     semaphore = asyncio.Semaphore(concurrency)
+    fetches: dict[str, asyncio.Future] = {}  # url -> (status, text): each distinct request is sent once
+
+    async def fetch(url: str) -> tuple[int, str]:
+        if url not in fetches:
+            async def get() -> tuple[int, str]:
+                async with semaphore:
+                    response = await http.get(url)
+                return response.status_code, response.text
+
+            fetches[url] = asyncio.ensure_future(get())
+        return await fetches[url]
 
     async def one(rec: dict) -> ReplayResult:
         def result(status: str, detail: str = "") -> ReplayResult:
@@ -164,18 +207,18 @@ async def replay_evidence(
         parsed = parse_request(rec["request"])
         if parsed is None:
             return result("skipped", "request is not replayable")
-        async with semaphore:
-            try:
-                if parsed[0] == "http":
-                    response = await http.get(parsed[1])
-                    if response.status_code != 200:
-                        return result("unavailable", f"HTTP {response.status_code}")
-                    same = supports(rec["payload"], response.text)
-                else:
+        try:
+            if parsed[0] == "http":
+                status, text = await fetch(parsed[1])
+                if status != 200:
+                    return result("unavailable", f"HTTP {status}")
+                same = supports(rec["payload"], text)
+            else:
+                async with semaphore:
                     answer = await lookup_status(resolver, parsed[2], parsed[1])
-                    same = _same_dns(rec["payload"], answer.payload())
-            except Exception as exc:  # noqa: BLE001 - a source being down is a result, not a crash
-                return result("unavailable", type(exc).__name__)
+                same = _same_dns(rec["payload"], answer.payload())
+        except Exception as exc:  # noqa: BLE001 - a source being down is a result, not a crash
+            return result("unavailable", type(exc).__name__)
         return result("unchanged" if same else "changed")
 
     return list(await asyncio.gather(*(one(rec) for rec in records)))

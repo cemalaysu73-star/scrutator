@@ -4,7 +4,8 @@ import ipaddress
 from collections.abc import Iterable
 from urllib.parse import urlsplit
 
-from scrutator.model import Entity, EntityType
+from scrutator.model import Entity, EntityType, Evidence
+from scrutator.modules.base import Observation
 
 
 def rel_for(root: str, name: str) -> str:
@@ -22,6 +23,32 @@ def host_entity(raw: str) -> Entity | None:
         return Entity(type=EntityType.DOMAIN, value=raw)
     except ValueError:
         return None
+
+
+def under(root: str, name: str) -> bool:
+    return name.endswith("." + root)
+
+
+def name_observations(
+    source: str, request: str, root: str, payloads: dict[str, str], *, only_under: bool = True
+) -> list[Observation]:
+    """One observation per hostname, each with its own small evidence record (`payloads` maps the
+    hostname to the slice of the source's answer that names it). Names that are not hostnames, the
+    root itself and, unless asked otherwise, names outside the root are dropped."""
+    seen: dict[str, str] = {}
+    for raw, payload in payloads.items():
+        found = host_entity(raw.strip().lower().removeprefix("*."))
+        if found is None or found.value == root or (only_under and not under(root, found.value)):
+            continue
+        seen.setdefault(found.value, payload)
+    return [
+        Observation(
+            Entity(type=EntityType.DOMAIN, value=name),
+            rel_for(root, name),
+            Evidence.create(source, request, payload),
+        )
+        for name, payload in sorted(seen.items())
+    ]
 
 
 def hosts_from_urls(urls: Iterable[str], *, root: str, max_samples: int = 5) -> dict[str, list[str]]:

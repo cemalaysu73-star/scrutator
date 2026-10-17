@@ -43,6 +43,7 @@ def test_parse_request_refuses_everything_else(request_text):
 def test_allowlist_is_exactly_the_sources_the_modules_use():
     assert ALLOWED_HTTP_HOSTS == {
         "crt.sh", "rdap.org", "stat.ripe.net", "web.archive.org", "index.commoncrawl.org", "api.certspotter.com",
+        "api.hackertarget.com", "api.subdomain.center", "urlscan.io", "api.mnemonic.no",
     }
 
 
@@ -118,3 +119,23 @@ async def test_hostile_requests_are_skipped_and_never_sent(http):
         assert not router.calls
     assert [r.status for r in results] == ["skipped"] * 3
     assert resolver.calls == []
+
+
+async def test_one_request_shared_by_many_records_is_sent_once(http):
+    """A name-listing source stores one evidence record per name, all with the same request. Replaying
+    them must not send that request once per name (hundreds of identical calls to a free service)."""
+    body = '["a.example.com", "b.example.com", "c.example.com"]'
+    records = [record("GET https://api.subdomain.center/?domain=example.com", f'["{n}.example.com"]', source="subdomaincenter") for n in "abcx"]
+    with respx.mock() as router:
+        route = router.get("https://api.subdomain.center/").mock(return_value=httpx.Response(200, text=body))
+        results = await replay_evidence(records, http, Resolver())
+    assert route.call_count == 1
+    assert [r.status for r in results] == ["unchanged", "unchanged", "unchanged", "changed"]
+
+
+async def test_a_failed_request_is_not_retried_for_every_record_that_shares_it(http):
+    records = [record("GET https://crt.sh/z", "[]") for _ in range(5)]
+    with respx.mock() as router:
+        route = router.get("https://crt.sh/z").mock(return_value=httpx.Response(502))
+        results = await replay_evidence(records, http, Resolver())
+    assert route.call_count == 1 and {r.status for r in results} == {"unavailable"}

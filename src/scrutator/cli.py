@@ -141,7 +141,7 @@ def scan(
     db: Optional[Path] = typer.Option(None, "--db", help="SQLite database path (default: <out>/scrutator.db)."),
     formats: str = typer.Option("json,html", "--format", help="Comma-separated: json, html."),
     max_entities: int = typer.Option(5000, "--max-entities", help="Soft cap on discovered entities."),
-    max_steps: Optional[int] = typer.Option(None, "--max-steps", help="Cap on module runs (default: config, 300)."),
+    max_steps: Optional[int] = typer.Option(None, "--max-steps", help="Cap on module runs (default: config, 1000)."),
     ai: str = typer.Option("auto", "--ai", help="auto, off, local, cloud or hybrid."),
     model: Optional[str] = typer.Option(None, "--model", help="Model name for every AI role."),
     redact: Optional[bool] = typer.Option(None, "--redact/--no-redact", help="Pseudonymise prompts sent to cloud endpoints."),

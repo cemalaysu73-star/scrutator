@@ -32,7 +32,8 @@ scrutator scan example.com
 
 This writes `scrutator-out/report.html` (open it in a browser), `report.json` and
 `scrutator.db`. Sources: certificate transparency (crt.sh and CertSpotter), DNS, RDAP, ASN
-(RIPEstat), Internet Archive and Common Crawl (see [Sources and their terms](#sources-and-their-terms)).
+(RIPEstat), Internet Archive, Common Crawl, passive DNS (mnemonic) and three name aggregators
+(Subdomain Center, HackerTarget, urlscan.io); see [Sources and their terms](#sources-and-their-terms).
 No API keys needed. Transient source failures are retried with backoff; any that still fail are
 listed under **Source coverage** in the report, so a missing result is never mistaken for a negative one.
 
@@ -53,11 +54,24 @@ source in a commercial engagement.
 |---|---|---|
 | crt.sh | Certificate Transparency names | Public service of Sectigo; no stated limit; often slow or 502. |
 | CertSpotter (`api.certspotter.com`) | Second CT view: names, issuer, key hash, revocation | Unauthenticated API is for personal or evaluation use; production needs an SSLMate account; the free tier may change at any time. At most 2 pages per scan. |
+| Subdomain Center (`api.subdomain.center`) | Names from web crawling, real-time CT ingestion and correlation, **including names that do not resolve** | Terms grant a limited licence for personal, non-commercial use. Free anonymous tier: up to 500 names per query, random order. Its names are one source's claim until DNS or a certificate agrees. |
+| HackerTarget (`api.hackertarget.com`, `hostsearch`) | Hostnames and addresses from its DNS data | Free API: 50 calls per day per IP address (shared with everything else you run from it), 2 per second, 500 lines. One call per scan; a used-up quota is reported as the source being unavailable, never as "no names". |
+| urlscan.io (search) | Hostnames it has scanned under the domain, with the IP, ASN, server and status that served them on a date | Anonymous search: 30 requests per minute; scans are submitted by third parties, so only metadata is kept (no screenshots, titles or page content). One call per scan. |
+| mnemonic passive DNS (`api.mnemonic.no`) | DNS history of the apex with first and last seen: old addresses, name servers, mail servers, aliases | TLP:white rows; terms of use could not be retrieved, so best effort. It answers for one exact name and cannot list subdomains. History is recorded under its own relations and is never scanned. |
 | DNS | A, AAAA, CNAME, MX, NS, TXT, CAA, with NXDOMAIN/NODATA as evidence | Your resolver. |
 | RDAP (`rdap.org`) | Registrar, name servers, network owner | Public redirector to the registries' RDAP servers. |
 | RIPEstat | IP to ASN | RIPE NCC terms: non-commercial use, no redistribution of the data without permission, credit RIPE NCC and the original source. Bundles that embed RIPEstat responses inherit this. |
 | Wayback Machine | Hostnames seen in the Internet Archive | Public CDX API; fair use. |
 | Common Crawl | Hostnames seen in the latest crawl | Public index; fair use. |
+
+Looked at and **not** used: RapidDNS (its own pricing page gives anonymous users no API access and 100
+records, so scraping its pages goes beyond what it offers, and it does not say where its data comes from);
+BufferOver, Anubis, ThreatMiner and BGPView (dead, blocked or keyed when probed on 2026-10-17, see
+`docs/superpowers/research/2026-10-17-v06-keyless-sources.md`).
+
+Sources that list names (crt.sh, CertSpotter, Subdomain Center, HackerTarget, urlscan, Wayback, Common
+Crawl) are asked once per scan, about the apex. Replay (`scrutator verify --replay`) contacts only the hosts
+in this table and the RIR RDAP servers `rdap.org` redirects to.
 
 ### Scope
 
@@ -414,7 +428,7 @@ is validated against a schema, with repair attempts and a deterministic fallback
 [ai]
 mode = "auto"        # auto | off | local | cloud | hybrid
 redact = false
-max_steps = 300
+max_steps = 1000
 
 [ai.planner]
 provider = "ollama"  # ollama | openai (any OpenAI-compatible server) | anthropic

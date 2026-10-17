@@ -12,6 +12,10 @@ _REL_TEXT = {
     "announced_by": "is announced by",
     "registrar": "is registered via",
     "netblock_owner": "belongs to network owned by",
+    "historically_resolved_to": "was seen resolving to",
+    "historic_cname": "was seen as an alias (CNAME) of",
+    "historic_ns": "was seen using name server",
+    "historic_mx": "was seen using mail server",
 }
 
 

@@ -84,3 +84,22 @@ def test_the_mcp_tools_in_the_readme_are_the_tools_the_server_offers():
     offered = {name for name in ("list_candidates", "attribution", "risk", "verify_bundle", "scan", "promote_candidate") if hasattr(ToolSet, name)}
     documented = set(re.findall(r"^\| `(\w+)` \| (?:always|`--allow-\w+`) \|", README, re.M))
     assert documented == offered
+
+
+def test_every_source_with_terms_is_in_the_sources_table():
+    """A module that carries a licence note must be documented, with its host, in the README."""
+    import inspect
+    import re
+
+    from scrutator.modules.registry import load_builtin_modules
+
+    documented = 0
+    for module in load_builtin_modules():
+        if not module.licence_note:
+            continue
+        documented += 1
+        hosts = set(re.findall(r"https://([a-z0-9.-]+)", inspect.getsource(type(module))))
+        assert hosts, module.name
+        for host in hosts:
+            assert host in README, f"{module.name}: {host} is not in the README sources table"
+    assert documented >= 5

@@ -347,4 +347,4 @@ def test_registration_data_and_name_sources_are_asked_once_per_apex():
 def test_the_default_step_budget_covers_a_large_name_list():
     from scrutator.ai.config import AIConfig
 
-    assert AIConfig().max_steps == 300
+    assert AIConfig().max_steps == 1000
