@@ -13,3 +13,6 @@ out/
 *.scrutator
 live*/
 *-scan.log
+bench/work/
+bench/results/_*/
+bench/results/*-run[0-9]*/
