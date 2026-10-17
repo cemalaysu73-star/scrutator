@@ -402,6 +402,12 @@ def analyse_scrutator(ctx: "Ctx", report: dict, out: Path, target: str) -> dict:
             for name in names:
                 reported[name] = entity["state"]
 
+    claimed: dict[str, str] = {}
+    for row in report.get("names", []):  # v0.6+: Scrutator's own resolution state for every in-scope name
+        names, _ = normalise([row["name"]], target)
+        for name in names:
+            claimed[name] = row["state"]
+
     backed = strict = 0
     unbacked: list[str] = []
     for name in reported:
@@ -416,6 +422,7 @@ def analyse_scrutator(ctx: "Ctx", report: dict, out: Path, target: str) -> dict:
     info: dict = {
         "_reported": sorted(reported),
         "states": {s: sum(1 for v in reported.values() if v == s) for s in sorted(set(reported.values()))},
+        "name_states": claimed,
         "hostnames_reported": len(reported),
         "evidence_backed": backed,
         "evidence_backed_strict": strict,
@@ -559,6 +566,19 @@ def score(results: list[ToolResult], target: str, truth_kind: str, axfr: dict | 
             "unique": len(unique), "unique_live": len(unique & live),
             "dropped": dropped[r.tool], "notes": r.notes, "command": r.command,
         })
+    for r, row in zip(results, rows):
+        claim = r.extra.get("name_states") if r.tool == "Scrutator" else None
+        if claim:
+            marked = {n for n, state in claim.items() if state == "live" and n in found[r.tool]}
+            row["claims"] = {
+                "marked_live": len(marked),
+                "confirmed_live": len(marked & live),
+                "marked_live_but_not_live": sorted(marked - live)[:20],
+                "live_not_marked_live": sorted((found[r.tool] & live) - marked)[:20],
+                "by_state": {s: sum(1 for n, v in claim.items() if v == s and n in found[r.tool]) for s in ("live", "stale", "wildcard", "unresolved")},
+                "precision_of_marked_live": pct(len(marked & live), len(marked)),
+                "recall_of_marked_live": pct(len(marked & truth), len(truth)),
+            }
     return {
         "target": target, "truth_kind": truth_kind, "truth_label": truth_label, "truth_size": len(truth),
         "truth_hosts_size": len(truth_hosts), "wildcard_dns": sorted(wildcard), "rows": rows,
@@ -586,6 +606,14 @@ def render_tables(scored: list[dict], results: dict[str, list[ToolResult]], meta
                       "| Hostnames reported | Evidence-backed | Backed by evidence naming the host | Findings | Risks | Evidence records | Bundle verify (pinned, no replay) | Tamper detected | Sources failed |",
                       "|---:|---:|---:|---:|---:|---:|---|---|---|",
                       f"| {e.get('hostnames_reported')} | {pct(e.get('evidence_backed', 0), e.get('hostnames_reported', 0))} ({e.get('evidence_backed')}) | {pct(e.get('evidence_backed_strict', 0), e.get('hostnames_reported', 0))} ({e.get('evidence_backed_strict')}) | {e.get('findings')} | {e.get('risks')} | {e.get('evidence_records')} | {'PASS' if e.get('verify_passed') else 'FAIL' if 'verify_passed' in e else 'n/a'} | {e.get('tamper_detected')} | {', '.join(e.get('sources_failed', [])) or 'none'} |"]
+        scr_row = next((r for r in s["rows"] if r["tool"] == "Scrutator" and r.get("claims")), None)
+        if scr_row:
+            c = scr_row["claims"]
+            st = c["by_state"]
+            lines += ["", "Scrutator's own name states (v0.6), checked against this harness's resolver:", "",
+                      "| Marked live | Stale | Wildcard-covered | Unresolved | Marked live and live here | Marked live but not live here | Live here but not marked live | Precision of the live set | Recall of the live set |",
+                      "|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
+                      f"| {st['live']} | {st['stale']} | {st['wildcard']} | {st['unresolved']} | {c['confirmed_live']} | {len(c['marked_live_but_not_live'])}{'+' if len(c['marked_live_but_not_live']) >= 20 else ''} | {len(c['live_not_marked_live'])}{'+' if len(c['live_not_marked_live']) >= 20 else ''} | {c['precision_of_marked_live']} | {c['recall_of_marked_live']} |"]
         if s["missed_by_all"]:
             lines += ["", f"Zone names no tool found (first {len(s['missed_by_all'])}): " + ", ".join(f"`{n}`" for n in s["missed_by_all"])]
         lines.append("")

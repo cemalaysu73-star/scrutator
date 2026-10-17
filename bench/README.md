@@ -74,6 +74,11 @@ stale (NXDOMAIN/no address). Recall against the truth; precision (zone target: s
 zone; pseudo-truth targets: live share of the names that can be judged, i.e. excluding
 wildcard-covered); names unique to the tool (and unique live); wall time.
 
+Scrutator only (v0.6): its own resolution state for each name (live, stale, wildcard-covered,
+unresolved), cross-checked against the harness's resolver: names it marks live that are live here,
+names it marks live that are not, and live names it did not mark live. This is the check that
+Scrutator knows which of the names it reports are hosts.
+
 Scrutator only: share of reported hostnames backed by at least one evidence record cited by an edge,
 finding or risk; the stricter share where the cited evidence actually contains the hostname;
 findings; risks; evidence records; sources that failed; `scrutator verify --pin` on the bundle; a
@@ -88,6 +93,11 @@ of each tool, plus `scrutator.summary.json`. Full Scrutator reports and database
 `results/` are scratch and ignored.
 
 ## Caveats
+
+- Free public sources have per-IP quotas that this harness spends. HackerTarget allows 50 calls a day
+  per IP address, shared by Scrutator's `hackertarget` module and knockpy's `hackertarget` service,
+  and CertSpotter allows about ten unauthenticated calls: run the benchmark once a day from a given
+  address, and read the per-source failures Scrutator reports before comparing two runs.
 
 - The resolver view is a snapshot; names come and go between runs, so numbers move a little.
 - The public sources are rate-limited and sometimes down (Common Crawl and the Wayback Machine
