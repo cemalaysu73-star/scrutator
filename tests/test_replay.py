@@ -41,7 +41,24 @@ def test_parse_request_refuses_everything_else(request_text):
 
 
 def test_allowlist_is_exactly_the_sources_the_modules_use():
-    assert ALLOWED_HTTP_HOSTS == {"crt.sh", "rdap.org", "stat.ripe.net", "web.archive.org", "index.commoncrawl.org"}
+    assert ALLOWED_HTTP_HOSTS == {
+        "crt.sh", "rdap.org", "stat.ripe.net", "web.archive.org", "index.commoncrawl.org", "api.certspotter.com",
+    }
+
+
+def test_every_host_a_module_contacts_is_replayable_and_nothing_else_is():
+    """Read the modules' own source: a module added without an allowlist entry cannot be replayed,
+    and an entry no module uses is a hole a hostile bundle could use."""
+    import re
+    from pathlib import Path
+
+    import scrutator.modules as package
+
+    hosts = set()
+    for path in Path(package.__file__).parent.glob("*.py"):
+        hosts.update(re.findall(r"https://([a-z0-9.-]+)", path.read_text(encoding="utf-8")))
+    # the Common Crawl module gets its index URL from the collection list, not from a literal
+    assert hosts | {"index.commoncrawl.org"} == ALLOWED_HTTP_HOSTS
 
 
 class Resolver:

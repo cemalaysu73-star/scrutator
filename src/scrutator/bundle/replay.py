@@ -14,7 +14,14 @@ from scrutator.resolver import lookup_status
 # The hosts the built-in modules query. A bundle is untrusted input: replay may only ever
 # contact these, so a hostile bundle cannot turn a verifier into a request forwarder.
 ALLOWED_HTTP_HOSTS = frozenset(
-    {"crt.sh", "rdap.org", "stat.ripe.net", "web.archive.org", "index.commoncrawl.org"}
+    {
+        "crt.sh",
+        "rdap.org",
+        "stat.ripe.net",
+        "web.archive.org",
+        "index.commoncrawl.org",
+        "api.certspotter.com",
+    }
 )
 _DNS = re.compile(r"DNS (A|AAAA|CNAME|MX|NS|TXT|CAA) (\S+)")
 

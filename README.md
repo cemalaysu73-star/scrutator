@@ -31,10 +31,33 @@ scrutator scan example.com
 ```
 
 This writes `scrutator-out/report.html` (open it in a browser), `report.json` and
-`scrutator.db`. Sources: certificate transparency (crt.sh), DNS, RDAP, ASN (RIPEstat),
-Internet Archive and Common Crawl. No API keys needed. Transient source failures are
-retried with backoff; any that still fail are listed under **Source coverage** in the report,
-so a missing result is never mistaken for a negative one.
+`scrutator.db`. Sources: certificate transparency (crt.sh and CertSpotter), DNS, RDAP, ASN
+(RIPEstat), Internet Archive and Common Crawl (see [Sources and their terms](#sources-and-their-terms)).
+No API keys needed. Transient source failures are retried with backoff; any that still fail are
+listed under **Source coverage** in the report, so a missing result is never mistaken for a negative one.
+
+A scan always ends. `--deadline 600` (seconds, the default; `0` for no limit) is the time the whole
+scan may take: at the deadline lookups still running are cancelled, nothing new starts, and the report
+is written with what was collected and a note that it is partial. A source that times out or answers
+5xx/429 three times in a row (`--breaker 3`; `0` to turn it off) is marked **down** for the rest of the
+scan and not asked again; Source coverage shows it as down, so it is never mistaken for a source with
+nothing to say. Sources that list every name under a domain are asked once, about the apex, not once
+per discovered name. Ctrl-C also writes a (partial) report.
+
+### Sources and their terms
+
+Every source is public and keyless. Their terms are theirs, not ours; read them before relying on a
+source in a commercial engagement.
+
+| Source | Gives | Terms in short |
+|---|---|---|
+| crt.sh | Certificate Transparency names | Public service of Sectigo; no stated limit; often slow or 502. |
+| CertSpotter (`api.certspotter.com`) | Second CT view: names, issuer, key hash, revocation | Unauthenticated API is for personal or evaluation use; production needs an SSLMate account; the free tier may change at any time. At most 2 pages per scan. |
+| DNS | A, AAAA, CNAME, MX, NS, TXT, CAA, with NXDOMAIN/NODATA as evidence | Your resolver. |
+| RDAP (`rdap.org`) | Registrar, name servers, network owner | Public redirector to the registries' RDAP servers. |
+| RIPEstat | IP to ASN | RIPE NCC terms: non-commercial use, no redistribution of the data without permission, credit RIPE NCC and the original source. Bundles that embed RIPEstat responses inherit this. |
+| Wayback Machine | Hostnames seen in the Internet Archive | Public CDX API; fair use. |
+| Common Crawl | Hostnames seen in the latest crawl | Public index; fair use. |
 
 ### Scope
 
