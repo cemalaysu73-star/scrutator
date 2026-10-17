@@ -31,7 +31,7 @@ from scrutator.bundle.replay import replay_evidence
 from scrutator.bundle.verify import verify_bundle
 from scrutator.bundle.writer import create_bundle
 from scrutator.context import ai_client, open_context
-from scrutator.deadline import Deadline
+from scrutator.deadline import DEFAULT_DEADLINE_S, Deadline
 from scrutator.engine import DEFAULT_BREAKER_THRESHOLD
 from scrutator.diff import diff_reports, render_diff
 from scrutator.mcp_tools import ToolSet
@@ -154,7 +154,7 @@ def scan(
     attribute: bool = typer.Option(False, "--attribution/--no-attribution", help="Mark names that may belong to the organisation as candidates and look at them passively, once."),
     max_candidates: int = typer.Option(20, "--max-candidates", help="With --attribution: how many candidates to look at."),
     playbooks: bool = typer.Option(True, "--playbooks/--no-playbooks", help="Offer the planner the knowledge packs' playbooks that fit the situation."),
-    deadline_s: float = typer.Option(600.0, "--deadline", min=0, help="Seconds the whole scan may take (0: no limit). At the deadline running lookups are cancelled, results so far are kept and the report says what is missing."),
+    deadline_s: float = typer.Option(DEFAULT_DEADLINE_S, "--deadline", min=0, help="Seconds the whole scan may take (0: no limit). At the deadline running lookups are cancelled, results so far are kept and the report says what is missing."),
     breaker: int = typer.Option(DEFAULT_BREAKER_THRESHOLD, "--breaker", min=0, help="Consecutive failures or timeouts after which a source is marked down for the rest of the scan (0: never)."),
 ) -> None:
     """Run a passive scan and write evidence-backed reports."""
@@ -424,7 +424,8 @@ def watch(
     db: Optional[Path] = typer.Option(None, "--db", help="SQLite database (default: <out>/scrutator.db)."),
     webhook: Optional[str] = typer.Option(None, "--webhook", help="POST a JSON summary of changes (https only, or localhost)."),
     max_runs: int = typer.Option(0, "--max-runs", help="Stop after N scans (0 = run until interrupted)."),
-    max_steps: int = typer.Option(60, "--max-steps", help="Cap on module runs per scan."),
+    max_steps: int = typer.Option(1000, "--max-steps", help="Cap on module runs per scan."),
+    deadline_s: float = typer.Option(DEFAULT_DEADLINE_S, "--deadline", min=0, help="Seconds each scan may take (0: no limit)."),
 ) -> None:
     """Re-scan on a schedule and report what changed (deterministic scans, no AI)."""
     try:
@@ -449,7 +450,10 @@ def watch(
 
     async def run_once() -> int:
         async with open_context() as ctx:
-            scan_id, _ = await run_scan(seed_entity, scope, store, ctx, max_steps=max_steps)
+            scan_id, _ = await run_scan(
+                seed_entity, scope, store, ctx, max_steps=max_steps,
+                deadline=Deadline(deadline_s) if deadline_s > 0 else None,
+            )
         return scan_id
 
     async def go():

@@ -77,6 +77,9 @@ class Module(ABC):
     apex_only: ClassVar[bool] = False
     # Modules that talk to the same service share one concurrency limit and one circuit breaker.
     rate_group: ClassVar[str | None] = None
+    # False for a module whose failures are the scan's own (the local resolver): the circuit breaker
+    # exists to stop calling someone else's service that is not answering.
+    breaker: ClassVar[bool] = True
     # A line for module listings and bundles: what the source's terms allow.
     licence_note: ClassVar[str | None] = None
 

@@ -5,15 +5,20 @@ organisation's internet-facing infrastructure in which every claim links to the 
 it came from. The AI is local-first: it runs on a model on your machine, and cloud models are
 an explicit, logged opt-in.
 
-**Status: v0.5.** Passive scanning with six keyless sources, a deny-by-default scope guard,
+**Status: v0.6.** Passive scanning with a dozen keyless sources (v0.6 added CertSpotter, passive DNS,
+three name aggregators, address enrichment and a wildcard probe), a scan that always ends inside a
+deadline, a resolution state for every name, a deny-by-default scope guard,
 an evidence store, JSON and HTML reports, a budgeted agent, an AI summary in which every
 statement is checked against evidence by a separate verifier, signed proof bundles that anyone
 can verify and replay, diff between scans, scheduled watching, knowledge packs, a dependency
 and risk analysis in which every risk cites its evidence and can be re-derived from a proof
 bundle, deterministic analyst detectors, SARIF export, and now an attribution engine (names
 outside the scope that probably belong to the organisation, with a score, a band and the evidence
-behind it), AI leads that must cite evidence, playbooks for the agent, and an MCP server. The
-benchmark is planned.
+behind it), AI leads that must cite evidence, playbooks for the agent, and an MCP server. A
+benchmark against sublist3r, dnsrecon and knockpy is in `bench/`; its latest reading is in
+[docs/benchmarks/2026-10-17-after-v0.6.md](docs/benchmarks/2026-10-17-after-v0.6.md): on the four frozen
+targets Scrutator's recall is at least the best competitor's, every name is backed by evidence and the
+bundles verify, and it is still 20 to 40 times slower than knockpy.
 
 ## Install
 
@@ -44,6 +49,11 @@ is written with what was collected and a note that it is partial. A source that 
 scan and not asked again; Source coverage shows it as down, so it is never mistaken for a source with
 nothing to say. Sources that list every name under a domain are asked once, about the apex, not once
 per discovered name. Ctrl-C also writes a (partial) report.
+
+```bash
+scrutator scan example.com --deadline 300 --breaker 5   # five minutes at most; mark a source down after five failures in a row
+scrutator scan example.com --deadline 0                 # no time limit
+```
 
 ### Sources and their terms
 

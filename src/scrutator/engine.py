@@ -146,7 +146,7 @@ class Engine:
                     f"no answer within {limit:g} s" if isinstance(exc, asyncio.TimeoutError) else "no detail given"
                 )
                 self._audit(scan_id, "error", module, entity, error=f"{type(exc).__name__}: {detail}")
-                if isinstance(exc, _SOURCE_FAILURES):
+                if module.breaker and isinstance(exc, _SOURCE_FAILURES):
                     self._count_failure(scan_id, module, entity, f"{type(exc).__name__}: {detail}")
                 return []
             self._failures[key] = 0

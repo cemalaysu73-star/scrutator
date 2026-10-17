@@ -11,7 +11,7 @@ import pytest
 from scrutator.deadline import Deadline
 from scrutator.engine import Engine
 from scrutator.model import Entity, EntityType, Evidence, ScopeState
-from scrutator.modules.base import Module, ModuleError, Observation, SourceUnavailable
+from scrutator.modules.base import Module, ModuleContext, ModuleError, Observation, SourceUnavailable
 from scrutator.report.build import build_report, source_health
 from scrutator.scan import run_scan
 from scrutator.scope import ScopePolicy
@@ -348,3 +348,51 @@ def test_the_default_step_budget_covers_a_large_name_list():
     from scrutator.ai.config import AIConfig
 
     assert AIConfig().max_steps == 1000
+
+
+async def test_the_local_resolver_is_never_marked_down(env):
+    """A remote source that keeps failing is given up on; the resolver is the scan's own and a blip
+    there must not turn every later name into 'unresolved'."""
+    from scrutator.modules.dns import Dns
+
+    store, scope, scan = env
+    seed_many(store, scan, 6)
+    engine = Engine(store, scope, None, breaker_threshold=2)
+
+    class Down:
+        async def query(self, name, rtype):
+            raise TimeoutError("resolver blip")
+
+    ctx = ModuleContext(http=None, resolver=Down())
+    engine.ctx = ctx
+    dns = Dns()
+    for i in range(6):
+        await engine.run_module(scan, dns, dom(f"h{i}.example.com"))
+    errors = [r for r in store.audit_log(scan) if r["event"] == "error"]
+    assert len(errors) == 6  # every run was attempted
+    assert source_health(store, scan)["dns"]["down"] is False
+
+
+def test_watch_gives_each_scan_the_default_deadline(tmp_path, monkeypatch):
+    from typer.testing import CliRunner
+
+    from scrutator import cli
+    from scrutator.agent.runner import AgentStats
+
+    seen = {}
+
+    async def spy(seed, scope, store, ctx, **kwargs):
+        seen.update(kwargs)
+        return store.create_scan(seed.value), AgentStats()
+
+    from contextlib import asynccontextmanager
+
+    @asynccontextmanager
+    async def fake_context():
+        yield None
+
+    monkeypatch.setattr(cli, "run_scan", spy)
+    monkeypatch.setattr(cli, "open_context", fake_context)
+    result = CliRunner().invoke(cli.app, ["watch", "example.com", "--out", str(tmp_path / "w"), "--max-runs", "1", "--every", "30s"])
+    assert result.exit_code == 0, result.output
+    assert seen["deadline"].seconds == 600.0 and seen["max_steps"] == 1000

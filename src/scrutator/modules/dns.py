@@ -33,6 +33,7 @@ class Dns(Module):
     accepts = frozenset({EntityType.DOMAIN})
     concurrency = 8
     priority = 10
+    breaker = False  # the resolver is the scan's own, not a remote service to give up on
 
     _QUERIES = (
         ("A", "resolves_to"),

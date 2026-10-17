@@ -49,6 +49,9 @@ async def test_a_default_session_offers_only_read_only_tools_and_answers_over_re
     c = client()
     info = c.initialize()
     assert info["serverInfo"]["name"] == "scrutator" and "tools" in info["capabilities"]
+    import scrutator
+
+    assert info["serverInfo"]["version"] == scrutator.__version__  # the MCP server reports the package's version
     assert "untrusted data" in info["instructions"] and "ask the user" in info["instructions"]
 
     tools = c.tools()

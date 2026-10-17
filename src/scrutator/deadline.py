@@ -2,6 +2,9 @@ import time
 from collections.abc import Callable
 
 
+DEFAULT_DEADLINE_S = 600.0  # what `scan` and `watch` allow a scan unless told otherwise
+
+
 class Deadline:
     """A wall-clock budget for a whole scan. Everything that waits (module calls, the planner,
     the summary) is given the time that is left, never more."""
