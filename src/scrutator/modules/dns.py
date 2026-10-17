@@ -54,10 +54,15 @@ class Dns(Module):
         attached: set[str] = set()  # evidence already cited by an observation
         # the queries do not depend on each other: ask them together, then read the answers in the
         # fixed order so the evidence and the relations come out the same every time
-        answers = await asyncio.gather(
-            *(lookup_status(ctx.resolver, entity.value, rtype) for rtype, _ in self._QUERIES)
+        results = await asyncio.gather(
+            *(self._ask(ctx, entity.value, rtype) for rtype, _ in self._QUERIES), return_exceptions=True
         )
-        for (rtype, rel), answer in zip(self._QUERIES, answers):
+        failed = [r for r in results if isinstance(r, Exception)]
+        if len(failed) == len(results):
+            raise failed[0]  # nothing answered: the run failed, it did not find an empty name
+        for (rtype, rel), answer in zip(self._QUERIES, results):
+            if isinstance(answer, Exception):
+                continue  # one lookup that timed out leaves the others' answers intact; silence is no evidence
             if answer.status != "answer":
                 if rtype == "A" and answer.status == "nxdomain":
                     facts.append(Fact(self._evidence(entity.value, rtype, answer)))
@@ -86,6 +91,14 @@ class Dns(Module):
         if is_zone:
             facts.extend(await self._auxiliary(ctx, entity.value, "CAA"))
         return [*observations, *facts]
+
+    @staticmethod
+    async def _ask(ctx: ModuleContext, name: str, rtype: str) -> DnsAnswer:
+        """One lookup, tried twice: a shared resolver that drops a query under load usually answers the next."""
+        try:
+            return await lookup_status(ctx.resolver, name, rtype)
+        except Exception:  # noqa: BLE001
+            return await lookup_status(ctx.resolver, name, rtype)
 
     async def _auxiliary(self, ctx: ModuleContext, name: str, rtype: str) -> list[Fact]:
         """A positive or definite-negative answer as a fact. These lookups are extras: a

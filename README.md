@@ -110,6 +110,23 @@ name has no such record" (NODATA), that answer is stored like any other, and it 
 risk about a missing record rests on. A timeout or a failed lookup is not stored as a negative:
 silence is never turned into a finding.
 
+### Names are not hosts
+
+A certificate or an archive names a host that may have been retired years ago, and an aggregator may
+list names that never resolved. So every in-scope name carries a **resolution state**, derived from the
+DNS evidence the scan holds (report `names`, the "Name states" table in the HTML report, and the
+`Names:` line of `scrutator scan` and `scrutator risk`):
+
+| State | Meaning |
+|---|---|
+| `live` | An A or AAAA answer was recorded. |
+| `stale` | The address lookup returned NXDOMAIN (the `ghost-hostname` risk flags the ones a certificate still names). |
+| `wildcard` | It resolves, but only to addresses that a random label under the same zone also resolves to (a probe recorded as evidence, `wc-probe-<random>.<apex>`), so DNS does not prove the name exists. `named_by` lists who else names it: a certificate may still vouch for it. Wildcards below a delegated sub-zone are not probed. |
+| `unresolved` | No address and no NXDOMAIN was recorded: the name has no address record, or the lookup did not run or failed. Never read as a negative. |
+
+The states are re-derived from the evidence by `scrutator verify` (check `name states derivable`), so a
+bundle cannot quietly relabel a stale name as live.
+
 ## Risks
 
 ```bash

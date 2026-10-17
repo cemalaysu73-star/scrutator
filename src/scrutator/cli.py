@@ -241,6 +241,8 @@ def scan(
         f"{counts['edges']} relations, {counts['findings']} findings "
         f"({stats.modules_run} module runs, {stats.rounds} rounds)."
     )
+    if counts.get("names"):
+        typer.echo(_names_line(counts["names"]))
     typer.echo(_risk_line(report["risks"]) + " Run `scrutator risk` for the list.")
     if attribute:
         typer.echo(_candidate_line(report["attribution"]) + " Run `scrutator candidates` for the list.")
@@ -466,6 +468,16 @@ def watch(
         store.close()
 
 
+def _names_line(names: dict | None) -> str:
+    """How many of the in-scope names are live: a list of names is not a list of hosts."""
+    if not names:
+        return ""
+    return (
+        f"Names: {names['live']} live, {names['stale']} stale, {names['wildcard']} wildcard-covered, "
+        f"{names['unresolved']} unresolved."
+    )
+
+
 def _risk_line(risks: list[dict]) -> str:
     counts = {name: sum(1 for r in risks if r["severity"] == name) for name in ("high", "medium", "low", "info")}
     detail = ", ".join(f"{counts[name]} {name}" for name in ("high", "medium", "low", "info"))
@@ -511,6 +523,8 @@ def risk(
         typer.echo(json.dumps({"risks": risks, "dependencies": report["dependencies"]}, indent=2, sort_keys=True))
     else:
         typer.echo(f"{label} of {report['scan']['seed']}. {_risk_line(risks)}")
+        if report.get("summary", {}).get("names"):
+            typer.echo(_names_line(report["summary"]["names"]))
         for item in risks:
             typer.echo(f"[{item['severity'].upper():<6}] {item['rule_id']}  {', '.join(item['entity_ids'][:3])}")
             typer.echo(f"         {item['title']}. {item['explanation']}")

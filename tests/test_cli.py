@@ -237,3 +237,19 @@ def test_ctrl_c_still_writes_a_report_of_what_was_collected(tmp_path, monkeypatc
     report = json.loads((out / "report.json").read_text(encoding="utf-8"))
     assert report["scan"]["seed"] == "example.com" and report["coverage"]["deadline_hit"] is False
     assert any(r["event"] == "interrupted" for r in __import__("scrutator.store", fromlist=["Store"]).Store(out / "scrutator.db").audit_log(1))
+
+
+def test_scan_prints_how_many_of_the_names_are_live(tmp_path):
+    result = runner.invoke(cli.app, ["scan", "example.com", "--out", str(tmp_path / "o")])
+    assert result.exit_code == 0, result.output
+    assert "Names: 0 live, 0 stale, 0 wildcard-covered, 1 unresolved." in result.output
+    report = json.loads((tmp_path / "o" / "report.json").read_text(encoding="utf-8"))
+    assert report["summary"]["names"] == {"live": 0, "stale": 0, "wildcard": 0, "unresolved": 1}
+    assert [r["name"] for r in report["names"]] == ["example.com"]
+
+
+def test_risk_prints_the_name_line_too(tmp_path):
+    out = tmp_path / "o"
+    assert runner.invoke(cli.app, ["scan", "example.com", "--out", str(out)]).exit_code == 0
+    shown = runner.invoke(cli.app, ["risk", "--db", str(out / "scrutator.db")])
+    assert shown.exit_code == 0 and "Names: 0 live" in shown.output

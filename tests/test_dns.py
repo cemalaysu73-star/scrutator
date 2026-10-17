@@ -84,3 +84,40 @@ def test_the_server_that_answered_is_tried_first_next_time():
     resolver._prefer(None)  # no answering server known: unchanged
     resolver._prefer("9.9.9.9")  # not one of ours: unchanged
     assert resolver._resolver.nameservers == ["1.1.1.1", "10.255.255.1", "8.8.8.8"]
+
+
+async def test_one_query_timing_out_does_not_discard_the_other_answers():
+    from dnsfakes import StatusResolver
+
+    zone = {("www.example.com", "A"): ["192.0.2.10"]}
+    resolver = StatusResolver(zone, boom={("www.example.com", "AAAA"): TimeoutError("slow resolver")})
+    obs = await Dns().run(dom("www.example.com"), ModuleContext(http=None, resolver=resolver))
+    assert [o.entity.value for o in obs if o.rel == "resolves_to"] == ["192.0.2.10"]
+
+
+async def test_a_failed_query_is_asked_once_more():
+    from scrutator.resolver import DnsAnswer
+
+    class Flaky:
+        def __init__(self):
+            self.calls = []
+
+        async def query(self, name, rtype):
+            self.calls.append((name, rtype))
+            if rtype == "A" and self.calls.count((name, rtype)) == 1:
+                raise TimeoutError("first try")
+            return DnsAnswer("answer", ("192.0.2.10",)) if rtype == "A" else DnsAnswer("nodata")
+
+    resolver = Flaky()
+    obs = await Dns().run(dom("www.example.com"), ModuleContext(http=None, resolver=resolver))
+    assert [o.entity.value for o in obs if o.rel == "resolves_to"] == ["192.0.2.10"]
+
+
+async def test_when_every_query_fails_the_run_fails_instead_of_looking_empty():
+    import pytest
+
+    from dnsfakes import StatusResolver
+
+    boom = {("www.example.com", t): TimeoutError("down") for t in ("A", "AAAA", "CNAME", "MX", "NS", "TXT")}
+    with pytest.raises(TimeoutError):
+        await Dns().run(dom("www.example.com"), ModuleContext(http=None, resolver=StatusResolver({}, boom=boom)))

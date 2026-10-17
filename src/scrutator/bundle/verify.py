@@ -10,6 +10,7 @@ from scrutator.bundle.keys import fingerprint, verify_signature
 from scrutator.bundle.reader import BundleError, read_raw
 from scrutator.exposure import exposure
 from scrutator.findings import findings_from_report
+from scrutator.names import name_states
 from scrutator.packs import KINDS, PackSet, load_packs
 from scrutator.report.build import promotions
 from scrutator.risk.engine import RULESET_VERSION, analyze
@@ -239,6 +240,8 @@ def verify_bundle(path: str | Path, *, pinned_fingerprint: str | None = None) ->
                 cited.update(note["evidence_ids"])
         for row in report.get("exposure", []):
             cited.update(row["evidence_ids"])
+        for row in report.get("names", []):
+            cited.update(row["evidence_ids"])
         leads = [*report.get("leads", {}).get("verified", []), *report.get("leads", {}).get("rejected", [])]
         unknown_entities = sorted({e for lead in leads for e in lead["entity_ids"]} - {e["id"] for e in report["entities"]})
         for lead in leads:
@@ -282,6 +285,14 @@ def verify_bundle(path: str | Path, *, pinned_fingerprint: str | None = None) ->
             add("exposure derivable", same, "" if same else "the address table is not what the cited evidence implies")
     except Exception as exc:  # noqa: BLE001
         add("exposure derivable", False, f"malformed exposure: {type(exc).__name__}: {exc}")
+
+    # the resolution state of each name: re-derived from the report's own DNS evidence
+    try:
+        if "names" in report:
+            same = name_states(report) == report["names"]
+            add("name states derivable", same, "" if same else "the name states are not what the cited DNS evidence implies")
+    except Exception as exc:  # noqa: BLE001
+        add("name states derivable", False, f"malformed name states: {type(exc).__name__}: {exc}")
 
     # attribution: re-derived from the report's own evidence, like the risks
     try:
