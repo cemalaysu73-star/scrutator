@@ -2,13 +2,19 @@ import re
 from pathlib import Path
 
 import pytest
+from ablation import BUDGETS, PUBLISHED
+from attrlab import TRUTH, run_lab
 from typer.testing import CliRunner
 
 from scrutator import cli
+from scrutator.attribution import SIGNALS, evaluate
 
 README = (Path(__file__).parent.parent / "README.md").read_text(encoding="utf-8")
 runner = CliRunner()
-COMMANDS = {"scan", "keygen", "export", "verify", "diff", "watch", "risk", "ai", "doctor", "packs", "list", "validate", "manifest"}
+COMMANDS = {
+    "scan", "keygen", "export", "verify", "diff", "watch", "risk", "ai", "doctor", "packs", "list", "validate", "manifest",
+    "candidates", "attribution", "promote", "mcp",
+}
 
 
 def documented_commands():
@@ -34,6 +40,12 @@ def documented_commands():
 def test_the_readme_documents_the_new_commands():
     paths = {tuple(path) for path, _, _ in documented_commands()}
     assert {("risk",), ("packs", "list"), ("packs", "validate"), ("scan",), ("verify",)} <= paths
+    assert {("candidates",), ("attribution",), ("promote",), ("mcp",)} <= paths
+
+
+def test_the_readme_shows_the_new_scan_options():
+    options = {option for _, found, _ in documented_commands() for option in found}
+    assert {"--attribution", "--allow-scan", "--allow-promote", "--scope", "--min-band", "--entity"} <= options
 
 
 @pytest.mark.parametrize("path, options, line", documented_commands())
@@ -44,3 +56,31 @@ def test_every_documented_command_and_option_exists(path, options, line):
     text = re.sub(r"\s+", " ", result.output)
     for option in options:
         assert option in text, f"{option} is not an option of `scrutator {' '.join(path)}` ({line})"
+
+
+def test_the_signal_table_is_the_one_the_code_uses():
+    for kind, (weight, _) in SIGNALS.items():
+        assert f"| `{kind}` | {weight:.2f} |" in README, kind
+    assert len(SIGNALS) == 10
+
+
+async def test_the_published_lab_table_is_what_the_lab_measures(http, tmp_path):
+    lab = await run_lab(http, tmp_path)
+    for band, row in evaluate(lab.report["attribution"], TRUTH).items():
+        expected = f"| {band} | {row['count']} | {row['true']} | {row['precision']:.2f} | {row['or_better_precision']:.2f} | {row['or_better_recall']:.2f} |"
+        assert expected in README, expected
+
+
+def test_the_published_ablation_table_is_what_the_harness_measures():
+    for budget in BUDGETS:
+        (without, with_) = PUBLISHED[budget]
+        row = f"| {budget} | {without[0]} | {with_[0]} | {without[1]} | {with_[1]} |"
+        assert row in README, row
+
+
+def test_the_mcp_tools_in_the_readme_are_the_tools_the_server_offers():
+    from scrutator.mcp_tools import ToolSet
+
+    offered = {name for name in ("list_candidates", "attribution", "risk", "verify_bundle", "scan", "promote_candidate") if hasattr(ToolSet, name)}
+    documented = set(re.findall(r"^\| `(\w+)` \| (?:always|`--allow-\w+`) \|", README, re.M))
+    assert documented == offered

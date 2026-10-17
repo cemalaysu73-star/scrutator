@@ -5,21 +5,24 @@ organisation's internet-facing infrastructure in which every claim links to the 
 it came from. The AI is local-first: it runs on a model on your machine, and cloud models are
 an explicit, logged opt-in.
 
-**Status: v0.4.** Passive scanning with six keyless sources, a deny-by-default scope guard,
+**Status: v0.5.** Passive scanning with six keyless sources, a deny-by-default scope guard,
 an evidence store, JSON and HTML reports, a budgeted agent, an AI summary in which every
 statement is checked against evidence by a separate verifier, signed proof bundles that anyone
 can verify and replay, diff between scans, scheduled watching, knowledge packs, a dependency
 and risk analysis in which every risk cites its evidence and can be re-derived from a proof
-bundle, deterministic analyst detectors, and SARIF export. Attribution and the benchmark are
-planned.
+bundle, deterministic analyst detectors, SARIF export, and now an attribution engine (names
+outside the scope that probably belong to the organisation, with a score, a band and the evidence
+behind it), AI leads that must cite evidence, playbooks for the agent, and an MCP server. The
+benchmark is planned.
 
 ## Install
 
 ```bash
 pipx install scrutator
+pipx install "scrutator[mcp]"     # with the MCP server
 ```
 
-From a checkout: `pip install -e ".[dev]"`.
+From a checkout: `pip install -e ".[dev]"` (this includes the MCP SDK; without it the MCP tests skip).
 
 ## Use
 
@@ -51,9 +54,11 @@ asns:
 scrutator scan example.com --scope scope.yaml
 ```
 
-Every discovered entity is marked `in`, `linked` or `out`. Out-of-scope entities are recorded
-but never queried. An IP that an in-scope host resolves to is `linked`: passive lookups about
-it are allowed.
+Every discovered entity is marked `in`, `candidate`, `linked` or `out`. Out-of-scope entities are
+recorded but never queried. An IP that an in-scope host resolves to is `linked`: passive lookups
+about it are allowed. A `candidate` is a name outside the scope that the attribution engine found
+evidence for (see below): it gets passive lookups only, until you promote it. Only your scope file
+defines what may be investigated.
 
 ### Evidence
 
@@ -119,12 +124,121 @@ location. Uploaders that need one (GitHub code scanning does) must supply it; th
 integration. Each result has a stable `partialFingerprints` entry made of the rule and the entities, so
 a later run can recognise the same finding and update its ticket instead of opening a new one.
 
+## Attribution
+
+Some assets belong to an organisation without any name match: a sister domain, an acquired brand, a
+service run under another name. Attribution looks for names **outside your scope** that the evidence
+ties to the organisation, scores them, and explains every score.
+
+```bash
+scrutator scan example.com --scope scope.yaml --attribution   # mark and look at candidates, passively
+scrutator candidates                                          # who may be ours, strongest first
+scrutator attribution --entity partner.example.net            # why, and what could make it wrong
+scrutator promote partner.example.net --scope scope.yaml      # accept it into scope (asks first)
+```
+
+**What it looks at.** Ten signals, each computed from stored evidence only. A signal that points at a
+shared provider (a CDN, a mail service, a public CA, a DNS operator the packs know) is kept in the
+output with weight 0 and the reason, so you can see what was ignored.
+
+| Signal | Weight | The evidence |
+|---|---|---|
+| `ns_in_scope` | 0.90 | the name is delegated to a name server under an in-scope domain |
+| `mx_in_scope` | 0.70 | its mail is received by a host under an in-scope domain |
+| `spf_in_scope` | 0.60 | its SPF record includes a name under an in-scope domain |
+| `cert_san` | 0.60 | one certificate lists both an in-scope name and this name |
+| `rdap_registrant` | 0.60 | its registrant organisation is the same as an in-scope domain's |
+| `shared_ns` | 0.50 | it uses the same name servers as an in-scope zone, and they are not a shared provider |
+| `shared_mx` | 0.40 | it receives mail on a host an in-scope name also uses, and that host is not a shared provider |
+| `network_owner` | 0.35 | its address is in a network with the same owner or AS as an in-scope address, and that is not a shared provider |
+| `scope_uses` | 0.20 | an in-scope name points its name servers, mail or SPF at it, and it is not a shared provider |
+| `cert_issuer` | 0.10 | it and an in-scope name use certificates from the same issuer, and that issuer is not a common CA |
+
+A certificate with more than ten names counts for less (ten divided by the number of names: it looks
+like a shared service's), and one that had been expired for over a year when it was collected counts
+half. A registrant that is a redaction placeholder or a privacy service is not a registrant.
+
+**The score and the band.** Independent signals combine as `1 - product(1 - weight)`, so no score
+passes 1 and weak signals stay weak. Bands: `confirmed` (score 0.90 or more from at least two kinds of
+signal), `probable` (0.70), `possible` (0.35), `unlikely`. **`probable` and `confirmed` need an
+ownership signal**: `ns_in_scope`, `mx_in_scope`, `spf_in_scope` or `rdap_registrant`, evidence that
+only the owner, or someone it runs services for, can produce. A shared certificate, name servers,
+network or mail host can just as well be a partner's or a host's, so on their own they never get past
+`possible`. The planted lab showed this rule was needed: without it a partner with a co-branded
+certificate and the same small DNS operator scored 0.80.
+
+**These weights are chosen by hand.** They are not measured and not calibrated to the real world.
+The knowledge packs' `signals` file can lower a signal's weight with a measured frequency (how often
+unrelated organisations show it, with the sample size); it ships empty because no such corpus has been
+collected, and numbers are not invented.
+
+**What a candidate may and may not receive.** A name enters the `candidate` state when at least one
+counted signal of 0.20 or more points at it (at most `--max-candidates`, 20 by default). It then gets
+passive DNS, registration and certificate lookups, once, and the network lookups for the addresses it
+resolves to. Names found through a candidate are only recorded. No active module ever runs on it.
+Names that nothing in the scan links to the scope cannot be found this way: finding them needs a
+reverse lookup (names on this name server, names on this address), which is a keyed source and not part
+of passive mode.
+
+**Promotion is the only way in.** `scrutator promote NAME --scope scope.yaml` shows the band, score and
+evidence count, asks for confirmation (`--yes` skips it), adds the name to your scope file (the old file
+is kept as `scope.yaml.bak`; YAML comments are not preserved), writes a `promoted` record to the
+hash-chained audit log (who asked: `cli` or `mcp`; when; the score and evidence it rested on), and only
+then raises the entity to `in`. Adding a name adds everything under it, so promote the apex you mean.
+Scan again to investigate it fully. Anything that is not a candidate is refused.
+
+**What the bundle checks.** `verify` recomputes the attribution from the report's own evidence
+(`attribution derivable`), so a raised band or a hidden caveat fails even when the bundle is re-signed.
+It also checks that the report's promotions are exactly those in the signed audit log
+(`promotions recorded`) and that every lead cites evidence that is in the bundle.
+
+### How well does it work?
+
+Measured on the planted lab (`tests/attrlab.py`): an organisation with 16 names of its own and a set of
+decoys, answered by a fake resolver and mocked sources, no network. It is a synthetic zone written by the
+author of the scoring: it shows the scoring behaves as designed on the cases its author thought of, not
+how accurate it is on real organisations. The decoys are the cases the design discounts (Cloudflare name
+servers, a shared hosting AS, a certificate that lists 28 names, a vendor the SPF record includes), two
+cases it only partly handles (a partner with a co-branded certificate on the same small DNS operator, an
+old certificate on that operator), and **one it cannot solve**: a customer whose DNS the organisation
+runs, which looks exactly like the organisation's own, and is a planted false positive in the
+`confirmed` band. Of the 16 true names, one is found but not believed (an old certificate and nothing
+else) and one cannot be found at all.
+
+| Band | Names | True | Precision | Precision, this band or better | Recall, this band or better |
+|---|---|---|---|---|---|
+| confirmed | 7 | 6 | 0.86 | 0.86 | 0.38 |
+| probable | 5 | 5 | 1.00 | 0.92 | 0.69 |
+| possible | 5 | 3 | 0.60 | 0.82 | 0.88 |
+| unlikely | 31 | 1 | 0.03 | 0.31 | 0.94 |
+
+The exit criterion is precision of at least 0.9 in the `probable` band on the lab: 5 of 5 in the band,
+11 of 12 for `probable` or better. Five names is a small sample; read it as a regression test, not as a
+rate.
+
+## Analyst leads and the pre-mortem (AI)
+
+Every candidate comes with a **pre-mortem** made by rules: what in the evidence could make the
+attribution wrong (one kind of signal only, a certificate that may be a partner's, signals ignored as
+shared providers, a name nobody has looked at yet), each citing the evidence it rests on. It needs no
+model.
+
+With a model, `scrutator scan --attribution` also asks the planner role for up to eight **leads**
+(something odd the evidence shows) and **pre-mortems** (what could make an attribution wrong). The model
+sees entities and evidence as short references (`N1`, `E3`), never real ids, inside fenced data blocks,
+and can only cite what was listed to it: an item with an unknown reference, a pre-mortem about something
+that is not a candidate, or a suggested check that is not a registered passive module on a listed
+entity is discarded before anyone reads it. What is left goes to the verifier role, like the summary
+statements: unsupported items are kept as *Unverified leads*, never in the report proper, and with no
+verifier nothing is published. A suggested check is shown, never run. Without a model, or when it fails,
+the rules' pre-mortem stands alone.
+
 ## Knowledge packs
 
 Everything the tool knows about the world that is not code is in versioned YAML packs shipped inside
 the package: provider fingerprints (name server, mail, CDN, hosting and certificate-authority patterns,
-and AS numbers), takeover fingerprints, and a schema for attribution-signal frequencies (empty until
-v0.5 has a measured corpus; inventing numbers would break the evidence rule).
+and AS numbers), takeover fingerprints, a schema for attribution-signal frequencies (empty until there is
+a measured corpus), and **playbooks**.
 
 ```bash
 scrutator packs list                    # the files in use, versions, entry counts
@@ -154,6 +268,40 @@ entries:
 
 An entry with the same `id` as a bundled one replaces it. The packs a scan used are recorded with it
 and travel inside its proof bundle, so a report is always read with the knowledge it was made with.
+The same entry also decides attribution: a name server operator listed here is a shared provider, and
+signals that point at it stop counting.
+
+**Playbooks** are short recipes for the agent: a title, the situations in which it applies (an alias
+points outside the scope, a certificate names an outside host, a name receives mail, a zone is
+delegated, an address has no network yet, candidates are waiting, an SPF record names other senders),
+the steps, and the modules the steps are about. Which situations hold is decided from the graph alone.
+When the planner has more lookups than steps and a model is running, the (at most three) playbooks that
+fit are put in its prompt as curated guidance outside the data fence; they can change the order it
+chooses in, never the options, and the scope stays whatever your file says. `--no-playbooks` turns them
+off, and the audit log records which playbooks each round was offered. Playbooks are loaded and
+validated like the other packs but are not part of the hash a proof depends on, because no derived
+result depends on them. The bundled ones are procedures written for Scrutator, all marked `verified:
+false`: their `source` is background reading.
+
+### Do playbooks help?
+
+A deterministic harness (`tests/ablation.py`) runs the agent on the planted lab with a stand-in planner
+that obeys guidance the way a model asked to would, once with the playbooks in its prompt and once
+without, at four lookup budgets:
+
+| Lookup budget | Names resolved, without | Names resolved, with | Risks found, without | Risks found, with |
+|---|---|---|---|---|
+| 8 | 1 | 6 | 1 | 2 |
+| 10 | 1 | 8 | 1 | 3 |
+| 14 | 4 | 8 | 2 | 3 |
+| 24 | 8 | 8 | 3 | 3 |
+
+This shows that retrieval reaches the prompt and changes what the agent does with a tight budget, and
+that with room to spare both finish the same investigation. It does **not** show that a real model
+benefits: the stand-in obeys by construction. The real-model ablation is part of the v1.0 benchmark.
+
+To change the bundled packs: edit the YAML in `src/scrutator/packs/data`, run `scrutator packs manifest
+src/scrutator/packs/data` to refresh the sha256 manifest, run `pytest`, and open a pull request.
 
 **Where the bundled data comes from.** Takeover entries come only from the community project
 [can-i-take-over-xyz](https://github.com/EdOverflow/can-i-take-over-xyz) (a service is listed only if its
@@ -161,9 +309,6 @@ and travel inside its proof bundle, so a report is always read with the knowledg
 `verified: true` were checked against the vendor documentation named in their `source`; those marked
 `verified: false` are widely known patterns that have not been re-checked yet, and the dependency map
 says so. Each entry carries `examples` that the test suite runs against the entry itself.
-
-To change the bundled packs: edit the YAML in `src/scrutator/packs/data`, run `scrutator packs manifest
-src/scrutator/packs/data` to refresh the sha256 manifest, run `pytest`, and open a pull request.
 
 ## Proof bundles
 
@@ -181,12 +326,13 @@ A bundle holds `report.json`, every raw evidence record (`evidence.jsonl`), the 
 log (`audit.jsonl`) and a signed manifest. `verify` checks each layer on its own: file hashes, the
 Ed25519 signature, the audit chain, that every evidence record hashes to its id, that everything the
 report cites is in the bundle, that the report's findings are exactly what the evidence implies, and
-that its **risks are exactly what the evidence and the embedded packs imply** (`risks derivable`): the
-risk engine is a pure function of the report, so `verify` recomputes it. The manifest records the packs
-used; `packs intact` checks them against this tool's own copy of the bundled packs, so removing a
-takeover fingerprint and recomputing every risk is still caught. Pack entries you added yourself cannot be
-checked against a trusted copy; `verify` says so, and the signer is vouching for them. Change one byte
-anywhere and a named check fails.
+that its **risks and its attribution are exactly what the evidence and the embedded packs imply**
+(`risks derivable`, `attribution derivable`): both engines are pure functions of the report, so `verify`
+recomputes them. The manifest records the packs used; `packs intact` checks them against this tool's own
+copy of the bundled packs, so removing a takeover fingerprint and recomputing every result is still
+caught. Pack entries you added yourself cannot be checked against a trusted copy; `verify` says so, and
+the signer is vouching for them. Change one byte anywhere and a named check fails. Bundles made by
+older versions still verify; the checks that did not exist then are reported as not applicable.
 
 **A valid signature only proves the bundle matches the key inside it.** Anyone can sign a forged
 bundle with their own key, so give readers your key fingerprint through a channel they trust and
@@ -224,12 +370,13 @@ it runs without AI. **It never falls back to a cloud model on its own.**
 What the models do:
 
 - **Planner**: when there are more lookups than the step budget (`--max-steps`), it ranks the
-  numbered options. It can only choose from the list it is given; if it fails, the first
-  options run. It also keeps a log of hypotheses, settled only with real evidence.
+  numbered options, guided by the playbooks that fit. It can only choose from the list it is given; if
+  it fails, the first options run. It also keeps a log of hypotheses, settled only with real evidence,
+  and proposes the leads described above.
 - **Writer**: drafts a short summary, each statement citing findings (risks included).
-- **Verifier**: checks each statement against the cited findings' evidence. Unsupported or
-  unverifiable statements go to *Unverified leads* and never into the summary. With no verifier,
-  nothing is published.
+- **Verifier**: checks each statement and each lead against the evidence it cites. Unsupported or
+  unverifiable ones go to *Unverified leads* and never into the report. With no verifier, nothing is
+  published.
 
 Collected text is passed to models inside fenced data blocks marked untrusted, and model output
 is validated against a schema, with repair attempts and a deterministic fallback.
@@ -269,17 +416,61 @@ model = "claude-sonnet-5-5"
 api_key_env = "ANTHROPIC_API_KEY"
 ```
 
+## MCP server
+
+`scrutator mcp` serves Scrutator to an MCP client such as Claude Desktop over stdio, using the official
+[MCP Python SDK](https://github.com/modelcontextprotocol/python-sdk) (`pip install "scrutator[mcp]"`).
+
+```bash
+scrutator mcp --db scrutator-out/scrutator.db                      # read-only tools only
+scrutator mcp --db scrutator-out/scrutator.db --scope scope.yaml --allow-scan
+scrutator mcp --db scrutator-out/scrutator.db --scope scope.yaml --allow-promote
+```
+
+| Tool | Offered | What it does |
+|---|---|---|
+| `list_candidates` | always | names outside the scope that may be ours, with band and score |
+| `attribution` | always | every signal and its evidence, and what could make it wrong |
+| `risk` | always | configuration risks of a scan, each citing evidence |
+| `verify_bundle` | always | the checks of `scrutator verify` for a `.scrutator` file |
+| `scan` | `--allow-scan` | a passive scan of a seed inside your scope file; a seed outside it is refused before anything is looked up; no AI, no active modules |
+| `promote_candidate` | `--allow-promote` | accept a candidate into scope; changes nothing unless called with `confirm=true` |
+
+A Claude Desktop entry (adapt the paths; use the full path to `scrutator` if it is not on `PATH`):
+
+```json
+{
+  "mcpServers": {
+    "scrutator": {
+      "command": "scrutator",
+      "args": ["mcp", "--db", "C:\\scans\\scrutator.db", "--scope", "C:\\scans\\scope.yaml", "--allow-scan"]
+    }
+  }
+}
+```
+
+What is checked, and what is not. The test suite starts the server as a real subprocess and speaks to it
+in raw JSON-RPC frames over stdio: the handshake, the tool list, every tool, refusals, and that stdout
+carries nothing but protocol frames. It has **not** been run against Claude Desktop itself; the roadmap
+criterion "Claude Desktop drives a scan via MCP" needs a manual run. Results contain names and text from
+the investigated organisation's public records, so each result says they are untrusted data; a client
+that shows you every tool call before it runs is also the human in the loop for `promote_candidate`,
+which Scrutator cannot check. The server never offers `scan` or `promote_candidate` unless you started it
+with the flag, and the scope file is the only thing that decides what a scan may touch.
+
 ## Checking it against a real domain
 
-`example.com` is reserved for documentation, so it is a safe target. Run this yourself; the commands
-need network access and, for the bundle, a signing key.
+`example.com` is reserved for documentation, so it is a safe target, and everything below is passive.
+Run this yourself; the commands need network access and, for the bundle, a signing key. A scan with
+attribution can take several minutes when crt.sh or the archives are slow.
 
 ```bash
 scrutator keygen
-scrutator scan example.com --out live04 --ai off --bundle
-scrutator risk --db live04/scrutator.db
-scrutator risk --db live04/scrutator.db --sarif live04/risks.sarif
-scrutator verify live04/proof.scrutator --pin ~/.config/scrutator/signing.pub --replay
+scrutator scan example.com --out live05 --ai off --attribution --bundle
+scrutator risk --db live05/scrutator.db
+scrutator candidates --db live05/scrutator.db --min-band unlikely
+scrutator attribution --db live05/scrutator.db --min-band unlikely
+scrutator verify live05/proof.scrutator --pin ~/.config/scrutator/signing.pub --replay
 scrutator packs validate
 ```
 
@@ -296,9 +487,18 @@ test, not this paragraph):
   `NXNAME` ("compact denial of existence"), and only to a query that asks for DNSSEC records. Scrutator
   sets the DO bit and treats that answer as `nxdomain`; an NSEC without `NXNAME` stays `nodata`, which is
   why the apex CAA lookup is still `NODATA` and `caa-missing` appears if the apex has no CAA record.
-- `verify` should pass every check, including `risks derivable` and `packs intact`. With `--replay`
-  the NXDOMAIN, NODATA and CAA records should replay as `unchanged`, and `skipped` should be 0.
-- Any risk that looks wrong is a bug: open the evidence it cites, and file an issue with the evidence id.
+- `candidates` should list **nothing** at `possible` or better. The only name outside the scope that
+  shares a certificate with example.com is `m.testexample.com`, on a certificate that expired in 2017:
+  expect it as `unlikely`, score 0.30 (`cert_san` halved for age), marked `candidate`, and a pre-mortem
+  that says one kind of evidence supports it. After its one passive look nothing else ties it to
+  example.com: its name servers are not example.com's. The Cloudflare name servers example.com
+  uses are a shared provider, so they are not candidates at all. A name that appears here as `probable`
+  or better is a bug: open the evidence it cites.
+- `verify` should pass every check, including `risks derivable`, `attribution derivable`, `promotions
+  recorded` and `packs intact`. With `--replay` the NXDOMAIN, NODATA and CAA records should replay as
+  `unchanged`, and `skipped` should be 0.
+- Any risk or candidate that looks wrong is a bug: open the evidence it cites, and file an issue with the
+  evidence id.
 
 ## Responsible use
 
@@ -306,8 +506,9 @@ Passive mode only queries third-party public sources, but those services see wha
 for, and cloud AI sees summaries of what was found. Only investigate organisations you are
 authorised to assess or that you are entitled to research. Scrutator never searches for a
 named private individual. Risk findings describe configuration visible in public DNS and
-certificate records; they are leads for the owner to confirm, not proof of compromise. Takeover
-confirmation by an active check is not part of passive mode.
+certificate records; they are leads for the owner to confirm, not proof of compromise. Attribution is
+a set of leads with scores: a `candidate` is not yours until you say so, and nothing is investigated
+beyond passive lookups before then. Takeover confirmation by an active check is not part of passive mode.
 
 ## Develop
 
