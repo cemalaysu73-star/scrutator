@@ -9,8 +9,8 @@ from scrutator.attribution import attribute
 from scrutator.bundle.keys import fingerprint, verify_signature
 from scrutator.bundle.reader import BundleError, read_raw
 from scrutator.exposure import exposure
-from scrutator.findings import findings_from_report
-from scrutator.names import name_states
+from scrutator.findings import findings_from_report, summarise_findings
+from scrutator.names import headline, name_states, summarise_states, summarise_tiers
 from scrutator.packs import KINDS, PackSet, load_packs
 from scrutator.report.build import promotions
 from scrutator.risk.engine import RULESET_VERSION, analyze
@@ -255,8 +255,13 @@ def verify_bundle(path: str | Path, *, pinned_fingerprint: str | None = None) ->
         else:
             detail = ""
         add("report references", not detail, detail)
-        derivable = findings_from_report(report) == report["findings"]
-        add("findings derivable", derivable, "" if derivable else "the findings are not what the cited evidence implies")
+        legacy = bool(report["findings"]) and "tier" not in report["findings"][0]  # made before v0.7
+        try:
+            derivable = findings_from_report(report, tiered=not legacy) == report["findings"]
+            why = "" if derivable else "the findings are not what the cited evidence implies"
+        except Exception as exc:  # noqa: BLE001 - the tiers read every DNS record in the bundle, which is untrusted
+            derivable, why = False, f"malformed evidence: {type(exc).__name__}: {exc}"
+        add("findings derivable", derivable, why)
         same_scan = report["scan"]["seed"] == manifest["scan"]["seed"]
         add("scan identity", same_scan, "" if same_scan else "the report is for a different scan than the manifest")
     except (ValueError, KeyError, TypeError) as exc:
@@ -286,13 +291,32 @@ def verify_bundle(path: str | Path, *, pinned_fingerprint: str | None = None) ->
     except Exception as exc:  # noqa: BLE001
         add("exposure derivable", False, f"malformed exposure: {type(exc).__name__}: {exc}")
 
-    # the resolution state of each name: re-derived from the report's own DNS evidence
+    # the resolution state and the tier of each name: re-derived from the report's own evidence
     try:
         if "names" in report:
-            same = name_states(report) == report["names"]
-            add("name states derivable", same, "" if same else "the name states are not what the cited DNS evidence implies")
+            legacy = bool(report["names"]) and "tier" not in report["names"][0]  # made before v0.7
+            same = name_states(report, tiered=not legacy) == report["names"]
+            add("name states derivable", same, "" if same else "the name states and tiers are not what the cited evidence implies")
     except Exception as exc:  # noqa: BLE001
         add("name states derivable", False, f"malformed name states: {type(exc).__name__}: {exc}")
+
+    # the numbers a reader quotes (verified and claimed names, findings per tier) are recounted, not trusted
+    try:
+        summary = report.get("summary", {})
+        if "tiers" in summary:
+            rows = name_states(report)
+            tiers = summarise_tiers(rows)
+            counted = summarise_findings(findings_from_report(report, names=rows))
+            problems = []
+            if summary.get("tiers") != tiers or summary.get("headline") != headline(tiers):
+                problems.append("the headline counts of names")
+            if summary.get("names") != summarise_states(rows):
+                problems.append("the name state counts")
+            if summary.get("findings_by_tier") != counted or summary.get("findings") != len(report["findings"]):
+                problems.append("the finding counts")
+            add("headline derivable", not problems, "" if not problems else "not what the evidence implies: " + ", ".join(problems))
+    except Exception as exc:  # noqa: BLE001
+        add("headline derivable", False, f"malformed summary: {type(exc).__name__}: {exc}")
 
     # attribution: re-derived from the report's own evidence, like the risks
     try:

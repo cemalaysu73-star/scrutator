@@ -236,11 +236,12 @@ def scan(
     store.close()
 
     counts = report["summary"]
+    typer.echo(f"Scan #{scan_id} of {seed_entity.value}: {counts['headline']}.")
     typer.echo(
-        f"Scan #{scan_id} of {seed_entity.value}: {counts['entities']} entities, "
-        f"{counts['edges']} relations, {counts['findings']} findings "
+        f"{counts['entities']} entities, {counts['edges']} relations, {counts['findings']} findings "
         f"({stats.modules_run} module runs, {stats.rounds} rounds)."
     )
+    typer.echo(_findings_line(counts["findings_by_tier"], counts["findings"]))
     if counts.get("names"):
         typer.echo(_names_line(counts["names"]))
     typer.echo(_risk_line(report["risks"]) + " Run `scrutator risk` for the list.")
@@ -479,6 +480,17 @@ def _names_line(names: dict | None) -> str:
     return (
         f"Names: {names['live']} live, {names['stale']} stale, {names['wildcard']} wildcard-covered, "
         f"{names['unresolved']} unresolved."
+    )
+
+
+def _findings_line(by_tier: dict[str, int], total: int) -> str:
+    """Findings about names DNS or a dated record supports come first; the rest are counted apart."""
+    solid = by_tier["verified"] + by_tier["other"]
+    return (
+        f"Findings: {by_tier['verified']} about verified names"
+        + (f" and {by_tier['other']} about addresses and registrations" if by_tier["other"] else "")
+        + f"; {total - solid} more about claimed ({by_tier['claimed']}), stale ({by_tier['stale']}) or "
+        f"wildcard-covered ({by_tier['wildcard']}) names, kept in the report and collapsed in the HTML."
     )
 
 

@@ -253,3 +253,13 @@ def test_risk_prints_the_name_line_too(tmp_path):
     assert runner.invoke(cli.app, ["scan", "example.com", "--out", str(out)]).exit_code == 0
     shown = runner.invoke(cli.app, ["risk", "--db", str(out / "scrutator.db")])
     assert shown.exit_code == 0 and "Names: 0 live" in shown.output
+
+
+def test_the_cli_summary_leads_with_verified_and_claimed(tmp_path):
+    result = runner.invoke(cli.app, ["scan", "example.com", "--out", str(tmp_path / "o")])
+    assert result.exit_code == 0, result.output
+    first = result.output.splitlines()[0]
+    assert first.startswith("Scan #1 of example.com: 0 verified, 1 claimed (0 stale, 0 wildcard-covered).")
+    assert "Findings: 0 about verified names" in result.output
+    report = json.loads((tmp_path / "o" / "report.json").read_text(encoding="utf-8"))
+    assert report["summary"]["headline"] == "0 verified, 1 claimed (0 stale, 0 wildcard-covered)"

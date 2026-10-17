@@ -6,8 +6,8 @@ from typing import Any
 from scrutator import __version__
 from scrutator.attribution import attribute
 from scrutator.exposure import exposure
-from scrutator.names import name_states, summarise_states
-from scrutator.findings import build_findings
+from scrutator.findings import findings_from_report, summarise_findings
+from scrutator.names import headline, name_states, summarise_states, summarise_tiers
 from scrutator.packs import PackSet, load_packs
 from scrutator.risk.engine import analyze
 from scrutator.store import Store
@@ -117,7 +117,6 @@ def build_report(
     core = core_report(store, scan_id)
     entities = store.entities(scan_id)
     edges = store.edges(scan_id)
-    findings = build_findings(store, scan_id)
     evidence = core["evidence"]
     if ai_info is None:
         ai_info = _meta_json(store, scan_id, "ai")
@@ -132,22 +131,14 @@ def build_report(
             "by_type": dict(Counter(s.entity.type.value for s in entities)),
             "by_scope": dict(Counter(s.state.value for s in entities)),
             "edges": len(edges),
-            "findings": len(findings),
+            "findings": 0,
             "risks": 0,
             "candidates": 0,
             "leads": 0,
         },
         "entities": core["entities"],
         "edges": core["edges"],
-        "findings": [
-            {
-                "claim": f.claim,
-                "entity_ids": list(f.entity_ids),
-                "evidence_ids": list(f.evidence_ids),
-                "confidence": f.confidence.value,
-            }
-            for f in findings
-        ],
+        "findings": [],
         "evidence": evidence,
         "sources": source_health(store, scan_id),
         "coverage": coverage(store, scan_id),
@@ -172,6 +163,12 @@ def build_report(
     report["exposure"] = exposure(report)
     report["names"] = name_states(report)
     report["summary"]["names"] = summarise_states(report["names"])
+    report["summary"]["tiers"] = summarise_tiers(report["names"])
+    report["summary"]["headline"] = headline(report["summary"]["tiers"])
+    # one finding per relation, each tagged with the tier of the name it is about, verified first
+    report["findings"] = findings_from_report(report)
+    report["summary"]["findings"] = len(report["findings"])
+    report["summary"]["findings_by_tier"] = summarise_findings(report["findings"])
     report["attribution"] = attribute(report, packs)
     report["summary"]["leads"] = len(report["leads"]["verified"])
     report["summary"]["candidates"] = sum(1 for c in report["attribution"]["candidates"] if c["band"] != "unlikely")

@@ -27,6 +27,10 @@ svg{width:100%;height:520px;background:var(--card);border:1px solid var(--line);
 select,input{background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:4px 8px;margin:0 8px 8px 0}
 ul.statements{padding-left:20px}
 .remedy{margin-top:4px}
+.headline{font-size:17px;font-weight:600;margin:8px 0}
+.tier-group{margin:12px 0}
+.tier-group>summary{cursor:pointer;font-weight:600;padding:6px 0}
+.tier-note{margin:2px 0 8px}
 td.sev{white-space:nowrap;word-break:normal;width:1%}
 .tag{font-size:12px;border:1px solid var(--line);border-radius:4px;padding:0 4px;margin-left:6px}
 .band-confirmed{color:var(--high)}.band-probable{color:var(--medium)}.band-possible{color:var(--low)}.band-unlikely{color:var(--muted)}
@@ -38,6 +42,7 @@ ul.statements li{margin:6px 0}
 <main>
 <h1>Scrutator report</h1>
 <div class="muted" id="meta"></div>
+<div id="headline"></div>
 <div class="cards" id="cards"></div>
 <div id="extra"></div>
 <div id="risks"></div>
@@ -69,6 +74,9 @@ const aiLine = D.ai
 document.getElementById("meta").textContent =
   `${D.scan.seed} · scan #${D.scan.id} · generated ${D.generated_at} · scrutator ${D.tool.version}${aiLine}`;
 
+if (D.summary.headline) {
+  document.getElementById("headline").append(el("p", {className: "headline", textContent: "Names: " + D.summary.headline + ". Verified names come first; the rest are counted below and open on demand."}));
+}
 const cards = document.getElementById("cards");
 const counts = {
   "Entities": D.summary.entities,
@@ -79,12 +87,12 @@ const counts = {
   "Edges": D.summary.edges,
   "Findings": D.summary.findings,
 };
-const nameCounts = D.summary.names || {};
+const tierCounts = D.summary.tiers || {};
 if (D.names && D.names.length) {
-  counts["Live names"] = nameCounts.live || 0;
-  counts["Stale (NXDOMAIN)"] = nameCounts.stale || 0;
-  counts["Wildcard-covered"] = nameCounts.wildcard || 0;
-  counts["Unresolved"] = nameCounts.unresolved || 0;
+  counts["Verified names"] = tierCounts.verified || 0;
+  counts["Claimed names"] = tierCounts.claimed || 0;
+  counts["Stale names"] = tierCounts.stale || 0;
+  counts["Wildcard-covered"] = tierCounts.wildcard || 0;
 }
 for (const [label, value] of Object.entries(counts)) {
   cards.append(el("div", {className: "card"}, el("b", {textContent: String(value)}), label));
@@ -262,6 +270,36 @@ function renderDependencies() {
 const NAME_STATE = {};
 for (const row of D.names || []) NAME_STATE[row.name] = row.state;
 const STATE_LABEL = {live: "live", stale: "stale (NXDOMAIN)", wildcard: "wildcard-covered", unresolved: "unresolved"};
+const TIER_LABEL = {verified: "Verified", other: "Addresses and registrations", claimed: "Claimed", stale: "Stale", wildcard: "Wildcard-covered"};
+const TIER_NOTE = {
+  verified: "DNS resolves them, or a certificate or a scan dated inside the last 90 days names them and DNS does not contradict it.",
+  other: "Relations that are about an address, a network or a registration rather than about one name.",
+  claimed: "Only a list (an aggregator, an archive) names them, and DNS gives no sign of them. Kept as claims, with the reason.",
+  stale: "Evidenced once (a certificate or a scan), but DNS no longer agrees or the record is older than 90 days.",
+  wildcard: "Only the zone's wildcard record answers for them, so DNS does not prove they exist.",
+};
+const nameTier = (r) => r.tier || (r.state === "live" ? "verified" : r.state === "wildcard" ? "wildcard" : "claimed");
+
+// Verified groups are shown; every other group is a counted disclosure whose table is built when it is first opened.
+function tierGroups(items, tierOf, order, noun, makeTable) {
+  const host = el("div");
+  for (const tier of order) {
+    const rows = items.filter(item => tierOf(item) === tier);
+    if (!rows.length) continue;
+    const note = el("p", {className: "muted tier-note", textContent: TIER_NOTE[tier] || ""});
+    if (tier === "verified" || tier === "other") {
+      host.append(el("h3", {textContent: `${TIER_LABEL[tier]} (${rows.length} ${noun})`}), note, makeTable(rows));
+    } else {
+      const group = el("details", {className: "tier-group"}, el("summary", {textContent: `${TIER_LABEL[tier]}: ${rows.length} ${noun} (click to expand)`}), note);
+      let built = false;
+      group.addEventListener("toggle", () => {
+        if (group.open && !built) { built = true; group.append(makeTable(rows)); }
+      });
+      host.append(group);
+    }
+  }
+  return host;
+}
 
 function renderNames() {
   const rows = D.names || [];
@@ -269,25 +307,22 @@ function renderNames() {
   const host = el("div");
   const c = D.summary.names || {};
   host.append(el("p", {className: "muted", textContent:
-    `${rows.length} in-scope name(s): ${c.live || 0} live, ${c.stale || 0} stale (the address lookup returned NXDOMAIN), ${c.wildcard || 0} wildcard-covered (the zone answers for any label, so DNS does not prove the name exists), ${c.unresolved || 0} unresolved (no address recorded). A certificate or archive naming a host does not make it live.`}));
-  const filter = el("select", {}, ...[["", "all states"], ["live", "live"], ["stale", "stale"], ["wildcard", "wildcard-covered"], ["unresolved", "unresolved"]].map(([value, label]) => el("option", {value, textContent: label})));
-  const body = el("tbody");
-  const draw = () => {
-    body.replaceChildren();
-    for (const r of rows) {
-      if (filter.value && r.state !== filter.value) continue;
+    `${rows.length} in-scope name(s) (the apex included). By tier: ${D.summary.headline || ""}. By DNS state: ${c.live || 0} live, ${c.stale || 0} stale (the address lookup returned NXDOMAIN), ${c.wildcard || 0} wildcard-covered, ${c.unresolved || 0} unresolved (no address recorded). A certificate or archive naming a host does not make it live.`}));
+  const table = (items) => {
+    const body = el("tbody");
+    for (const r of items) {
       body.append(el("tr", {},
         el("td", {textContent: r.name}),
-        el("td", {className: r.state === "live" ? "" : "bad", textContent: STATE_LABEL[r.state] || r.state}),
-        el("td", {textContent: r.reason}),
+        el("td", {className: nameTier(r) === "verified" ? "" : "bad", textContent: (TIER_LABEL[nameTier(r)] || nameTier(r)) + (r.basis ? ` (${r.basis})` : "")}),
+        el("td", {textContent: STATE_LABEL[r.state] || r.state}),
+        el("td", {textContent: r.tier_reason || r.reason}),
         el("td", {textContent: r.named_by.join(", ")}),
         el("td", {}, evidenceDetails(r.evidence_ids))));
     }
+    return el("table", {}, el("thead", {}, el("tr", {}, ...["Name", "Tier", "DNS state", "Why", "Named by", "Evidence"].map(t => el("th", {textContent: t})))), body);
   };
-  filter.addEventListener("input", draw);
-  host.append(filter, el("table", {}, el("thead", {}, el("tr", {}, ...["Name", "State", "Why", "Named by", "Evidence"].map(t => el("th", {textContent: t})))), body));
-  draw();
-  section("risks", "Name states (what DNS says about each in-scope name)", host);
+  host.append(tierGroups(rows, nameTier, ["verified", "claimed", "stale", "wildcard"], "name(s)", table));
+  section("risks", "Name states (what the evidence says about each in-scope name)", host);
 }
 
 function renderExposure() {
@@ -310,27 +345,36 @@ function renderExposure() {
 }
 
 function renderFindings() {
-  const table = el("table", {}, el("tr", {}, el("th", {textContent: "Claim"}), el("th", {textContent: "Confidence"}), el("th", {textContent: "Evidence"})));
-  for (const f of D.findings) {
-    const evidenceCell = el("td");
-    for (const id of f.evidence_ids) {
-      const ev = D.evidence[id];
-      evidenceCell.append(el("details", {},
-        el("summary", {textContent: `${ev.source}: ${ev.request}`}),
-        el("div", {className: "muted", textContent: `collected ${ev.collected_at} · id ${id}`}),
-        el("pre", {textContent: ev.payload.slice(0, 20000)})));
-    }
-    const claim = el("td", {textContent: f.claim});
-    for (const id of f.entity_ids) {
-      const state = NAME_STATE[id.replace(/^domain:/, "")];
-      if (state && state !== "live") claim.append(el("span", {className: "tag bad", textContent: STATE_LABEL[state]}));
-    }
-    table.append(el("tr", {},
-      claim,
-      el("td", {}, el("span", {className: `badge ${f.confidence}`, textContent: f.confidence})),
-      evidenceCell));
+  const host = document.getElementById("findings");
+  const by = D.summary.findings_by_tier;
+  if (by) {
+    host.append(el("p", {className: "muted", textContent:
+      `${D.summary.findings} finding(s), one per relation: ${by.verified} about verified names, ${by.other} about addresses and registrations, ${by.claimed} about claimed names, ${by.stale} about stale names, ${by.wildcard} about wildcard-covered names. All are kept; the last three groups open on demand.`}));
   }
-  document.getElementById("findings").append(table);
+  const table = (items) => {
+    const t = el("table", {}, el("tr", {}, el("th", {textContent: "Claim"}), el("th", {textContent: "Confidence"}), el("th", {textContent: "Evidence"})));
+    for (const f of items) {
+      const evidenceCell = el("td");
+      for (const id of f.evidence_ids) {
+        const ev = D.evidence[id];
+        evidenceCell.append(el("details", {},
+          el("summary", {textContent: `${ev.source}: ${ev.request}`}),
+          el("div", {className: "muted", textContent: `collected ${ev.collected_at} · id ${id}`}),
+          el("pre", {textContent: ev.payload.slice(0, 20000)})));
+      }
+      const claim = el("td", {textContent: f.claim});
+      for (const id of f.entity_ids) {
+        const state = NAME_STATE[id.replace(/^domain:/, "")];
+        if (state && state !== "live") claim.append(el("span", {className: "tag bad", textContent: STATE_LABEL[state]}));
+      }
+      t.append(el("tr", {},
+        claim,
+        el("td", {}, el("span", {className: `badge ${f.confidence}`, textContent: f.confidence})),
+        evidenceCell));
+    }
+    return t;
+  };
+  host.append(tierGroups(D.findings, f => f.tier || "verified", ["verified", "other", "claimed", "stale", "wildcard"], "finding(s)", table));
 }
 
 function renderEntities() {

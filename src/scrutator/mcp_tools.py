@@ -198,6 +198,7 @@ class ToolSet:
             "seed": entity.value,
             "entities": report["summary"]["entities"],
             "relations": report["summary"]["edges"],
+            "names": report["summary"]["headline"],
             "lookups": stats.modules_run,
             "steps_exhausted": stats.steps_exhausted,
             "risks": severities,
