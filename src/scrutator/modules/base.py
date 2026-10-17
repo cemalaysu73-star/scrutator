@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from typing import ClassVar, Protocol
 
@@ -58,6 +58,9 @@ class ModuleContext:
 
     http: httpx.AsyncClient
     resolver: Resolver
+    # memory shared by the lookups of one scan (the context lives as long as the scan): a module may keep
+    # what it learned here so as not to ask a service the same thing twice
+    cache: dict = field(default_factory=dict)
 
 
 class Module(ABC):

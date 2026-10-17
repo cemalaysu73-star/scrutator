@@ -31,7 +31,7 @@ class Dns(Module):
 
     name = "dns"
     accepts = frozenset({EntityType.DOMAIN})
-    concurrency = 8
+    concurrency = 32  # names at once (six queries each); the resolver's own pool bounds what is on the wire
     priority = 10
     breaker = False  # the resolver is the scan's own, not a remote service to give up on
 

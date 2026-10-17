@@ -153,27 +153,30 @@ class Engine:
 
         explorable: list[Entity] = []
         evidence_ids: set[str] = set()
-        for obs in observations:
-            if isinstance(obs, Fact):
+        # everything the lookup found is written in one transaction: the store runs on the event loop's
+        # thread, so a commit per record stalls every other lookup for as long as the disk takes
+        with self.store.batch():
+            for obs in observations:
+                if isinstance(obs, Fact):
+                    self.store.add_evidence(obs.evidence)
+                    self.store.add_scan_evidence(scan_id, obs.evidence.id)
+                    evidence_ids.add(obs.evidence.id)
+                    continue
+                if obs.entity == entity:
+                    continue
                 self.store.add_evidence(obs.evidence)
-                self.store.add_scan_evidence(scan_id, obs.evidence.id)
                 evidence_ids.add(obs.evidence.id)
-                continue
-            if obs.entity == entity:
-                continue
-            self.store.add_evidence(obs.evidence)
-            evidence_ids.add(obs.evidence.id)
-            child_state = self._classify(state, obs.rel, obs.entity)
-            changed = self.store.upsert_entity(scan_id, obs.entity, child_state)
-            self.store.add_edge(scan_id, entity.id, obs.rel, obs.entity.id, [obs.evidence.id])
-            if changed and child_state is not ScopeState.OUT:
-                explorable.append(obs.entity)
-        self._audit(
-            scan_id,
-            "ok",
-            module,
-            entity,
-            observations=len(observations),
-            evidence_ids=sorted(evidence_ids),
-        )
+                child_state = self._classify(state, obs.rel, obs.entity)
+                changed = self.store.upsert_entity(scan_id, obs.entity, child_state)
+                self.store.add_edge(scan_id, entity.id, obs.rel, obs.entity.id, [obs.evidence.id])
+                if changed and child_state is not ScopeState.OUT:
+                    explorable.append(obs.entity)
+            self._audit(
+                scan_id,
+                "ok",
+                module,
+                entity,
+                observations=len(observations),
+                evidence_ids=sorted(evidence_ids),
+            )
         return explorable

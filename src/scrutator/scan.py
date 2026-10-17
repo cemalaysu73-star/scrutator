@@ -56,6 +56,9 @@ async def run_scan(
     chosen = load_builtin_modules() if modules is None else modules
 
     async def collect() -> AgentStats:
+        warm = getattr(ctx.resolver, "warm_up", None) if ctx is not None else None
+        if callable(warm):
+            await warm()  # rank the name servers by speed before hundreds of lookups start at once
         stats = await run_agent(
             engine, scan_id, seed, chosen, ai, max_steps=max_steps, max_entities=max_entities,
             playbooks=packs.playbooks if playbooks else (),

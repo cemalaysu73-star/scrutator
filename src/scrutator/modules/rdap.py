@@ -1,3 +1,6 @@
+import asyncio
+import ipaddress
+
 from scrutator.model import Entity, EntityType, Evidence
 from scrutator.modules._names import host_entity, usable_org
 from scrutator.modules.base import Fact, Module, ModuleContext, ModuleError, Observation, http_failure
@@ -24,19 +27,49 @@ def _org(value: str | None) -> Entity | None:
         return None
 
 
+def _range(data: dict) -> tuple | None:
+    """(first, last) address of the network an RDAP answer describes, or None."""
+    try:
+        first = ipaddress.ip_address(str(data["startAddress"]))
+        last = ipaddress.ip_address(str(data["endAddress"]))
+    except (KeyError, ValueError):
+        return None
+    return (first, last) if first.version == last.version and first <= last else None
+
+
 @register
 class Rdap(Module):
     """Registration data for a domain (name servers, registrar, and the registrant when the
-    registry publishes one) or an IP (network owner) through the rdap.org bootstrap redirector."""
+    registry publishes one) or an IP (network owner) through the rdap.org bootstrap redirector.
+
+    An RDAP answer about an address describes its whole network (first and last address, handle, owner),
+    and a site on a CDN has dozens of addresses in a handful of networks: 50 addresses of owasp.org are in
+    20. So an address inside a network already looked up in this scan is not asked again; its
+    `netblock_owner` relation cites the record that contains it, whose range anyone can check."""
 
     name = "rdap"
     accepts = frozenset({EntityType.DOMAIN, EntityType.IP})
     priority = 30
-    concurrency = 4  # rdap.org answered about one lookup in 3 s per slot; 48 addresses took over a minute at 2
+    concurrency = 4  # at 8 at once rdap.org answered 429 to a third of the requests and the back-off cost more than it saved
     apex_only = True  # registration data is per registered domain; a subdomain gets HTTP 400
 
     async def run(self, entity: Entity, ctx: ModuleContext) -> list[Observation | Fact]:
+        if entity.type is not EntityType.IP:
+            return await self._ask(entity, ctx)
+        # Addresses next to each other are mostly in one network. Looking them up one after the other
+        # (within a /16, or a /32 for IPv6) lets the first answer cover the rest, where all at once would
+        # ask the same network again and again; addresses far apart still go in parallel.
+        address = ipaddress.ip_address(entity.value)
+        lane = (address.version, int(address) >> (16 if address.version == 4 else 96))
+        async with ctx.cache.setdefault("rdap-lanes", {}).setdefault(lane, asyncio.Lock()):
+            for first, last, record, owner in ctx.cache.setdefault("rdap-networks", []):
+                if first.version == address.version and first <= address <= last:
+                    return [Observation(owner, "netblock_owner", record)] if owner else []
+            return await self._ask(entity, ctx)
+
+    async def _ask(self, entity: Entity, ctx: ModuleContext) -> list[Observation | Fact]:
         kind = "ip" if entity.type is EntityType.IP else "domain"
+        networks: list = ctx.cache.setdefault("rdap-networks", [])
         url = f"https://rdap.org/{kind}/{entity.value}"
         resp = await ctx.http.get(url)
         if resp.status_code == 404:
@@ -58,6 +91,9 @@ class Rdap(Module):
             owner = _org(data.get("name"))
             if owner:
                 observations.append(Observation(owner, "netblock_owner", evidence))
+            known = _range(data)
+            if known:
+                networks.append((*known, evidence, owner))
             return observations
 
         for ns in data.get("nameservers", []):

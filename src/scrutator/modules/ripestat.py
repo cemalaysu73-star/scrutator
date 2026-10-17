@@ -18,7 +18,7 @@ class RipeStat(Module):
 
     name = "ripestat"
     accepts = frozenset({EntityType.IP})
-    concurrency = 4  # RIPEstat allows 8 at once per client; shared with the asn module
+    concurrency = 8  # RIPEstat allows 8 at once per client; shared with the asn module
     timeout = 45.0
     priority = 28
     rate_group = "ripestat"

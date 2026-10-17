@@ -84,3 +84,19 @@ async def test_a_request_can_ask_for_fewer_attempts():
         except httpx.ConnectTimeout:
             pass
     assert len(calls) == 2 and len(sleeps) == 1
+
+
+async def test_a_server_asking_for_a_long_wait_is_not_waited_for_when_told_to_give_up():
+    response, calls, sleeps = await run([(429, {"retry-after": "60"}), 200], give_up_after=8.0)
+    assert response.status_code == 429 and len(calls) == 1 and sleeps == []
+    response, calls, sleeps = await run([(503, {"retry-after": "5"}), 200], give_up_after=8.0)
+    assert response.status_code == 200 and sleeps == [5.0]  # a short wait is still honoured
+    response, calls, sleeps = await run([429, 200], give_up_after=8.0)
+    assert response.status_code == 200 and sleeps == [1.0]  # no Retry-After: the usual back-off
+
+
+async def test_the_scan_context_gives_up_on_long_waits():
+    from scrutator.context import GIVE_UP_AFTER_S, open_context
+
+    async with open_context() as ctx:
+        assert ctx.http._transport.give_up_after == GIVE_UP_AFTER_S == 8.0

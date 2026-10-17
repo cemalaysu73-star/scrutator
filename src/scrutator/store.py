@@ -2,6 +2,7 @@ import hashlib
 import json
 import sqlite3
 from collections import defaultdict
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -120,13 +121,42 @@ class Store:
         self._db = sqlite3.connect(str(path))
         self._db.row_factory = sqlite3.Row
         self._db.executescript(_SCHEMA)
+        self._open_batches = 0
 
     def close(self) -> None:
         self._db.close()
 
+    @contextmanager
+    def _write(self):
+        """One write is one transaction, unless a batch is open: then the batch commits for all of them."""
+        if self._open_batches:
+            yield
+        else:
+            with self._db:
+                yield
+
+    @contextmanager
+    def batch(self):
+        """Write many records in one transaction. Every commit stalls the event loop (the store is used from
+        its thread), so a lookup's results are written together: one commit instead of one per record. Batches
+        nest; an exception rolls the outermost one back. Reads inside a batch see its writes."""
+        if self._open_batches:
+            self._open_batches += 1
+            try:
+                yield
+            finally:
+                self._open_batches -= 1
+            return
+        self._open_batches = 1
+        try:
+            with self._db:
+                yield
+        finally:
+            self._open_batches = 0
+
     # scans
     def create_scan(self, seed: str) -> int:
-        with self._db:
+        with self._write():
             cur = self._db.execute(
                 "INSERT INTO scans (seed, started_at) VALUES (?, ?)", (seed, _now())
             )
@@ -151,7 +181,7 @@ class Store:
         return int(row["id"]) if row else None
 
     def set_meta(self, scan_id: int, key: str, value: str) -> None:
-        with self._db:
+        with self._write():
             self._db.execute(
                 "INSERT OR REPLACE INTO scan_meta (scan_id, key, value) VALUES (?, ?, ?)",
                 (scan_id, key, value),
@@ -166,7 +196,7 @@ class Store:
     # entities
     def upsert_entity(self, scan_id: int, entity: Entity, state: ScopeState) -> bool:
         """Insert, or promote to a higher scope state. True if anything changed."""
-        with self._db:
+        with self._write():
             row = self._db.execute(
                 "SELECT scope FROM entities WHERE scan_id = ? AND id = ?",
                 (scan_id, entity.id),
@@ -185,6 +215,9 @@ class Store:
                 )
                 return True
             return False
+
+    def entity_count(self, scan_id: int) -> int:
+        return int(self._db.execute("SELECT COUNT(*) FROM entities WHERE scan_id = ?", (scan_id,)).fetchone()[0])
 
     def scope_state(self, scan_id: int, entity_id: str) -> ScopeState | None:
         row = self._db.execute(
@@ -206,7 +239,7 @@ class Store:
 
     # evidence and edges
     def add_evidence(self, evidence: Evidence) -> None:
-        with self._db:
+        with self._write():
             self._db.execute(
                 "INSERT OR IGNORE INTO evidence (id, source, request, payload, collected_at)"
                 " VALUES (?, ?, ?, ?, ?)",
@@ -219,7 +252,7 @@ class Store:
 
     def add_scan_evidence(self, scan_id: int, evidence_id: str) -> None:
         """Attach evidence to a scan without attaching it to a relation (see modules.base.Fact)."""
-        with self._db:
+        with self._write():
             self._db.execute(
                 "INSERT OR IGNORE INTO scan_evidence (scan_id, evidence_id) VALUES (?, ?)",
                 (scan_id, evidence_id),
@@ -237,7 +270,7 @@ class Store:
         return [Evidence(**dict(r)) for r in rows]
 
     def add_edge(self, scan_id: int, src: str, rel: str, dst: str, evidence_ids: list[str]) -> None:
-        with self._db:
+        with self._write():
             self._db.execute(
                 "INSERT OR IGNORE INTO edges (scan_id, src, rel, dst) VALUES (?, ?, ?, ?)",
                 (scan_id, src, rel, dst),
@@ -271,7 +304,7 @@ class Store:
 
     # audit log
     def append_audit(self, scan_id: int, record: dict) -> None:
-        with self._db:
+        with self._write():
             last = self._db.execute(
                 "SELECT seq, hash FROM audit WHERE scan_id = ? ORDER BY seq DESC LIMIT 1",
                 (scan_id,),
@@ -325,7 +358,7 @@ class Store:
         payload_sha256: str,
         redacted: bool,
     ) -> None:
-        with self._db:
+        with self._write():
             self._db.execute(
                 "INSERT INTO egress (scan_id, at, role, provider, model, host, bytes_sent,"
                 " payload_sha256, redacted) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
@@ -342,7 +375,7 @@ class Store:
 
     # agent hypotheses
     def add_hypothesis(self, scan_id: int, text: str) -> int:
-        with self._db:
+        with self._write():
             cur = self._db.execute(
                 "INSERT INTO hypotheses (scan_id, text, status, evidence_ids) VALUES (?, ?, 'open', '[]')",
                 (scan_id, text),
@@ -350,7 +383,7 @@ class Store:
         return int(cur.lastrowid)
 
     def settle_hypothesis(self, hypothesis_id: int, status: str, evidence_ids: list[str]) -> None:
-        with self._db:
+        with self._write():
             self._db.execute(
                 "UPDATE hypotheses SET status = ?, evidence_ids = ? WHERE id = ?",
                 (status, json.dumps(sorted(evidence_ids)), hypothesis_id),
@@ -377,7 +410,7 @@ class Store:
         reason: str = "",
         confidence: str | None = None,
     ) -> None:
-        with self._db:
+        with self._write():
             self._db.execute(
                 "INSERT INTO statements (scan_id, text, evidence_ids, status, reason, confidence)"
                 " VALUES (?, ?, ?, ?, ?, ?)",
@@ -415,7 +448,7 @@ class Store:
         check: str = "",
         reason: str = "",
     ) -> None:
-        with self._db:
+        with self._write():
             self._db.execute(
                 "INSERT INTO leads (scan_id, kind, claim, entity_ids, evidence_ids, check_text, status, reason)"
                 " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",

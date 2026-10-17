@@ -10,7 +10,7 @@ class Asn(Module):
     name = "asn"
     accepts = frozenset({EntityType.IP})
     priority = 20
-    concurrency = 4  # RIPEstat allows 8 at a time per client, shared with the ripestat module
+    concurrency = 8  # RIPEstat allows 8 at a time per client, shared with the ripestat module
     rate_group = "ripestat"
     licence_note = (
         "RIPEstat's terms allow non-commercial use only, forbid redistributing its data without permission and "

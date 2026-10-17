@@ -25,6 +25,7 @@ class RetryingTransport(httpx.AsyncBaseTransport):
         attempts: int = 3,
         base_delay: float = 1.0,
         max_delay: float = 20.0,
+        give_up_after: float | None = None,
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
         jitter: Callable[[], float] = random.random,
     ) -> None:
@@ -32,6 +33,10 @@ class RetryingTransport(httpx.AsyncBaseTransport):
         self.attempts = attempts
         self.base_delay = base_delay
         self.max_delay = max_delay
+        # A server that asks us to wait longer than this (Retry-After) is not waited for: its 429 or 5xx is
+        # handed back at once and the caller reports the source as unavailable. A free tier's quota does not
+        # come back within a scan, and a scan that sleeps 20 s twice for it ends 40 s later with nothing.
+        self.give_up_after = give_up_after
         self._sleep = sleep
         self._jitter = jitter
 
@@ -55,6 +60,9 @@ class RetryingTransport(httpx.AsyncBaseTransport):
                 await self._sleep(self._delay(attempt, None))
                 continue
             if response.status_code in RETRY_STATUS and not last:
+                asked = response.headers.get("retry-after")
+                if self.give_up_after is not None and asked and asked.isdigit() and float(asked) > self.give_up_after:
+                    return response
                 delay = self._delay(attempt, response.headers.get("retry-after"))
                 await response.aclose()
                 await self._sleep(delay)

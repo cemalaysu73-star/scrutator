@@ -91,10 +91,15 @@ async def run_agent(
     max_rounds: int = 20,
     max_entities: int = 5000,
     playbooks: Sequence[PlaybookEntry] = (),
+    pipelined: bool | None = None,
 ) -> AgentStats:
-    """Expand the graph from `seed` under a step budget. With no AI (or when the model fails)
-    this is the deterministic breadth-first expansion; with AI, the planner ranks lookups when
-    there are more candidates than steps left."""
+    """Expand the graph from `seed` under a step budget.
+
+    Without a planner model the expansion is pipelined: a lookup starts the moment the entity it is about
+    is known, so the names a fast source lists are resolved while a slow source is still waiting. Which
+    lookups run does not depend on the order they finish in (the budget aside), only when they run.
+    With a planner model the agent works in rounds, because the planner ranks the lookups of a round
+    (and settles hypotheses with that round's evidence); `pipelined` forces either way."""
     decision = engine.scope.decide_entity(seed)
     if not decision.allowed:
         raise ValueError(f"seed is out of scope: {decision.reason}")
@@ -103,6 +108,98 @@ async def run_agent(
     engine.add_root(seed)
 
     stats = AgentStats()
+    if pipelined is None:
+        pipelined = ai is None or not ai.has("planner")
+    if pipelined:
+        await _run_pipelined(engine, scan_id, modules, stats, max_steps=max_steps, max_rounds=max_rounds, max_entities=max_entities)
+    else:
+        await _run_rounds(engine, scan_id, modules, ai, stats, max_steps=max_steps, max_rounds=max_rounds, max_entities=max_entities, playbooks=playbooks)
+    stats.deadline_hit = stats.deadline_hit or engine.deadline_losses > 0
+    stats.entities = len(store.entities(scan_id))
+    return stats
+
+
+def _by_priority(waiting: list[tuple[int, Candidate]]) -> list[tuple[int, Candidate]]:
+    return sorted(waiting, key=lambda w: (w[1].module.priority, w[1].module.name, w[1].entity.id))
+
+
+async def _run_pipelined(
+    engine: Engine,
+    scan_id: int,
+    modules: list[Module],
+    stats: AgentStats,
+    *,
+    max_steps: int,
+    max_rounds: int,
+    max_entities: int,
+) -> None:
+    """Start every lookup as soon as its entity is known; `rounds` counts the depth of the discovery (the
+    seed's lookups are depth 1, those of what they found depth 2, ...), as the round loop did."""
+    store = engine.store
+    queued: set[tuple[str, str]] = set()  # (module, entity) pairs already waiting or started
+    waiting: list[tuple[int, Candidate]] = []  # (depth, lookup) not started yet
+    running: dict[asyncio.Task, int] = {}
+
+    def queue(entity: Entity, depth: int) -> None:
+        if depth > max_rounds:
+            return
+        for module in engine.runnable(modules, entity):
+            key = (module.name, entity.id)
+            if key not in queued:
+                queued.add(key)
+                waiting.append((depth, Candidate(module, entity)))
+
+    for stored in store.entities(scan_id):
+        if stored.state is not ScopeState.OUT:
+            queue(stored.entity, 1)
+
+    stopped = False  # nothing new starts: the deadline passed, the entity cap was reached or the budget is spent
+    try:
+        while True:
+            if waiting and not stopped:
+                if engine.expired:
+                    stats.deadline_hit = stopped = True
+                else:
+                    room = max(0, max_steps - stats.modules_run)
+                    ordered = _by_priority(waiting)
+                    batch, waiting = ordered[:room], ordered[room:]
+                    if waiting:  # candidates remain and the budget is spent
+                        stats.steps_exhausted = stopped = True
+                    for depth, candidate in batch:
+                        task = asyncio.ensure_future(engine.run_module(scan_id, candidate.module, candidate.entity))
+                        running[task] = depth
+                        stats.modules_run += 1
+                        stats.rounds = max(stats.rounds, depth)
+            if not running:
+                break
+            finished, _ = await asyncio.wait(running, return_when=asyncio.FIRST_COMPLETED)
+            for task in finished:
+                depth = running.pop(task)
+                for found in task.result():
+                    queue(found, depth + 1)
+            if not stopped and store.entity_count(scan_id) >= max_entities:
+                stopped = True
+    finally:
+        for task in running:
+            task.cancel()
+        if running:
+            await asyncio.gather(*running, return_exceptions=True)
+
+
+async def _run_rounds(
+    engine: Engine,
+    scan_id: int,
+    modules: list[Module],
+    ai: AIRuntime | None,
+    stats: AgentStats,
+    *,
+    max_steps: int,
+    max_rounds: int,
+    max_entities: int,
+    playbooks: Sequence[PlaybookEntry],
+) -> None:
+    """The planner's loop: each round the planner ranks the lookups that fit the remaining budget."""
+    store = engine.store
     done: set[tuple[str, str]] = set()
     for round_no in range(1, max_rounds + 1):
         remaining = max_steps - stats.modules_run
@@ -141,6 +238,3 @@ async def run_agent(
         await _settle(ai, store, scan_id, audit_before)
         if len(store.entities(scan_id)) >= max_entities:
             break
-    stats.deadline_hit = stats.deadline_hit or engine.deadline_losses > 0
-    stats.entities = len(store.entities(scan_id))
-    return stats
