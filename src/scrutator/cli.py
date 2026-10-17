@@ -11,6 +11,7 @@ import yaml
 from scrutator.ai.config import AIConfig, AIMode, load_config
 from scrutator.ai.doctor import render_doctor, run_doctor
 from scrutator.ai.setup import build_runtime, cloud_hosts
+from scrutator.agent.runner import AgentStats
 from scrutator.ai.types import AIError
 from scrutator.analyst.leads import run_leads
 from scrutator.attribution import BANDS
@@ -30,6 +31,8 @@ from scrutator.bundle.replay import replay_evidence
 from scrutator.bundle.verify import verify_bundle
 from scrutator.bundle.writer import create_bundle
 from scrutator.context import ai_client, open_context
+from scrutator.deadline import Deadline
+from scrutator.engine import DEFAULT_BREAKER_THRESHOLD
 from scrutator.diff import diff_reports, render_diff
 from scrutator.mcp_tools import ToolSet
 from scrutator.model import Entity, EntityType
@@ -138,7 +141,7 @@ def scan(
     db: Optional[Path] = typer.Option(None, "--db", help="SQLite database path (default: <out>/scrutator.db)."),
     formats: str = typer.Option("json,html", "--format", help="Comma-separated: json, html."),
     max_entities: int = typer.Option(5000, "--max-entities", help="Soft cap on discovered entities."),
-    max_steps: Optional[int] = typer.Option(None, "--max-steps", help="Cap on module runs (default: config, 60)."),
+    max_steps: Optional[int] = typer.Option(None, "--max-steps", help="Cap on module runs (default: config, 300)."),
     ai: str = typer.Option("auto", "--ai", help="auto, off, local, cloud or hybrid."),
     model: Optional[str] = typer.Option(None, "--model", help="Model name for every AI role."),
     redact: Optional[bool] = typer.Option(None, "--redact/--no-redact", help="Pseudonymise prompts sent to cloud endpoints."),
@@ -151,6 +154,8 @@ def scan(
     attribute: bool = typer.Option(False, "--attribution/--no-attribution", help="Mark names that may belong to the organisation as candidates and look at them passively, once."),
     max_candidates: int = typer.Option(20, "--max-candidates", help="With --attribution: how many candidates to look at."),
     playbooks: bool = typer.Option(True, "--playbooks/--no-playbooks", help="Offer the planner the knowledge packs' playbooks that fit the situation."),
+    deadline_s: float = typer.Option(600.0, "--deadline", min=0, help="Seconds the whole scan may take (0: no limit). At the deadline running lookups are cancelled, results so far are kept and the report says what is missing."),
+    breaker: int = typer.Option(DEFAULT_BREAKER_THRESHOLD, "--breaker", min=0, help="Consecutive failures or timeouts after which a source is marked down for the rest of the scan (0: never)."),
 ) -> None:
     """Run a passive scan and write evidence-backed reports."""
     wanted = {f.strip() for f in formats.split(",") if f.strip()}
@@ -173,6 +178,16 @@ def scan(
 
     out.mkdir(parents=True, exist_ok=True)
     store = Store(db or out / "scrutator.db")
+    deadline = Deadline(deadline_s) if deadline_s > 0 else None
+
+    async def within(awaitable):
+        """What is left of the deadline, for the steps that come after collection."""
+        if deadline is None:
+            return await awaitable
+        try:
+            return await asyncio.wait_for(awaitable, deadline.remaining())
+        except asyncio.TimeoutError:
+            return None
 
     async def go():
         async with open_context() as ctx, ai_client() as ai_http:
@@ -184,15 +199,25 @@ def scan(
                 seed_entity, scope, store, ctx, ai=runtime,
                 max_steps=max_steps or config.max_steps, max_entities=max_entities, packs=packs,
                 attribution=attribute, max_candidates=max_candidates, playbooks=playbooks,
+                deadline=deadline, breaker_threshold=breaker,
             )
-            verdict = await summarise(runtime, store, scan_id) if runtime is not None and summary else None
-            leads = await run_leads(runtime, store, scan_id) if runtime is not None and attribute else None
+            verdict = await within(summarise(runtime, store, scan_id)) if runtime is not None and summary else None
+            leads = await within(run_leads(runtime, store, scan_id)) if runtime is not None and attribute else None
             return scan_id, stats, runtime, used, verdict, leads
 
+    interrupted = False
     try:
         scan_id, stats, runtime, used, verdict, leads = asyncio.run(go())
     except (ValueError, AIError) as exc:
         raise _fail(str(exc)) from exc
+    except KeyboardInterrupt:
+        # what was collected is already in the database: report it instead of throwing it away
+        found = store.latest_scan(seed_entity.value)
+        if found is None:
+            raise _fail("interrupted before the scan started") from None
+        scan_id, stats, runtime, used, verdict, leads = found, AgentStats(), None, None, None, None
+        store.append_audit(scan_id, {"event": "interrupted"})
+        interrupted = True
 
     if runtime is not None:
         store.set_meta(scan_id, "ai", json.dumps({"mode": used.value, **runtime.describe()}, sort_keys=True))
@@ -219,6 +244,18 @@ def scan(
     typer.echo(_risk_line(report["risks"]) + " Run `scrutator risk` for the list.")
     if attribute:
         typer.echo(_candidate_line(report["attribution"]) + " Run `scrutator candidates` for the list.")
+    if interrupted:
+        typer.echo("Interrupted: the report covers what was collected so far (partial).")
+    if stats.deadline_hit:
+        typer.echo(
+            f"Deadline of {deadline_s:g} s reached: the report is partial. Lookups still running were "
+            "cancelled and the rest did not start; Source coverage lists what is missing."
+        )
+    if report["coverage"]["sources_down"]:
+        typer.echo(
+            "Sources marked down after repeated failures (no more calls this scan): "
+            + ", ".join(report["coverage"]["sources_down"]) + "."
+        )
     if stats.steps_exhausted:
         typer.echo("Step budget reached: some lookups were not run. Raise --max-steps to cover them.")
     failed = sum(h["error"] for h in report["sources"].values())

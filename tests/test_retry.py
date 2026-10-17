@@ -65,3 +65,22 @@ async def test_retry_after_header_is_honoured_and_capped():
     assert sleeps == [2.0]
     _, _, capped = await run([(429, {"retry-after": "999"}), 200], max_delay=20.0)
     assert capped == [20.0]
+
+
+async def test_a_request_can_ask_for_fewer_attempts():
+    sleeps, calls = [], []
+
+    async def fake_sleep(delay):
+        sleeps.append(delay)
+
+    def handler(request):
+        calls.append(request)
+        raise httpx.ConnectTimeout("no route")
+
+    transport = RetryingTransport(httpx.MockTransport(handler), sleep=fake_sleep, jitter=lambda: 1.0)
+    async with httpx.AsyncClient(transport=transport) as client:
+        try:
+            await client.get("https://example.test/", extensions={"scrutator_attempts": 2})
+        except httpx.ConnectTimeout:
+            pass
+    assert len(calls) == 2 and len(sleeps) == 1

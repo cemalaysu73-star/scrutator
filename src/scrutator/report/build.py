@@ -12,22 +12,43 @@ from scrutator.store import Store
 
 
 def source_health(store: Store, scan_id: int) -> dict[str, dict[str, Any]]:
-    """Per data source: how many runs succeeded, failed, were denied or skipped, and the
-    first few distinct error messages. A source that failed is a gap in coverage."""
+    """Per data source: how many runs succeeded, failed, were denied or skipped, how many were
+    cancelled by the deadline, whether the circuit breaker marked it down, and the first few
+    distinct error messages. A source that failed or was marked down is a gap in coverage."""
     health: dict[str, dict[str, Any]] = {}
     for record in store.audit_log(scan_id):
         module = record.get("module")
         if not module:
             continue
         entry = health.setdefault(
-            module, {"ok": 0, "error": 0, "denied": 0, "skipped": 0, "errors": []}
+            module, {"ok": 0, "error": 0, "denied": 0, "skipped": 0, "cancelled": 0, "down": False, "errors": []}
         )
         event = record.get("event")
-        if event in ("ok", "error", "denied", "skipped"):
+        if event in ("ok", "error", "denied", "skipped", "cancelled"):
             entry[event] += 1
-        if event == "error" and len(entry["errors"]) < 3 and record.get("error") not in entry["errors"]:
-            entry["errors"].append(record["error"])
+        message = None
+        if event == "error":
+            message = record.get("error")
+        elif event == "breaker":
+            entry["down"] = True
+            message = f"marked down after {record.get('after')} consecutive failures: no more calls this scan"
+        elif event == "skipped" and str(record.get("reason", "")).startswith("source down"):
+            entry["down"] = True
+        if message and len(entry["errors"]) < 3 and message not in entry["errors"]:
+            entry["errors"].append(message)
     return health
+
+
+def coverage(store: Store, scan_id: int) -> dict[str, Any]:
+    """What the scan could not do: the deadline it ran under, whether it ended the scan early, and
+    the sources marked down. Derived from the audit log, so a bundle can be checked against it."""
+    limits = _meta_json(store, scan_id, "limits") or {}
+    log = store.audit_log(scan_id)
+    return {
+        "deadline_s": limits.get("deadline_s"),
+        "deadline_hit": any(r.get("event") == "deadline" for r in log),
+        "sources_down": sorted({r["module"] for r in log if r.get("event") == "breaker"}),
+    }
 
 
 def _meta_json(store: Store, scan_id: int, key: str) -> Any:
@@ -127,6 +148,7 @@ def build_report(
         ],
         "evidence": evidence,
         "sources": source_health(store, scan_id),
+        "coverage": coverage(store, scan_id),
         "summary_statements": [
             {"text": s["text"], "evidence_ids": s["evidence_ids"], "confidence": s["confidence"]}
             for s in store.statements(scan_id, status="verified")

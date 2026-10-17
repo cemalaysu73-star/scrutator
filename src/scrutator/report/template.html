@@ -101,22 +101,28 @@ function renderNarrative() {
 function renderSources() {
   const rows = Object.entries(D.sources || {}).sort(([a], [b]) => a.localeCompare(b));
   if (!rows.length) return;
-  const table = el("table", {}, el("tr", {}, ...["Source", "OK", "Failed", "Denied", "Skipped", "Errors"].map(t => el("th", {textContent: t}))));
+  const table = el("table", {}, el("tr", {}, ...["Source", "OK", "Failed", "Denied", "Skipped", "Cancelled", "Status", "Errors"].map(t => el("th", {textContent: t}))));
   let gaps = 0;
   for (const [name, h] of rows) {
-    gaps += h.error;
+    gaps += h.error + (h.cancelled || 0);
     table.append(el("tr", {},
       el("td", {textContent: name}),
       el("td", {textContent: String(h.ok)}),
       el("td", {className: h.error ? "bad" : "", textContent: String(h.error)}),
       el("td", {textContent: String(h.denied)}),
       el("td", {textContent: String(h.skipped)}),
+      el("td", {className: h.cancelled ? "bad" : "", textContent: String(h.cancelled || 0)}),
+      el("td", {className: h.down ? "bad" : "", textContent: h.down ? "down" : "answered"}),
       el("td", {textContent: h.errors.join("; ")})));
   }
-  const note = el("p", {className: "muted", textContent: gaps
-    ? `${gaps} source run(s) failed. Coverage has gaps: a missing result may only mean a source did not answer.`
-    : "Every source run answered."});
-  section("extra", "Source coverage", el("div", {}, note, table));
+  const cov = D.coverage || {};
+  const down = cov.sources_down || [];
+  const notes = [el("p", {className: "muted", textContent: gaps
+    ? `${gaps} source run(s) failed or were cancelled. Coverage has gaps: a missing result may only mean a source did not answer.`
+    : "Every source run answered."})];
+  if (down.length) notes.push(el("p", {className: "bad", textContent: `Marked down after repeated failures, not asked again in this scan: ${down.join(", ")}.`}));
+  if (cov.deadline_hit) notes.push(el("p", {className: "bad", textContent: `The scan hit its ${cov.deadline_s} s deadline: lookups still running were cancelled and the rest did not start. This report is partial.`}));
+  section("extra", "Source coverage", el("div", {}, ...notes, table));
 }
 
 function renderAttribution() {

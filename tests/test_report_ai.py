@@ -26,7 +26,7 @@ def make():
 def test_source_health_summarises_the_audit_log():
     store, sid, _ = make()
     sources = build_report(store, sid)["sources"]
-    assert sources["crtsh"] == {"ok": 1, "error": 0, "denied": 0, "skipped": 0, "errors": []}
+    assert sources["crtsh"] == {"ok": 1, "error": 0, "denied": 0, "skipped": 0, "cancelled": 0, "down": False, "errors": []}
     assert sources["wayback"]["error"] == 2 and sources["wayback"]["errors"] == ["ReadTimeout: "]
     assert sources["dns"]["denied"] == 1
 

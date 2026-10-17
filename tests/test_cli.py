@@ -184,3 +184,56 @@ def test_ai_doctor_without_a_runtime_explains_itself():
     result = runner.invoke(cli.app, ["ai", "doctor"])
     assert result.exit_code == 1
     assert "no AI" in result.output
+
+
+def test_deadline_and_breaker_flags_reach_the_scan(tmp_path, monkeypatch):
+    captured = {}
+
+    async def spy(seed, scope, store, ctx, **kwargs):
+        captured["deadline"] = kwargs["deadline"].seconds if kwargs["deadline"] else None
+        captured["breaker"] = kwargs["breaker_threshold"]
+        return store.create_scan(seed.value), AgentStats()
+
+    monkeypatch.setattr(cli, "run_scan", spy)
+    out = str(tmp_path / "o")
+    result = runner.invoke(cli.app, ["scan", "example.com", "--out", out, "--deadline", "42", "--breaker", "5"])
+    assert result.exit_code == 0, result.output
+    assert captured == {"deadline": 42.0, "breaker": 5}
+    runner.invoke(cli.app, ["scan", "example.com", "--out", out])
+    assert captured == {"deadline": 600.0, "breaker": 3}  # the defaults
+    runner.invoke(cli.app, ["scan", "example.com", "--out", out, "--deadline", "0"])
+    assert captured["deadline"] is None  # 0 means no deadline
+
+
+def test_a_scan_cut_short_by_the_deadline_says_so_and_still_writes_the_report(tmp_path, monkeypatch):
+    async def cut_short(seed, scope, store, ctx, **kwargs):
+        scan_id = store.create_scan(seed.value)
+        store.upsert_entity(scan_id, seed, ScopeState.IN)
+        store.append_audit(scan_id, {"event": "deadline", "seconds": 5})
+        store.append_audit(scan_id, {"event": "breaker", "module": "commoncrawl", "entity": "domain:example.com", "after": 3, "last_error": "x", "group": "commoncrawl"})
+        return scan_id, AgentStats(deadline_hit=True)
+
+    monkeypatch.setattr(cli, "run_scan", cut_short)
+    out = tmp_path / "o"
+    result = runner.invoke(cli.app, ["scan", "example.com", "--out", str(out), "--deadline", "5"])
+    assert result.exit_code == 0, result.output
+    assert "deadline" in result.output.lower() and "partial" in result.output.lower()
+    assert "commoncrawl" in result.output and "marked down" in result.output
+    report = json.loads((out / "report.json").read_text(encoding="utf-8"))
+    assert report["coverage"] == {"deadline_s": None, "deadline_hit": True, "sources_down": ["commoncrawl"]}
+
+
+def test_ctrl_c_still_writes_a_report_of_what_was_collected(tmp_path, monkeypatch):
+    async def interrupted(seed, scope, store, ctx, **kwargs):
+        scan_id = store.create_scan(seed.value)
+        store.upsert_entity(scan_id, seed, ScopeState.IN)
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(cli, "run_scan", interrupted)
+    out = tmp_path / "o"
+    result = runner.invoke(cli.app, ["scan", "example.com", "--out", str(out)])
+    assert result.exit_code == 0, result.output
+    assert "interrupted" in result.output.lower()
+    report = json.loads((out / "report.json").read_text(encoding="utf-8"))
+    assert report["scan"]["seed"] == "example.com" and report["coverage"]["deadline_hit"] is False
+    assert any(r["event"] == "interrupted" for r in __import__("scrutator.store", fromlist=["Store"]).Store(out / "scrutator.db").audit_log(1))

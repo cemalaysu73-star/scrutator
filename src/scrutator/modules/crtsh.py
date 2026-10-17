@@ -2,7 +2,7 @@ import json
 
 from scrutator.model import Entity, EntityType, Evidence
 from scrutator.modules._names import host_entity, rel_for
-from scrutator.modules.base import Module, ModuleContext, ModuleError, Observation
+from scrutator.modules.base import Module, ModuleContext, ModuleError, Observation, http_failure
 from scrutator.modules.registry import register
 
 _CERT_FIELDS = ("id", "issuer_name", "name_value", "not_before", "not_after")
@@ -16,11 +16,13 @@ class CrtSh(Module):
     accepts = frozenset({EntityType.DOMAIN})
     concurrency = 1
     timeout = 90.0
+    priority = 0
+    apex_only = True
 
     async def run(self, entity: Entity, ctx: ModuleContext) -> list[Observation]:
         resp = await ctx.http.get("https://crt.sh/", params={"q": f"%.{entity.value}", "output": "json"})
         if resp.status_code != 200:
-            raise ModuleError(f"crt.sh returned HTTP {resp.status_code}")
+            raise http_failure("crt.sh", resp.status_code)
         try:
             rows = resp.json()
         except ValueError as exc:

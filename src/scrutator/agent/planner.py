@@ -40,6 +40,12 @@ class Choice:
     playbooks: tuple[str, ...] = ()  # ids of the playbooks that were in the prompt
 
 
+def by_priority(candidates: Sequence[Candidate]) -> list[Candidate]:
+    """Cheap lookups that turn names into facts first (resolve a name before asking an archive
+    about it). Used whenever the order is the tool's own choice: no model, or a model that failed."""
+    return sorted(candidates, key=lambda c: (c.module.priority, c.module.name, c.entity.id))
+
+
 async def choose(
     candidates: Sequence[Candidate],
     remaining: int,
@@ -56,7 +62,7 @@ async def choose(
     if len(candidates) <= remaining:
         return Choice(list(candidates), "all")
     if ai is None or not ai.has("planner"):
-        return Choice(list(candidates[:remaining]), "all")
+        return Choice(by_priority(candidates)[:remaining], "all")
 
     options = list(candidates[:MAX_OPTIONS])
     listing = "\n".join(f"{i}: {c.label}" for i, c in enumerate(options))
@@ -74,7 +80,7 @@ async def choose(
     try:
         ranking = await ai.generate("planner", SYSTEM, user, Ranking)
     except AIError:
-        return Choice(list(candidates[:remaining]), "fallback", playbooks=offered)
+        return Choice(by_priority(candidates)[:remaining], "fallback", playbooks=offered)
 
     picked: list[Candidate] = []
     seen: set[int] = set()
@@ -83,5 +89,5 @@ async def choose(
             seen.add(index)
             picked.append(options[index])
     if not picked:
-        return Choice(list(candidates[:remaining]), "fallback", playbooks=offered)
+        return Choice(by_priority(candidates)[:remaining], "fallback", playbooks=offered)
     return Choice(picked[:remaining], "ai", ranking.hypothesis, offered)

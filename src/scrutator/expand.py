@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from scrutator.engine import Engine
 from scrutator.model import Entity, ScopeState
 from scrutator.modules.base import Module
-from scrutator.modules.registry import select_modules
 
 
 @dataclass
@@ -30,6 +29,7 @@ async def expand(
     if not decision.allowed:
         raise ValueError(f"seed is out of scope: {decision.reason}")
     engine.store.upsert_entity(scan_id, seed, ScopeState.IN)
+    engine.add_root(seed)
 
     stats = ExpandStats()
     done: set[tuple[str, str]] = set()
@@ -37,7 +37,7 @@ async def expand(
     for round_no in range(1, max_rounds + 1):
         tasks = []
         for entity in frontier:
-            for module in select_modules(modules, entity.type, allow_active=engine.allow_active):
+            for module in engine.runnable(modules, entity):
                 key = (module.name, entity.id)
                 if key in done:
                     continue

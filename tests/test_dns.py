@@ -1,4 +1,7 @@
+import asyncio
+
 from scrutator.model import Entity, EntityType
+from scrutator.modules.base import ModuleContext
 from scrutator.modules.dns import Dns
 
 RECORDS = {
@@ -52,3 +55,32 @@ async def test_junk_answers_are_ignored(make_ctx):
 
 async def test_no_records_yield_nothing(make_ctx):
     assert await Dns().run(dom("empty.example.com"), make_ctx({})) == []
+
+
+async def test_the_queries_for_one_name_are_asked_together():
+    import time
+
+    from scrutator.resolver import DnsAnswer
+
+    class SlowResolver:
+        async def query(self, name, rtype):
+            await asyncio.sleep(0.2)
+            return DnsAnswer("answer", ("192.0.2.1",)) if rtype == "A" else DnsAnswer("nodata")
+
+    ctx = ModuleContext(http=None, resolver=SlowResolver())
+    started = time.monotonic()
+    obs = await Dns().run(Entity(type=EntityType.DOMAIN, value="www.example.com"), ctx)
+    assert time.monotonic() - started < 0.6  # six queries one after the other would take 1.2 s
+    assert [o.entity.value for o in obs if o.rel == "resolves_to"] == ["192.0.2.1"]
+
+
+def test_the_server_that_answered_is_tried_first_next_time():
+    from scrutator.resolver import DnsResolver
+
+    resolver = DnsResolver(["10.255.255.1", "1.1.1.1", "8.8.8.8"])
+    resolver._prefer("1.1.1.1")
+    assert resolver._resolver.nameservers == ["1.1.1.1", "10.255.255.1", "8.8.8.8"]
+    resolver._prefer("1.1.1.1")  # already first: unchanged
+    resolver._prefer(None)  # no answering server known: unchanged
+    resolver._prefer("9.9.9.9")  # not one of ours: unchanged
+    assert resolver._resolver.nameservers == ["1.1.1.1", "10.255.255.1", "8.8.8.8"]

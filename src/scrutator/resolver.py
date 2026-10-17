@@ -88,8 +88,16 @@ class DnsResolver:
             return DnsAnswer("nxdomain" if _denies_existence(error) else "nodata")
         except dns.resolver.NoNameservers:
             return DnsAnswer("servfail")
+        self._prefer(getattr(answer, "nameserver", None))
         records = tuple(record.to_text() for record in answer)
         return DnsAnswer("answer", records) if records else DnsAnswer("nodata")
+
+    def _prefer(self, nameserver: str | None) -> None:
+        """Try the server that just answered first from now on. A dead first server in the system
+        configuration otherwise costs a full timeout on every single lookup."""
+        servers = self._resolver.nameservers
+        if nameserver in servers and servers[0] != nameserver:
+            self._resolver.nameservers = [nameserver, *(s for s in servers if s != nameserver)]
 
     async def lookup(self, name: str, rtype: str) -> list[str]:
         return list((await self.query(name, rtype)).records)

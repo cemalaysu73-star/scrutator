@@ -17,6 +17,19 @@ class ModuleError(Exception):
     """A source failed or returned something unusable. The engine records it and moves on."""
 
 
+class SourceUnavailable(ModuleError):
+    """The source itself is not answering (HTTP 5xx or 429, a timeout, a refused connection or an
+    exhausted quota), as opposed to refusing one particular question. Enough of these in a row
+    mark the source down for the rest of the scan."""
+
+
+def http_failure(source: str, status: int) -> ModuleError:
+    """The error for a non-success status: 429 and 5xx mean the source is struggling, anything
+    else is an answer about this one question."""
+    cls = SourceUnavailable if status == 429 or status >= 500 else ModuleError
+    return cls(f"{source} returned HTTP {status}")
+
+
 class Resolver(Protocol):
     async def lookup(self, name: str, rtype: str) -> list[str]: ...
 
@@ -54,6 +67,18 @@ class Module(ABC):
     needs_key: ClassVar[str | None] = None
     concurrency: ClassVar[int] = 2
     timeout: ClassVar[float] = 60.0
+    # Lower runs first when the step budget cannot cover everything: resolving names comes before
+    # asking an archive about them.
+    priority: ClassVar[int] = 50
+    # Asked once per apex, not once per discovered name. A source that lists every name under a
+    # domain (certificates, archives, passive DNS) already covers every depth with its
+    # `*.example.com` query, and registration data belongs to the registered domain: asking again for
+    # each subdomain only spends the step budget and the source's rate limit.
+    apex_only: ClassVar[bool] = False
+    # Modules that talk to the same service share one concurrency limit and one circuit breaker.
+    rate_group: ClassVar[str | None] = None
+    # A line for module listings and bundles: what the source's terms allow.
+    licence_note: ClassVar[str | None] = None
 
     @abstractmethod
     async def run(self, entity: Entity, ctx: ModuleContext) -> list[Observation | Fact]: ...

@@ -1,6 +1,6 @@
 from scrutator.model import Entity, EntityType, Evidence
 from scrutator.modules._names import host_entity, usable_org
-from scrutator.modules.base import Fact, Module, ModuleContext, ModuleError, Observation
+from scrutator.modules.base import Fact, Module, ModuleContext, ModuleError, Observation, http_failure
 from scrutator.modules.registry import register
 
 
@@ -31,6 +31,9 @@ class Rdap(Module):
 
     name = "rdap"
     accepts = frozenset({EntityType.DOMAIN, EntityType.IP})
+    priority = 30
+    concurrency = 4  # rdap.org answered about one lookup in 3 s per slot; 48 addresses took over a minute at 2
+    apex_only = True  # registration data is per registered domain; a subdomain gets HTTP 400
 
     async def run(self, entity: Entity, ctx: ModuleContext) -> list[Observation | Fact]:
         kind = "ip" if entity.type is EntityType.IP else "domain"
@@ -39,7 +42,7 @@ class Rdap(Module):
         if resp.status_code == 404:
             return []
         if resp.status_code != 200:
-            raise ModuleError(f"rdap returned HTTP {resp.status_code}")
+            raise http_failure("rdap", resp.status_code)
         try:
             data = resp.json()
         except ValueError as exc:

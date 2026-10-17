@@ -42,8 +42,11 @@ class RetryingTransport(httpx.AsyncBaseTransport):
         return backoff * (0.5 + self._jitter() / 2)
 
     async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
-        for attempt in range(1, self.attempts + 1):
-            last = attempt == self.attempts
+        # a module that knows its source is flaky can ask for fewer tries
+        wanted = request.extensions.get("scrutator_attempts")
+        attempts = min(self.attempts, wanted) if isinstance(wanted, int) and wanted >= 1 else self.attempts
+        for attempt in range(1, attempts + 1):
+            last = attempt == attempts
             try:
                 response = await self._inner.handle_async_request(request)
             except _RETRY_EXCEPTIONS:

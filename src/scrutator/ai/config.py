@@ -37,7 +37,7 @@ class AIConfig:
     mode: AIMode = AIMode.AUTO
     roles: Mapping[str, RoleSpec] = field(default_factory=dict)
     redact: bool = False
-    max_steps: int = 60
+    max_steps: int = 300
 
 
 def default_config_path() -> Path:
@@ -73,5 +73,5 @@ def load_config(path: Path | None) -> AIConfig:
         mode=AIMode(data.get("mode", "auto")),
         roles=roles,
         redact=bool(data.get("redact", False)),
-        max_steps=int(data.get("max_steps", 60)),
+        max_steps=int(data.get("max_steps", 300)),
     )

@@ -1,9 +1,15 @@
 import json
 
+import httpx
+
 from scrutator.model import Entity, EntityType, Evidence
 from scrutator.modules._names import hosts_from_urls, rel_for
-from scrutator.modules.base import Module, ModuleContext, ModuleError, Observation
+from scrutator.modules.base import Module, ModuleContext, ModuleError, Observation, http_failure
 from scrutator.modules.registry import register
+
+
+# Quick to give up: the archive is slow or unreachable from some networks, and a scan has a deadline.
+_TIMEOUT = httpx.Timeout(30.0, connect=8.0)
 
 
 @register
@@ -13,7 +19,9 @@ class Wayback(Module):
     name = "wayback"
     accepts = frozenset({EntityType.DOMAIN})
     concurrency = 1
-    timeout = 90.0
+    timeout = 60.0
+    priority = 0
+    apex_only = True
 
     async def run(self, entity: Entity, ctx: ModuleContext) -> list[Observation]:
         resp = await ctx.http.get(
@@ -25,9 +33,11 @@ class Wayback(Module):
                 "collapse": "urlkey",
                 "limit": "500",
             },
+            timeout=_TIMEOUT,
+            extensions={"scrutator_attempts": 2},
         )
         if resp.status_code != 200:
-            raise ModuleError(f"wayback returned HTTP {resp.status_code}")
+            raise http_failure("wayback", resp.status_code)
         try:
             rows = resp.json() if resp.text.strip() else []
         except ValueError as exc:

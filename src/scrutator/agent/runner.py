@@ -12,7 +12,6 @@ from scrutator.ai.types import AIError
 from scrutator.engine import Engine
 from scrutator.model import Entity, ScopeState
 from scrutator.modules.base import Module
-from scrutator.modules.registry import select_modules
 from scrutator.packs.schema import PlaybookEntry
 from scrutator.store import Store
 
@@ -33,6 +32,7 @@ class AgentStats:
     fallbacks: int = 0
     playbook_rounds: int = 0  # rounds in which the planner's prompt carried at least one playbook
     steps_exhausted: bool = False
+    deadline_hit: bool = False  # the clock ended the scan before every lookup had run
 
 
 def _candidates(
@@ -42,7 +42,7 @@ def _candidates(
     for stored in engine.store.entities(scan_id):
         if stored.state is ScopeState.OUT:
             continue
-        for module in select_modules(modules, stored.entity.type, allow_active=engine.allow_active):
+        for module in engine.runnable(modules, stored.entity):
             if (module.name, stored.entity.id) not in done:
                 found.append(Candidate(module, stored.entity))
     return sorted(found, key=lambda c: (c.module.name, c.entity.id))
@@ -100,6 +100,7 @@ async def run_agent(
         raise ValueError(f"seed is out of scope: {decision.reason}")
     store = engine.store
     store.upsert_entity(scan_id, seed, ScopeState.IN)
+    engine.add_root(seed)
 
     stats = AgentStats()
     done: set[tuple[str, str]] = set()
@@ -107,6 +108,9 @@ async def run_agent(
         remaining = max_steps - stats.modules_run
         candidates = _candidates(engine, scan_id, modules, done)
         if not candidates:
+            break
+        if engine.expired:
+            stats.deadline_hit = True
             break
         if remaining <= 0:
             stats.steps_exhausted = True
@@ -137,5 +141,6 @@ async def run_agent(
         await _settle(ai, store, scan_id, audit_before)
         if len(store.entities(scan_id)) >= max_entities:
             break
+    stats.deadline_hit = stats.deadline_hit or engine.deadline_losses > 0
     stats.entities = len(store.entities(scan_id))
     return stats

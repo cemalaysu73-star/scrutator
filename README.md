@@ -291,13 +291,15 @@ without, at four lookup budgets:
 
 | Lookup budget | Names resolved, without | Names resolved, with | Risks found, without | Risks found, with |
 |---|---|---|---|---|
-| 8 | 1 | 6 | 1 | 2 |
-| 10 | 1 | 8 | 1 | 3 |
-| 14 | 4 | 8 | 2 | 3 |
+| 8 | 5 | 6 | 2 | 2 |
+| 10 | 7 | 8 | 3 | 3 |
+| 14 | 8 | 8 | 3 | 3 |
 | 24 | 8 | 8 | 3 | 3 |
 
-This shows that retrieval reaches the prompt and changes what the agent does with a tight budget, and
-that with room to spare both finish the same investigation. It does **not** show that a real model
+(v0.5 published 1, 1, 4 and 8 names without playbooks. In v0.6 the sources that list every name under a
+domain run once per apex instead of once per name, so the unguided agent wastes far fewer lookups and the
+guidance has less to win back.) This shows that retrieval reaches the prompt and changes what the agent
+does with a tight budget, and that with room to spare both finish the same investigation. It does **not** show that a real model
 benefits: the stand-in obeys by construction. The real-model ablation is part of the v1.0 benchmark.
 
 To change the bundled packs: edit the YAML in `src/scrutator/packs/data`, run `scrutator packs manifest
@@ -389,7 +391,7 @@ is validated against a schema, with repair attempts and a deterministic fallback
 [ai]
 mode = "auto"        # auto | off | local | cloud | hybrid
 redact = false
-max_steps = 60
+max_steps = 300
 
 [ai.planner]
 provider = "ollama"  # ollama | openai (any OpenAI-compatible server) | anthropic

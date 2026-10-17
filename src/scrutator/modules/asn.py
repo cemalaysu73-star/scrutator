@@ -1,5 +1,5 @@
 from scrutator.model import Entity, EntityType, Evidence
-from scrutator.modules.base import Module, ModuleContext, ModuleError, Observation
+from scrutator.modules.base import Module, ModuleContext, ModuleError, Observation, http_failure
 from scrutator.modules.registry import register
 
 
@@ -9,13 +9,15 @@ class Asn(Module):
 
     name = "asn"
     accepts = frozenset({EntityType.IP})
+    priority = 20
+    concurrency = 4  # RIPEstat allows 8 at a time per client
 
     async def run(self, entity: Entity, ctx: ModuleContext) -> list[Observation]:
         resp = await ctx.http.get(
             "https://stat.ripe.net/data/prefix-overview/data.json", params={"resource": entity.value}
         )
         if resp.status_code != 200:
-            raise ModuleError(f"ripestat returned HTTP {resp.status_code}")
+            raise http_failure("ripestat", resp.status_code)
         try:
             asns = resp.json()["data"]["asns"]
         except (ValueError, KeyError, TypeError) as exc:

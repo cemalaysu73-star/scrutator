@@ -1,3 +1,4 @@
+import asyncio
 import re
 
 from scrutator.model import Entity, EntityType, Evidence
@@ -31,6 +32,7 @@ class Dns(Module):
     name = "dns"
     accepts = frozenset({EntityType.DOMAIN})
     concurrency = 8
+    priority = 10
 
     _QUERIES = (
         ("A", "resolves_to"),
@@ -50,8 +52,12 @@ class Dns(Module):
         observations: list[Observation] = []
         facts: list[Fact] = []
         attached: set[str] = set()  # evidence already cited by an observation
-        for rtype, rel in self._QUERIES:
-            answer = await lookup_status(ctx.resolver, entity.value, rtype)
+        # the queries do not depend on each other: ask them together, then read the answers in the
+        # fixed order so the evidence and the relations come out the same every time
+        answers = await asyncio.gather(
+            *(lookup_status(ctx.resolver, entity.value, rtype) for rtype, _ in self._QUERIES)
+        )
+        for (rtype, rel), answer in zip(self._QUERIES, answers):
             if answer.status != "answer":
                 if rtype == "A" and answer.status == "nxdomain":
                     facts.append(Fact(self._evidence(entity.value, rtype, answer)))

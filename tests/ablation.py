@@ -20,9 +20,12 @@ from scrutator.ai.runtime import AIRuntime
 BUDGETS = (8, 10, 14, 24)
 PUBLISHED = {
     # lookup budget: (names resolved, risks found) without playbooks, then with them
-    8: ((1, 1), (6, 2)),
-    10: ((1, 1), (8, 3)),
-    14: ((4, 2), (8, 3)),
+    # re-measured for v0.6, when name-listing sources began to run once per apex instead of once per
+    # name: the unguided arm wastes fewer lookups, so the gap the guidance closes is smaller
+    # (v0.5 published 8: ((1, 1), (6, 2)), 10: ((1, 1), (8, 3)), 14: ((4, 2), (8, 3)))
+    8: ((5, 2), (6, 2)),
+    10: ((7, 3), (8, 3)),
+    14: ((8, 3), (8, 3)),
     24: ((8, 3), (8, 3)),
 }
 OPTION = re.compile(r"^(\d+): (\w+) on (\w+) (\S+)$", re.M)
