@@ -26,6 +26,7 @@ async def run_scan(
     packs: PackSet | None = None,
     attribution: bool = False,
     max_candidates: int = 20,
+    playbooks: bool = True,
 ) -> tuple[int, AgentStats]:
     scan_id = store.create_scan(seed.value)
     packs = packs or load_packs()
@@ -38,7 +39,8 @@ async def run_scan(
     engine = Engine(store, scope, ctx, allow_active=allow_active)
     chosen = load_builtin_modules() if modules is None else modules
     stats = await run_agent(
-        engine, scan_id, seed, chosen, ai, max_steps=max_steps, max_entities=max_entities
+        engine, scan_id, seed, chosen, ai, max_steps=max_steps, max_entities=max_entities,
+        playbooks=packs.playbooks if playbooks else (),
     )
     if attribution:
         await attribute_scan(engine, scan_id, chosen, packs, max_candidates=max_candidates)

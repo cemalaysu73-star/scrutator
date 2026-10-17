@@ -149,6 +149,7 @@ def scan(
     packs_dirs: list[Path] = typer.Option([], "--packs", help="Extra knowledge pack directory (repeatable); extends or overrides the bundled packs."),
     attribute: bool = typer.Option(False, "--attribution/--no-attribution", help="Mark names that may belong to the organisation as candidates and look at them passively, once."),
     max_candidates: int = typer.Option(20, "--max-candidates", help="With --attribution: how many candidates to look at."),
+    playbooks: bool = typer.Option(True, "--playbooks/--no-playbooks", help="Offer the planner the knowledge packs' playbooks that fit the situation."),
 ) -> None:
     """Run a passive scan and write evidence-backed reports."""
     wanted = {f.strip() for f in formats.split(",") if f.strip()}
@@ -181,7 +182,7 @@ def scan(
             scan_id, stats = await run_scan(
                 seed_entity, scope, store, ctx, ai=runtime,
                 max_steps=max_steps or config.max_steps, max_entities=max_entities, packs=packs,
-                attribution=attribute, max_candidates=max_candidates,
+                attribution=attribute, max_candidates=max_candidates, playbooks=playbooks,
             )
             verdict = await summarise(runtime, store, scan_id) if runtime is not None and summary else None
             leads = await run_leads(runtime, store, scan_id) if runtime is not None and attribute else None

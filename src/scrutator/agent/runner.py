@@ -1,7 +1,9 @@
 import asyncio
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 from scrutator.agent.planner import Candidate, choose
+from scrutator.agent.playbooks import retrieve, situation
 from scrutator.agent.schemas import SettleResult
 from scrutator.agent.summary import graph_summary
 from scrutator.ai.prompt import wrap_data
@@ -11,6 +13,7 @@ from scrutator.engine import Engine
 from scrutator.model import Entity, ScopeState
 from scrutator.modules.base import Module
 from scrutator.modules.registry import select_modules
+from scrutator.packs.schema import PlaybookEntry
 from scrutator.store import Store
 
 _SETTLE_SYSTEM = (
@@ -28,6 +31,7 @@ class AgentStats:
     entities: int = 0
     ai_choices: int = 0
     fallbacks: int = 0
+    playbook_rounds: int = 0  # rounds in which the planner's prompt carried at least one playbook
     steps_exhausted: bool = False
 
 
@@ -86,6 +90,7 @@ async def run_agent(
     max_steps: int = 60,
     max_rounds: int = 20,
     max_entities: int = 5000,
+    playbooks: Sequence[PlaybookEntry] = (),
 ) -> AgentStats:
     """Expand the graph from `seed` under a step budget. With no AI (or when the model fails)
     this is the deterministic breadth-first expansion; with AI, the planner ranks lookups when
@@ -107,9 +112,13 @@ async def run_agent(
             stats.steps_exhausted = True
             break
         open_texts = [f"H{h['id']}: {h['text']}" for h in store.hypotheses(scan_id) if h["status"] == "open"]
+        offered = retrieve(playbooks, situation(store, scan_id)) if playbooks else []
         choice = await choose(
-            candidates, remaining, ai, summary=graph_summary(store, scan_id), open_hypotheses=open_texts
+            candidates, remaining, ai, summary=graph_summary(store, scan_id), open_hypotheses=open_texts, playbooks=offered
         )
+        if choice.playbooks:
+            stats.playbook_rounds += 1
+            store.append_audit(scan_id, {"event": "playbooks", "round": round_no, "ids": list(choice.playbooks)})
         if choice.source == "ai":
             stats.ai_choices += 1
             if choice.hypothesis.strip():
