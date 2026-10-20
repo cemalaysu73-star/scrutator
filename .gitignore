@@ -18,3 +18,4 @@ bench/results/_*/
 bench/results/*-run[0-9]*/
 demo-out/
 !docs/examples/**/*.scrutator
+scrutator-bench/
