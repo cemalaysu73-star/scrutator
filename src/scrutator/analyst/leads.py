@@ -27,7 +27,7 @@ from scrutator.modules.registry import load_builtin_modules
 from scrutator.report import build_report
 from scrutator.store import Store
 from scrutator.verify.entail import judge_entailment
-from scrutator.verify.grounding import ungrounded
+from scrutator.verify.grounding import repeats_record_text, ungrounded
 
 MAX_LEADS = 8
 MAX_CANDIDATES = 12
@@ -183,7 +183,10 @@ async def run_leads(ai: AIRuntime | None, store: Store, scan_id: int) -> LeadRes
         excerpts += [_excerpt(report["evidence"][i]) for i in evidence_ids]
         check = f"{lead.check.module} on {entity_refs[lead.check.entity_ref]}" if lead.check else ""
         item = {"kind": lead.kind, "claim": lead.claim, "entity_ids": entity_ids, "evidence_ids": evidence_ids, "check": check}
-        problem = ungrounded(lead.claim, _facts(report, entity_ids, by_entity))
+        facts = _facts(report, entity_ids, by_entity)
+        problem = ungrounded(lead.claim, facts) or repeats_record_text(
+            lead.claim, facts, [report["evidence"][i]["payload"] for i in evidence_ids if i in report["evidence"]]
+        )
         if problem:
             result.rejected.append({**item, "reason": f"ungrounded: {problem}"})
             continue

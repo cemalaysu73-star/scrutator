@@ -363,6 +363,8 @@ async def hallucination(work: Path, state: dict, model: str | None, ollama_url: 
     else:
         results = await halluc.hallucination_test()
         notes.append("local model verifier: not run (pass --verifier-model to measure one)")
+    notes.append("the gated row (floor + facts-only verifier) uses a mechanical stand-in judge, not a language model: it shows the "
+                 "pipeline publishes nothing unsupported when the verifier does its job; the obedient row is the worst case")
     gate = results["floor + facts-only verifier"]
     metrics = {
         "statements": _metric(gate["unsupported_total"] + gate["supported_total"]),

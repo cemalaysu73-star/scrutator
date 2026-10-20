@@ -19,8 +19,19 @@ is the record's words, not the rule's, so it is cut out of the facts first: ever
 to the last, so a quote character planted inside the record cannot reopen the fact. A statement may quote a
 record as well, but a quoted span must appear verbatim in a cited fact.
 
-It is a floor, not a judge: a statement that only uses known names and invents what they do ("www.example.com runs
-an outdated server") passes it and is left to the verifier model. Words such as provider names are not checked."""
+Two more checks guard the statements a writer model drafts for a summary (`overclaims`, `repeats_record_text`):
+
+- a statement may not use an alarm word ("compromised", "outdated", "vulnerable", "misconfigured", ...) or a negation
+  ("not", "no", "never", "without", "missing") unless a cited fact does: the facts are written by deterministic code
+  and say what the evidence shows, so a model that adds "compromised" or "does not resolve" has added a judgement;
+- a statement may not repeat three consecutive words of a cited *raw record* that the cited facts do not contain,
+  when one of them is a word the facts never use:
+  free text in a record (a TXT string, an RDAP remark, a page title) is where an instruction planted by the target
+  lives, and repeating it as a statement is how it would reach the report.
+
+It is a floor, not a judge. A statement that only uses known names and plain words and invents what they do
+("www.example.com serves a legacy application") passes it and is left to the verifier model. The words of the lists
+below are the ones this project could think of; a synonym passes. Words such as provider names are not checked."""
 
 import re
 
@@ -75,4 +86,68 @@ def ungrounded(statement: str, facts: list[str]) -> str:
             partners = [other for other in entities if other != token]
             if not any(_contains(fact, token) and any(_contains(fact, other) for other in partners) for fact in lowered):
                 return f"puts {token} together with {', '.join(partners[:2])}, which no cited fact does"
+    return ""
+
+
+_WORD = re.compile(r"[a-z0-9]+(?:'[a-z]+)?")
+_NEGATIONS = frozenset({"not", "no", "never", "without", "cannot", "none", "neither", "nor", "missing", "lacks", "lacking",
+                        "absent", "nxdomain", "nodata", "unreachable", "offline", "down"})
+_NEGATION_SUFFIX = "n't"
+# stems: "compromis" covers compromised/compromise, "vulnerab" covers vulnerable/vulnerability, ...
+_ALARMS = ("outdat", "vulnerab", "compromis", "breach", "hack", "malicious", "malware", "insecure", "unsecure", "misconfig",
+           "unpatch", "exploit", "hijack", "leak", "backdoor", "infect", "phish", "dangerous", "unsafe", "obsolete",
+           "end-of-life", "ransom", "stolen", "unauthori", "expos", "poison", "spoof", "defac", "trojan", "botnet",
+           "illegal", "fraud")
+
+
+def _words(text: str) -> list[str]:
+    return _WORD.findall(text.lower())
+
+
+def _negated(words: list[str]) -> bool:
+    return any(w in _NEGATIONS or w.endswith(_NEGATION_SUFFIX) for w in words)
+
+
+def overclaims(statement: str, facts: list[str]) -> str:
+    """Why `statement` asserts a judgement none of the cited `facts` makes (an alarm word or a negation), or ''."""
+    spoken = _words(_QUOTE.sub("", statement))
+    said = _words(_QUOTED.sub("", " ".join(facts)))
+    if _negated(spoken) and not _negated(said):
+        return "denies something (not, no, never, without, missing) that none of the cited facts denies"
+    for word in spoken:
+        for stem in _ALARMS:
+            if word.startswith(stem) and not any(w.startswith(stem) for w in said):
+                return f'says "{word}", which none of the cited facts says'
+    return ""
+
+
+_RUN = 3  # consecutive words
+
+
+def repeats_record_text(statement: str, facts: list[str], payloads: list[str]) -> str:
+    """Why `statement` repeats the text of a raw record rather than a derived fact, or ''.
+
+    Three consecutive words of the statement (outside quotes) that occur in a cited raw record, that the cited facts
+    do not contain, and of which one is a word of five letters or more that no cited fact uses: the statement is
+    quoting the record's prose, which anyone could have written into it. Recombining words the facts use, or
+    restating a record's syntax ("192.0.2.10") through a fact, is not refused."""
+    spoken = _words(_QUOTE.sub("", statement))
+    if len(spoken) < _RUN:
+        return ""
+    factual = [_words(fact) for fact in facts]
+    known_words = {w for words in factual for w in words}
+    known = {tuple(words[i : i + _RUN]) for words in factual for i in range(len(words) - _RUN + 1)}
+    wanted = {
+        run
+        for run in (tuple(spoken[i : i + _RUN]) for i in range(len(spoken) - _RUN + 1))
+        if run not in known and any(len(w) >= 5 and w.isalpha() and w not in known_words for w in run)
+    }
+    if not wanted:
+        return ""
+    for payload in payloads:
+        words = _words(payload[:2_000_000])
+        for i in range(len(words) - _RUN + 1):
+            run = tuple(words[i : i + _RUN])
+            if run in wanted:
+                return f'repeats "{" ".join(run)}", text of a raw record that no cited fact contains'
     return ""

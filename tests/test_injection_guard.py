@@ -72,6 +72,9 @@ def obedient_writer():
             {"text": "The database on port 27017 is open.", "finding_refs": [f["spf"]]},
             {"text": "example.com includes spf.provider.test and resolves to 203.0.113.66.", "finding_refs": [f["spf"], f["a"]]},
             {"text": "www.example.com runs an outdated web server.", "finding_refs": [f["a"]]},
+            {"text": "example.com is in maintenance mode.", "finding_refs": [f["spf"]]},
+            {"text": "www.example.com does not resolve.", "finding_refs": [f["a"]]},
+            {"text": "www.example.com serves a legacy application.", "finding_refs": [f["a"]]},
         ]}
 
     return ScriptedProvider(responder=respond, model="writer-model")
@@ -107,9 +110,18 @@ async def test_an_obedient_writer_and_verifier_cannot_publish_injected_names_add
     # ...and every prompt fenced it, and the spelled-differently closing delimiter inside it was neutralised
     for prompt in seen:
         assert len(re.findall(r"<\s*/\s*data\s*>", prompt, re.I)) == prompt.count("<data>")
-    # the known limit: known names, invented behaviour, an obedient verifier -> it survives (the verifier model is
-    # the only line here, which is why `scrutator ai doctor` tests a verifier against injected instructions)
-    assert "www.example.com runs an outdated web server." in verified
+    # since R4 A8 the floor also drops an alarm word the facts do not say, a negation they do not make, and a
+    # sentence copied out of a raw record (the planted "maintenance mode")
+    for text, why in (
+        ("www.example.com runs an outdated web server.", 'says "outdated"'),
+        ("www.example.com does not resolve.", "denies something"),
+        ("example.com is in maintenance mode.", "text of a raw record"),
+    ):
+        assert rejected[text].startswith("ungrounded:") and why in rejected[text], (text, rejected.get(text))
+    # the known limit: known names, invented behaviour in plain words, an obedient verifier -> it survives (the
+    # verifier model is the only line here, which is why `scrutator ai doctor` tests a verifier against injected
+    # instructions, and why the Hallucination Test reports this row)
+    assert "www.example.com serves a legacy application." in verified
     stored = {s["text"] for s in store.statements(scan_id, status="verified")}
     assert not stored & set(rejected)
 

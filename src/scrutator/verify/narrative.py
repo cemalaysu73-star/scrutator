@@ -11,7 +11,7 @@ from scrutator.report.build import build_report
 from scrutator.risk.engine import findings_from_risks
 from scrutator.store import Store
 from scrutator.verify.entail import judge_entailment
-from scrutator.verify.grounding import ungrounded
+from scrutator.verify.grounding import overclaims, repeats_record_text, ungrounded
 
 _ORDER = {Confidence.LOW: 0, Confidence.MEDIUM: 1, Confidence.HIGH: 2}
 _RANK = {Confidence.HIGH: 0, Confidence.MEDIUM: 1, Confidence.LOW: 2}
@@ -110,19 +110,29 @@ async def summarise(ai: AIRuntime | None, store: Store, scan_id: int) -> Summary
             )
             continue
         # deterministic floor first: a statement may only name what its cited facts name (verify/grounding.py)
-        problem = ungrounded(statement.text, [f.claim for f in cited])
+        claims = [f.claim for f in cited]
+        problem = ungrounded(statement.text, claims) or overclaims(statement.text, claims)
         if problem:
             result.rejected.append(RejectedStatement(statement.text, tuple(statement.finding_refs), f"ungrounded: {problem}"))
             continue
         evidence_ids: list[str] = []
         excerpts: list[str] = []
+        payloads: list[str] = []
         for finding in cited:
             excerpts.append(f"finding: {finding.claim}")
             for evidence_id in finding.evidence_ids[:2]:
                 evidence = store.get_evidence(evidence_id)
                 if evidence is not None:
                     excerpts.append(f"  {evidence.source} {evidence.request} -> {evidence.payload[:MAX_EXCERPT]}")
+            for evidence_id in finding.evidence_ids:
+                evidence = store.get_evidence(evidence_id)
+                if evidence is not None:
+                    payloads.append(evidence.payload)
             evidence_ids.extend(finding.evidence_ids)
+        problem = repeats_record_text(statement.text, claims, payloads)
+        if problem:
+            result.rejected.append(RejectedStatement(statement.text, tuple(statement.finding_refs), f"ungrounded: {problem}"))
+            continue
         try:
             verdict = await judge_entailment(ai, statement.text, excerpts)
         except AIError as exc:
