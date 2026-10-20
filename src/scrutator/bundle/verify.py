@@ -13,6 +13,8 @@ from scrutator.findings import findings_from_report, summarise_findings
 from scrutator.names import headline, name_states, summarise_states, summarise_tiers
 from scrutator.brand import SOURCE as BRAND_SOURCE
 from scrutator.brand import brand_presence
+from scrutator.orgexposure import SOURCES as EXPOSURE_SOURCES
+from scrutator.orgexposure import engagement_record, org_exposure
 from scrutator.packs import KINDS, NEWER_KINDS, PackSet, load_packs
 from scrutator.modules.registry import load_builtin_modules
 from scrutator.report.build import promotions
@@ -352,6 +354,28 @@ def _verify(path: str | Path, pinned_fingerprint: str | None, result: VerifyRepo
             add("brand derivable", same, "" if same else "the brand section is not what the cited evidence and the platforms pack imply")
     except Exception as exc:  # noqa: BLE001
         add("brand derivable", False, f"malformed brand section: {type(exc).__name__}: {exc}")
+
+    # organisation exposure: the engagement must be the one the signed audit log recorded before any lookup, and the
+    # aggregate must be what the minimised evidence implies. Exposure evidence without a recorded engagement fails.
+    try:
+        has_evidence = any(isinstance(r, dict) and r.get("source") in EXPOSURE_SOURCES for r in report["evidence"].values())
+        if has_evidence or "org_exposure" in report or "engagement" in report:
+            recorded = engagement_record(audit_records)
+            problem = ""
+            if recorded is None:
+                problem = "the bundle holds organisation-exposure data but the audit log records no engagement"
+            elif report.get("engagement") != recorded:
+                problem = "the report's engagement is not the one recorded in the signed audit log"
+            else:
+                first_lookup = next((i for i, r in enumerate(audit_records) if r.get("module")), len(audit_records))
+                engaged_at = next(i for i, r in enumerate(audit_records) if r.get("event") == "engagement")
+                if engaged_at > first_lookup:
+                    problem = "the engagement was recorded after the first lookup"
+            add("engagement recorded", not problem, problem)
+            same = org_exposure(report) == report.get("org_exposure")
+            add("org exposure derivable", same, "" if same else "the exposure aggregate is not what the minimised evidence implies")
+    except Exception as exc:  # noqa: BLE001
+        add("org exposure derivable", False, f"malformed exposure section: {type(exc).__name__}: {exc}")
 
     # the resolution state and the tier of each name: re-derived from the report's own evidence
     try:

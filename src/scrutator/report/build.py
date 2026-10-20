@@ -6,6 +6,7 @@ from typing import Any
 from scrutator import __version__
 from scrutator.attribution import attribute
 from scrutator.brand import brand_presence
+from scrutator.orgexposure import engagement_record, org_exposure
 from scrutator.exposure import exposure
 from scrutator.findings import findings_from_report, summarise_findings
 from scrutator.names import headline, name_states, summarise_states, summarise_tiers
@@ -169,6 +170,12 @@ def build_report(
     brand = brand_presence(report, packs)
     if brand is not None:  # only scans run with --brand have the section
         report["brand"] = brand
+    engagement = engagement_record(store.audit_log(scan_id))
+    if engagement is not None:  # only `scrutator exposure` records an engagement
+        report["engagement"] = engagement
+    org = org_exposure(report)
+    if org is not None:
+        report["org_exposure"] = org
     report["names"] = name_states(report)
     report["summary"]["names"] = summarise_states(report["names"])
     report["summary"]["tiers"] = summarise_tiers(report["names"])

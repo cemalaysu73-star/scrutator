@@ -374,6 +374,31 @@ function renderBrand() {
   section("risks", "Brand presence", host);
 }
 
+function renderOrgExposure() {
+  const org = D.org_exposure;
+  if (!org) return;
+  const e = D.engagement || {};
+  const by = e.authorised_by || {};
+  const a = org.addresses;
+  const host = el("div", {},
+    el("p", {className: "muted", textContent: `Authorised assessment (scrutator exposure): ${e.organisation || "?"} · domains ${(e.domains || []).join(", ")} · authorised by ${by.name || "?"} (${by.role || "?"}) · ${e.start} to ${e.end} · engagement file sha256 ${e.sha256}. Aggregate only: person-like addresses are counted by shape and never shown here.`}),
+    el("p", {textContent: `${a.distinct} work address(es) found: ${a.role} role mailbox(es), ${a.person_like} person-like; ${a.outside_engagement_dropped} outside the engagement dropped.`}));
+  if (org.naming_patterns.length) {
+    host.append(el("p", {textContent: "Naming patterns of person-like addresses: " + org.naming_patterns.map(p => `${p.shape} ${p.count} (${Math.round(p.share * 100)}%)`).join(", ")}));
+  }
+  const list = el("ul");
+  for (const item of org.inferences) list.append(el("li", {}, el("span", {textContent: item.text}), evidenceDetails(item.evidence_ids)));
+  host.append(list);
+  if (org.role_mailboxes.length) {
+    const table = el("table", {}, el("thead", {}, el("tr", {}, ...["Role mailbox", "Function", "Evidence"].map(t => el("th", {textContent: t})))));
+    const body = el("tbody");
+    for (const r of org.role_mailboxes) body.append(el("tr", {}, el("td", {textContent: r.address}), el("td", {textContent: r.function}), el("td", {}, evidenceDetails(r.evidence_ids))));
+    table.append(body);
+    host.append(table);
+  }
+  section("risks", "Organisation exposure (authorised, aggregate)", host);
+}
+
 function renderFindings() {
   const host = document.getElementById("findings");
   const by = D.summary.findings_by_tier;
@@ -496,6 +521,7 @@ renderNames();
 renderDependencies();
 renderExposure();
 renderBrand();
+renderOrgExposure();
 renderAttribution();
 renderAnalystLeads();
 renderFindings();

@@ -14,7 +14,7 @@ SOURCES_PAGE = (Path(__file__).parent.parent / "docs" / "sources.md").read_text(
 runner = CliRunner()
 COMMANDS = {
     "scan", "keygen", "export", "verify", "diff", "watch", "risk", "ai", "doctor", "packs", "list", "validate", "manifest",
-    "candidates", "attribution", "promote", "mcp", "sources", "bench", "protect-key",
+    "candidates", "attribution", "promote", "mcp", "sources", "bench", "protect-key", "exposure",
 }
 # options of the program itself, not of a command (`scrutator --version`)
 ROOT_OPTIONS = {"--version", "--help"}

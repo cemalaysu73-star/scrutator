@@ -882,6 +882,85 @@ def promote_cmd(
     _echo(f"{scope_file} now lists it (the previous file is kept as {scope_file.name}.bak). Scan again to investigate it fully.")
 
 
+@app.command("exposure")
+def exposure_cmd(
+    seed: str = typer.Argument(..., help="The organisation's domain (one of the engagement's domains). A person is never a seed."),
+    engagement_file: Path = typer.Option(..., "--engagement", help="The engagement file that authorises the assessment (organisation, domains, authorised_by, start, end, purpose)."),
+    detail: bool = typer.Option(False, "--detail", help="Also write the person-like work addresses found to exposure-detail.json (never into the report or the bundle). Logged in the audit log."),
+    yes: bool = typer.Option(False, "--yes", help="Confirm the attestation without a prompt (recorded as such)."),
+    out: Path = typer.Option(Path("scrutator-out"), "--out", help="Output directory."),
+    db: Optional[Path] = typer.Option(None, "--db", help="SQLite database path (default: <out>/scrutator.db)."),
+    bundle: bool = typer.Option(False, "--bundle/--no-bundle", help="Also write a signed proof bundle (minimised data only)."),
+    key_dir: Optional[Path] = typer.Option(None, "--key-dir", help="Directory with signing.key (default: ~/.config/scrutator)."),
+    deadline_s: float = typer.Option(300, "--deadline", min=0, help="Seconds the assessment may take (0: no limit)."),
+) -> None:
+    """Organisation exposure (off by default; needs an engagement file): how many work addresses the organisation itself
+    publishes, their naming pattern, which functions are visible, and what an attacker could infer. Aggregate only,
+    unless --detail."""
+    from scrutator.engagement import EngagementError, check_seed, load_engagement
+    from scrutator.exposure_scan import exposure_scope, run_exposure, write_detail
+    from scrutator.web import open_web, scope_guard
+
+    try:
+        loaded = load_engagement(engagement_file)
+        host = check_seed(seed, loaded.engagement)
+    except EngagementError as exc:
+        raise _fail(f"refused: {exc}") from exc
+    record = loaded.engagement.record()
+    _echo("Engagement (written to the audit log before any lookup):")
+    _echo(f"  organisation: {record['organisation']}")
+    _echo(f"  domains: {', '.join(record['domains'])}")
+    _echo(f"  authorised by: {record['authorised_by']['name']} ({record['authorised_by']['role']})")
+    _echo(f"  in force: {record['start']} to {record['end']}")
+    _echo(f"  purpose: {record['purpose']}")
+    _echo(f"  file sha256: {loaded.sha256}")
+    if yes:
+        confirmed = "--yes"
+    elif sys.stdin is not None and sys.stdin.isatty():
+        if not typer.confirm("I confirm this engagement authorises the assessment of these domains", default=False):
+            raise _fail("not confirmed: nothing was looked up")
+        confirmed = "prompt"
+    else:
+        raise _fail("the attestation must be confirmed: run in a terminal, or pass --yes")
+    signing_key = _signing_key(key_dir) if bundle else None
+    out.mkdir(parents=True, exist_ok=True)
+    store = Store(db or out / "scrutator.db")
+
+    async def go():
+        async with open_context() as ctx, open_web(scope_guard(exposure_scope(loaded.engagement))) as web:
+            ctx.web = web
+            return await run_exposure(loaded, host, store, ctx, confirmed=confirmed, detail=detail, deadline_s=deadline_s or None)
+
+    scan_id, run = asyncio.run(go())
+    detail_rows = []
+    if detail:
+        _, detail_rows = write_detail(store, scan_id, run, loaded, out)
+    report = build_report(store, scan_id)
+    (out / "report.json").write_text(render_json(report), encoding="utf-8")
+    (out / "report.html").write_text(render_html(report), encoding="utf-8")
+    manifest = create_bundle(store, scan_id, signing_key, out / "proof.scrutator") if signing_key is not None else None
+    store.close()
+    org = report.get("org_exposure") or {}
+    counts = org.get("addresses") or {}
+    _echo(f"Exposure #{scan_id} of {record['organisation']}: {counts.get('distinct', 0)} work address(es) found "
+          f"({counts.get('role', 0)} role mailboxes, {counts.get('person_like', 0)} person-like), "
+          f"{counts.get('outside_engagement_dropped', 0)} outside the engagement dropped.")
+    if org.get("naming_patterns"):
+        _echo("Naming patterns of person-like addresses: " + ", ".join(f"{p['shape']} {p['count']}" for p in org["naming_patterns"]) + ".")
+    if org.get("functions"):
+        _echo("Functions with a published mailbox: " + ", ".join(f"{k} {v}" for k, v in org["functions"].items()) + ".")
+    for item in org.get("inferences", []):
+        _echo(f"- {item['text']}")
+    failed = sum(h["error"] for h in report["sources"].values())
+    if failed:
+        _echo(f"{failed} lookup(s) failed; see Source coverage in the report.")
+    _echo(f"Wrote report.json, report.html to {out}")
+    if detail:
+        _echo(f"Per-person detail: {len(detail_rows)} address(es) in {out / 'exposure-detail.json'} (logged in the audit log; not in the report or the bundle).")
+    if manifest is not None:
+        _echo(f"Proof bundle: {out / 'proof.scrutator'} (signing key {manifest['key_fingerprint']})")
+
+
 @app.command("mcp")
 def mcp_cmd(
     db: Path = typer.Option(Path("scrutator-out/scrutator.db"), "--db", help="SQLite database the tools read (and, with --allow-scan, write)."),

@@ -323,6 +323,54 @@ impersonator's). The behaviour of each platform was observed live on 2026-10-20 
 and is recorded with the entry; platforms change. `verify` re-derives the section from the evidence and the
 embedded pack (`brand derivable`); `verify --replay` re-asks the profile pages, never the organisation's site.
 
+## Organisation exposure (authorised, aggregate)
+
+Off by default, a separate command, and it refuses to run without an engagement file. It estimates how much of an
+organisation's social-engineering surface its own publications give away, for an authorised red-team or defensive
+assessment. It is **not** a way to look people up: a person is never a seed, and nothing is collected about anyone
+outside their work address.
+
+```yaml
+# engagement.yaml
+organisation: Example Corp
+domains: [example.com]
+authorised_by: {name: A. Person, role: CISO}
+start: 2026-10-01
+end: 2026-12-31
+purpose: External red-team assessment of phishing exposure
+github_orgs: [example]          # optional: public code organisations the organisation owns
+```
+
+```bash
+scrutator exposure example.com --engagement engagement.yaml            # shows the attestation and asks to confirm
+scrutator exposure example.com --engagement engagement.yaml --yes --bundle
+scrutator exposure example.com --engagement engagement.yaml --detail   # per-person file, logged in the audit log
+```
+
+- **Refusals.** No engagement file, an invalid one, or one not in force today: refused before any lookup. A seed that
+  is a name, an e-mail address, a phone number or a handle: refused. A domain that is not in the engagement: refused.
+  The engagement (file sha256, fields, how the attestation was confirmed) is written to the hash-chained audit log
+  before the first lookup, and travels in the signed bundle.
+- **Sources: only what the organisation itself publishes.** Its site (robots.txt honoured: `security.txt`, the home
+  page and at most three contact, about, team, imprint or legal pages it links to), its DMARC and SOA records, its RDAP
+  contacts, and the public repositories of the GitHub organisations the engagement file names (commit addresses). No
+  professional networks, no social profiles, no search engines. Breach counts are designed as counts only
+  (`orgexposure.breach_counts`) and are not wired to any service.
+- **Minimised at collection.** An address outside the engagement's domains is dropped and only counted. A role mailbox
+  (`security@`, `billing@`, `hr@` ...) is kept: it names a function. Any other address is stored only as its shape
+  (`word.word`, `initial.word` ...) and a pseudonym under a key that lives for one run, so the database, the report, the
+  HTML and the bundle hold no personal address. Names, phone numbers and postal addresses on pages are never extracted.
+- **Output is aggregate:** how many work addresses are public, role mailboxes and the functions they reveal, the
+  naming pattern of person-like addresses, and what an attacker could infer (each inference cites its evidence). With
+  `--detail` the person-like work addresses of this run are written to `exposure-detail.json` beside the report (never
+  into the report or the bundle), and an `exposure_detail` record is added to the audit log.
+- `verify` checks that the report's engagement is the one the signed audit log recorded before any lookup
+  (`engagement recorded`) and re-derives the aggregate (`org exposure derivable`).
+
+**Release status.** The design requires a legal and ethics review before this ships; it has not had one. It is a
+preview, off by default; read [RESPONSIBLE_USE.md](RESPONSIBLE_USE.md) and check the law where you work (in the EU, the
+GDPR applies to work addresses too) before using it on real data.
+
 ## Attribution
 
 Some assets belong to an organisation without any name match: a sister domain, an acquired brand, a
@@ -709,7 +757,8 @@ authorised to assess or that you are entitled to research. Scrutator never searc
 named private individual. Risk findings describe configuration visible in public DNS and
 certificate records; they are leads for the owner to confirm, not proof of compromise. Attribution is
 a set of leads with scores: a `candidate` is not yours until you say so, and nothing is investigated
-beyond passive lookups before then. Takeover confirmation by an active check is not part of passive mode.
+beyond passive lookups before then. Takeover confirmation by an active check is not part of passive mode. The two
+opt-in modules (`--brand`, `scrutator exposure`) and what they may be used for: [RESPONSIBLE_USE.md](RESPONSIBLE_USE.md).
 
 ## Develop
 

@@ -13,7 +13,7 @@ from typer.testing import CliRunner
 from scrutator import cli
 
 ROOT = Path(__file__).resolve().parent.parent
-DOCS = [ROOT / "README.md", ROOT / "CHANGELOG.md", ROOT / "SECURITY.md", ROOT / "CONTRIBUTING.md", ROOT / "CODE_OF_CONDUCT.md",
+DOCS = [ROOT / "README.md", ROOT / "CHANGELOG.md", ROOT / "SECURITY.md", ROOT / "CONTRIBUTING.md", ROOT / "CODE_OF_CONDUCT.md", ROOT / "RESPONSIBLE_USE.md",
         ROOT / "demo" / "README.md", *sorted((ROOT / "docs").glob("*.md"))]
 PAGES = [p for p in DOCS if p.exists()]
 

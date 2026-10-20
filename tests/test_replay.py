@@ -57,6 +57,10 @@ def test_every_host_a_module_contacts_is_replayable_and_nothing_else_is():
 
     hosts = set()
     for path in Path(package.__file__).parent.glob("*.py"):
+        if path.name == "exposure.py":
+            # organisation exposure stores minimised records, not what the source answered: never replayed
+            assert "api.github.com" not in ALLOWED_HTTP_HOSTS
+            continue
         hosts.update(re.findall(r"https://([a-z0-9.-]+)", path.read_text(encoding="utf-8")))
     # the Common Crawl module gets its index URL from the collection list, not from a literal
     assert hosts | {"index.commoncrawl.org"} == ALLOWED_HTTP_HOSTS

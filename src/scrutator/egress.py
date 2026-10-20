@@ -40,6 +40,8 @@ SOURCE_HOSTS = frozenset(
         "www.virustotal.com",
         "api.securitytrails.com",
         "api.shodan.io",
+        # only `scrutator exposure`, for the public repositories of organisations its engagement file names
+        "api.github.com",
     }
 )
 # Hosts whose redirects may leave the list: the RDAP bootstrap, and (once a redirect reached one) RDAP servers,

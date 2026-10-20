@@ -65,6 +65,10 @@ class ModuleContext:
     # organisation exposure): a client guarded by scrutator.web.WebGuard, and the knowledge packs of the scan.
     web: httpx.AsyncClient | None = None
     packs: Any = None
+    # What the organisation-exposure modules need from the engagement file, and where `--detail` collects
+    # per-person rows (None unless --detail was given). See scrutator/orgexposure.py.
+    engagement: Any = None
+    detail: list | None = None
 
 
 class Module(ABC):

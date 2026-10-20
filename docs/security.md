@@ -22,6 +22,8 @@ and your database), and the sources' own integrity (a service that lies produces
 | **Bounded reading of untrusted bundles**: sizes are checked from the declared header before inflating (a 200 KiB zip bomb: refused in under 2 s, under 16 MB of memory). | `bundle/reader.py` | `tests/test_bundle_reader_limits.py` |
 | **Prompt injection cannot add facts.** Text from sources is fenced as untrusted data for models; a deterministic floor drops statements that name anything the cited facts do not, assert an alarm word or a negation they do not, or repeat a raw record's prose; a verifier checks the rest; nothing is published without one. | [AI and privacy](ai-and-privacy.md) | `tests/test_injection_guard.py` (a writer, planner and verifier that all obey the planted text), the Hallucination Test |
 | **Interrupted and parallel scans leave a consistent database.** Ctrl-C in the middle of a lookup's write batch rolls that batch back; the audit chain verifies; the partial bundle verifies; two scans in parallel on one database file both finish (busy timeout 30 s). A damaged or locked database is a one-line error with what to do. | one transaction per lookup | `tests/test_robustness_r4.py` |
+| **The opt-in modules reach only the scope and the platforms they may ask.** `scan --brand` and `scrutator exposure` use a separate client: in-scope hosts that resolve to public addresses, the hosts of the platforms whose profile page tells existence by status (brand), `rdap.org` and `api.github.com` for the engagement's own GitHub organisations (exposure). No automatic redirects; robots.txt honoured (unreadable = disallow); one request a second per host. | `scrutator.web.WebGuard` | `tests/test_brand.py`, `tests/test_org_exposure.py` (every request and DNS question of the lab runs checked against the allowed set) |
+| **Organisation exposure stores no personal address and needs an engagement.** Without a valid engagement file, with a person as the seed, or with a domain outside the engagement, nothing is looked up. Person-like addresses are reduced to a shape and a one-run pseudonym before storage; the database, report, HTML and bundle are scanned for every planted name, address, phone number and place in the lab: none appears. `--detail` writes a separate file and an audit record. | `scrutator/orgexposure.py`, `scrutator/engagement.py` | `tests/test_org_exposure.py` |
 | **Private signing keys can be encrypted at rest** (scrypt + ChaCha20-Poly1305; passphrase never an argument). | [proof bundles](proof-bundles.md#keys) | `tests/test_key_at_rest.py` |
 
 ## Known limits
@@ -59,6 +61,20 @@ Stated plainly, because a security claim is only as good as the list of what it 
   job when the verifier does its job.
 - In cloud mode a summary of what was found leaves your machine; `--redact` pseudonymises names, addresses and
   organisations but not what can be inferred from structure.
+
+**Opt-in modules**
+
+- Brand presence reads the HTTP status of a public profile page and nothing else. A suspended or renamed account can
+  answer like a missing one; a platform can change its behaviour at any time (each entry records what was observed on
+  2026-10-20 from one network). Both brand risks are therefore low confidence.
+- Organisation exposure has **not had the legal and ethics review** the design requires before release; it is a
+  preview. Work addresses are personal data in many jurisdictions (the GDPR among them), even minimised. The
+  `exposure-detail.json` file written by `--detail` holds work addresses in clear text and is not encrypted (owner-only
+  permissions on POSIX; none set on Windows). The report and the audit log name the person who authorised the
+  engagement, by design. Role mailboxes are shown as they are. There is no `purge` command yet: nothing personal is
+  stored outside the detail file, which you delete like any file.
+- The classification of a mailbox as a role or a person is a word list: a person whose address is a role word
+  (`office@`) is counted as a role, and an unusual role mailbox as a person.
 
 **Keys and files**
 
