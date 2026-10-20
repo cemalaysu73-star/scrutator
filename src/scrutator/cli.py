@@ -187,7 +187,7 @@ def scan(
     out: Path = typer.Option(Path("scrutator-out"), "--out", help="Output directory."),
     db: Optional[Path] = typer.Option(None, "--db", help="SQLite database path (default: <out>/scrutator.db)."),
     formats: str = typer.Option("json,html", "--format", help="Comma-separated: json, html."),
-    max_entities: int = typer.Option(5000, "--max-entities", help="Soft cap on discovered entities."),
+    max_entities: int = typer.Option(5000, "--max-entities", min=1, help="Cap on the entities a scan records (names, addresses, networks). Past it, names the sources give are counted in the report, not recorded, and no new lookups start. Cost of large scans: docs/security.md."),
     max_steps: Optional[int] = typer.Option(None, "--max-steps", help="Cap on module runs (default: config, 1000)."),
     ai: str = typer.Option("auto", "--ai", help="auto, off, local, cloud or hybrid."),
     model: Optional[str] = typer.Option(None, "--model", help="Model name for every AI role."),
@@ -307,6 +307,12 @@ def scan(
         _echo(
             f"Deadline of {deadline_s:g} s reached: the report is partial. Lookups still running were "
             "cancelled and the rest did not start; Source coverage lists what is missing."
+        )
+    capped = report["coverage"].get("entity_cap")
+    if capped:
+        _echo(
+            f"Entity cap of {capped['cap']} reached: {capped['dropped']} name(s) the sources gave were not recorded "
+            "and nothing past them was looked up. Raise --max-entities to keep them."
         )
     if report["coverage"]["sources_down"]:
         _echo(
@@ -925,3 +931,20 @@ def doctor(
         raise typer.Exit(1)
     _echo(render_doctor(report))
     raise typer.Exit(0 if report.passed else 1)
+
+
+def run() -> None:
+    """The `scrutator` command. A database problem anywhere (not a database, damaged, locked by another process) is
+    a usage error with the file named and a hint, never a traceback."""
+    import sqlite3
+
+    from scrutator.store import StoreError, describe_db_error
+
+    try:
+        app()
+    except StoreError as exc:
+        _echo(f"error: {exc}", err=True)
+        raise SystemExit(2) from None
+    except sqlite3.Error as exc:
+        _echo(f"error: {describe_db_error(Store.last_path or 'in use', exc)}", err=True)
+        raise SystemExit(2) from None

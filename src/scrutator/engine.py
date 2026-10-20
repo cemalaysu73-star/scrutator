@@ -29,6 +29,7 @@ class Engine:
         allow_active: bool = False,
         deadline: Deadline | None = None,
         breaker_threshold: int = DEFAULT_BREAKER_THRESHOLD,
+        max_entities: int | None = None,
     ) -> None:
         self.store = store
         self.scope = scope
@@ -37,6 +38,11 @@ class Engine:
         self.deadline = deadline
         self.breaker_threshold = breaker_threshold  # consecutive failures that mark a source down; 0 = never
         self.deadline_losses = 0  # lookups cancelled or never started because the clock ran out
+        # A hard cap on the entities a scan records. One answer can name tens of thousands of hosts (a certificate
+        # log of a large zone); past the cap new names are counted in the audit log (`entity_cap`), not recorded.
+        self.max_entities = max_entities
+        self._entities: int | None = None  # entities recorded so far, counted once and then kept up to date
+        self.entities_dropped = 0
         self.roots: set[str] = set(scope.to_dict()["domains"])
         self._semaphores: dict[str, asyncio.Semaphore] = {}
         self._failures: dict[str, int] = {}
@@ -157,6 +163,7 @@ class Engine:
         evidence_ids: set[str] = set()
         # everything the lookup found is written in one transaction: the store runs on the event loop's
         # thread, so a commit per record stalls every other lookup for as long as the disk takes
+        dropped = 0
         with self.store.batch():
             for obs in observations:
                 if isinstance(obs, Fact):
@@ -166,6 +173,13 @@ class Engine:
                     continue
                 if obs.entity == entity:
                     continue
+                if self.max_entities is not None and self.store.scope_state(scan_id, obs.entity.id) is None:
+                    if self._entities is None:
+                        self._entities = self.store.entity_count(scan_id)
+                    if self._entities >= self.max_entities:
+                        dropped += 1
+                        continue
+                    self._entities += 1
                 self.store.add_evidence(obs.evidence)
                 evidence_ids.add(obs.evidence.id)
                 child_state = self._classify(state, obs.rel, obs.entity)
@@ -181,4 +195,7 @@ class Engine:
                 observations=len(observations),
                 evidence_ids=sorted(evidence_ids),
             )
+            if dropped:
+                self.entities_dropped += dropped
+                self._audit(scan_id, "entity_cap", module, entity, dropped=dropped, cap=self.max_entities)
         return explorable

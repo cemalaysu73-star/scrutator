@@ -53,7 +53,8 @@ async def run_scan(
     if ai is not None:
         ai.bind(store, scan_id)
     engine = Engine(
-        store, scope, ctx, allow_active=allow_active, deadline=deadline, breaker_threshold=breaker_threshold
+        store, scope, ctx, allow_active=allow_active, deadline=deadline, breaker_threshold=breaker_threshold,
+        max_entities=max_entities,
     )
     chosen = load_builtin_modules() if modules is None else modules
     # which sources may run is the user's decision (and which have a key): recorded first, in the audit log too,

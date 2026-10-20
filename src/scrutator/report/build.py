@@ -46,10 +46,13 @@ def coverage(store: Store, scan_id: int) -> dict[str, Any]:
     the sources marked down. Derived from the audit log, so a bundle can be checked against it."""
     limits = _meta_json(store, scan_id, "limits") or {}
     log = store.audit_log(scan_id)
+    capped = [r for r in log if r.get("event") == "entity_cap"]
     return {
         "deadline_s": limits.get("deadline_s"),
         "deadline_hit": any(r.get("event") == "deadline" for r in log),
         "sources_down": sorted({r["module"] for r in log if r.get("event") == "breaker"}),
+        # present only when the cap was reached: how many names the sources gave that the scan did not record
+        **({"entity_cap": {"cap": capped[0]["cap"], "dropped": sum(int(r["dropped"]) for r in capped)}} if capped else {}),
     }
 
 

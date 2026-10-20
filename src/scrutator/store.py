@@ -108,6 +108,27 @@ CREATE TABLE IF NOT EXISTS statements (
 """
 
 
+BUSY_TIMEOUT_S = 30.0
+
+
+class StoreError(Exception):
+    """The database cannot be used: not a database, damaged, locked by another process, or not writable."""
+
+
+def describe_db_error(path, exc: Exception) -> str:
+    text = str(exc)
+    lowered = text.lower()
+    if "locked" in lowered or "busy" in lowered:
+        hint = "another process (a running scan, watch or MCP server) holds it; wait for it to finish or use another --db"
+    elif "not a database" in lowered or "malformed" in lowered or "corrupt" in lowered:
+        hint = "the file is not a Scrutator database or is damaged; point --db at another file and keep this one for inspection"
+    elif "readonly" in lowered or "unable to open" in lowered:
+        hint = "the file or its directory cannot be written or opened"
+    else:
+        hint = "SQLite refused the operation"
+    return f"database {path}: {text} ({hint})"
+
+
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
@@ -117,10 +138,19 @@ def chain_hash(prev_hash: str, record_json: str) -> str:
 
 
 class Store:
-    def __init__(self, path: str | Path = ":memory:") -> None:
-        self._db = sqlite3.connect(str(path))
-        self._db.row_factory = sqlite3.Row
-        self._db.executescript(_SCHEMA)
+    last_path: str | None = None  # the database most recently opened in this process, for error messages
+
+    def __init__(self, path: str | Path = ":memory:", *, timeout: float = BUSY_TIMEOUT_S) -> None:
+        Store.last_path = str(path)  # named in the error message of a database that fails later (damaged pages)
+        # Two scans (or a scan and an MCP server) may share one database: a writer waits up to `timeout` seconds
+        # for the other one's short transaction instead of failing at once. A file that is not a database, or one
+        # locked for longer, is a StoreError that names the file and says what to do.
+        try:
+            self._db = sqlite3.connect(str(path), timeout=timeout)
+            self._db.row_factory = sqlite3.Row
+            self._db.executescript(_SCHEMA)
+        except sqlite3.Error as exc:
+            raise StoreError(describe_db_error(path, exc)) from exc
         self._open_batches = 0
 
     def close(self) -> None:

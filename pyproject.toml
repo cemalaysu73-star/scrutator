@@ -29,7 +29,7 @@ dev = [
 ]
 
 [project.scripts]
-scrutator = "scrutator.cli:app"
+scrutator = "scrutator.cli:run"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/scrutator"]
