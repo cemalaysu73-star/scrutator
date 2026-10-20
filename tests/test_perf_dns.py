@@ -174,3 +174,76 @@ async def test_warm_up_does_not_wait_for_a_server_that_is_slow_or_dead(monkeypat
     assert sorted(started) == ["1.1.1.1", "10.255.255.1", "8.8.8.8"]
     await asyncio.sleep(0)
     assert not [t for t in asyncio.all_tasks() if t is not asyncio.current_task() and not t.done()]  # the probe was cancelled
+
+
+# ------------------------------------------------------------------------------------------ two stages
+
+
+class Counting:
+    def __init__(self, zone):
+        self.zone, self.calls = zone, []
+
+    async def query(self, name, rtype):
+        self.calls.append((name, rtype))
+        return self.zone.get((name, rtype), DnsAnswer("nxdomain" if rtype == "A" else "nodata"))
+
+
+def dom_entity(value):
+    from scrutator.model import Entity, EntityType
+
+    return Entity(type=EntityType.DOMAIN, value=value)
+
+
+async def test_a_name_that_does_not_exist_costs_two_queries_not_six():
+    from scrutator.modules.base import ModuleContext
+
+    resolver = Counting({})
+    out = await Dns().run(dom_entity("ghost.example.com"), ModuleContext(http=None, resolver=resolver))
+    assert sorted(t for _, t in resolver.calls) == ["A", "CNAME"]
+    assert [f.evidence.request + "=" + f.evidence.payload for f in out] == ["DNS A ghost.example.com=NXDOMAIN"]  # the same evidence as before
+
+
+async def test_a_name_that_exists_is_still_asked_everything():
+    from scrutator.modules.base import ModuleContext
+
+    resolver = Counting({("www.example.com", "A"): DnsAnswer("answer", ("192.0.2.1",))})
+    out = await Dns().run(dom_entity("www.example.com"), ModuleContext(http=None, resolver=resolver))
+    assert sorted(t for _, t in resolver.calls) == ["A", "AAAA", "CNAME", "MX", "NS", "TXT"]
+    assert [o.entity.value for o in out if o.rel == "resolves_to"] == ["192.0.2.1"]
+
+
+async def test_a_dangling_alias_is_still_found_although_its_address_lookup_says_nxdomain():
+    from scrutator.modules.base import ModuleContext
+
+    resolver = Counting({("shop.example.com", "CNAME"): DnsAnswer("answer", ("shop.azurewebsites.net.",))})
+    out = await Dns().run(dom_entity("shop.example.com"), ModuleContext(http=None, resolver=resolver))
+    assert [o.entity.value for o in out if getattr(o, "rel", "") == "cname_to"] == ["shop.azurewebsites.net"]
+    assert any(f.evidence.payload == "NXDOMAIN" for f in out)  # and the NXDOMAIN fact the risk rule needs
+
+
+async def test_silence_is_not_a_reason_to_skip_the_other_queries():
+    from scrutator.modules.base import ModuleContext
+
+    class Flaky(Counting):
+        async def query(self, name, rtype):
+            if rtype == "CNAME":
+                self.calls.append((name, rtype))
+                raise TimeoutError("slow")
+            return await super().query(name, rtype)
+
+    resolver = Flaky({})
+    await Dns().run(dom_entity("x.example.com"), ModuleContext(http=None, resolver=resolver))
+    assert {t for _, t in resolver.calls} >= {"MX", "NS", "TXT", "AAAA"}  # the alias lookup failed: nothing is known
+
+
+async def test_every_lookup_failing_is_still_a_failed_run():
+    import pytest
+
+    from scrutator.modules.base import ModuleContext
+
+    class Down:
+        async def query(self, name, rtype):
+            raise TimeoutError("down")
+
+    with pytest.raises(TimeoutError):
+        await Dns().run(dom_entity("x.example.com"), ModuleContext(http=None, resolver=Down()))

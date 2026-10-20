@@ -203,6 +203,31 @@ DNS evidence the scan holds (report `names`, the "Name states" table in the HTML
 The states are re-derived from the evidence by `scrutator verify` (check `name states derivable`), so a
 bundle cannot quietly relabel a stale name as live.
 
+### Verified or only claimed (v0.7)
+
+A long list is not a long result: example.com has one live name and an aggregator will happily list five hundred.
+So every name also has a **tier**, how well the evidence supports the claim that it exists, and the number to
+quote for a scan is *N verified, M claimed*, not one big count:
+
+| Tier | Meaning |
+|---|---|
+| `verified` | DNS resolves it (an address, or any other record), **or** a certificate (`crtsh`, `certspotter`) or a scan of the host (`urlscan`) with a timestamp inside the last 90 days before it was collected names it and DNS does not contradict it. A wildcard answer does not count as a contradiction. |
+| `claimed` | Only a list names it (an aggregator, an archive, `known_as` from InternetDB) and DNS gives no sign of it: NXDOMAIN or no answer. |
+| `stale` | It was evidenced once (a certificate or scan, however old) and DNS no longer agrees, or the dated record is older than the window and DNS recorded no address. |
+| `wildcard` | Only the zone's wildcard record answers for it and nothing dated vouches for it. |
+
+Nothing is deleted: every claim stays in the evidence store, the report and the bundle, with the reason it is a
+claim (`tier_reason`). What changes is what you see first. The report's `names` and `findings` lists put verified
+entries first and every finding carries the tier of the name it is about (`other` for addresses and registrations);
+`summary.headline` reads `N verified, M claimed (S stale, W wildcard-covered)`; `scrutator scan` prints that line
+first; the HTML report shows the verified tables open and folds claimed, stale and wildcard names and findings into
+counted groups that open on demand. A listing from an aggregator never vouches for a name, whatever dates its
+payload carries; only certificate validity and scan time do, and only from the sources that record them.
+
+`scrutator verify` re-derives the tiers, the tier of every finding and the headline counts from the report's own
+evidence (checks `name states derivable`, `findings derivable`, `headline derivable`); bundles made before v0.7 carry
+no tiers and still verify.
+
 ## Risks
 
 ```bash

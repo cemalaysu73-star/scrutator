@@ -141,7 +141,7 @@ def main() -> int:
         async with open_context() as ctx:
             memo["resolver"] = ctx.resolver
             scan_id, stats = await run_scan(seed, scope, store, ctx, ai=None, max_steps=1000, deadline=Deadline(args.deadline), modules=modules)
-            memo["cache"] = {k: len(v) for k, v in getattr(ctx, "cache", {}).items()}
+            memo["cache"] = {k: len(v) for k, v in getattr(ctx, "cache", {}).items() if hasattr(v, "__len__")}
         phases["collect"] = time.perf_counter() - start
         return store, scan_id, stats
 

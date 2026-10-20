@@ -53,11 +53,25 @@ class Dns(Module):
         observations: list[Observation] = []
         facts: list[Fact] = []
         attached: set[str] = set()  # evidence already cited by an observation
-        # the queries do not depend on each other: ask them together, then read the answers in the
-        # fixed order so the evidence and the relations come out the same every time
-        results = await asyncio.gather(
-            *(self._ask(ctx, entity.value, rtype) for rtype, _ in self._QUERIES), return_exceptions=True
+        # The queries do not depend on each other: ask them together, then read the answers in the fixed order
+        # so the evidence and the relations come out the same every time. Two stages, though: a name that does
+        # not exist (NXDOMAIN for the address, and no CNAME that leads nowhere) has no other record either, and
+        # most names a long list claims do not exist, so MX, NS, TXT and AAAA are asked only when it does. The
+        # evidence is the same either way: a negative answer for those types is never recorded.
+        first = ("A", "CNAME")
+        head = await asyncio.gather(*(self._ask(ctx, entity.value, rtype) for rtype in first), return_exceptions=True)
+        address, alias = head
+        gone = (
+            isinstance(address, DnsAnswer) and address.status == "nxdomain"
+            and isinstance(alias, DnsAnswer) and alias.status != "answer"
         )
+        rest = [rtype for rtype, _ in self._QUERIES if rtype not in first]
+        if gone:
+            tail = [DnsAnswer("empty")] * len(rest)
+        else:
+            tail = await asyncio.gather(*(self._ask(ctx, entity.value, rtype) for rtype in rest), return_exceptions=True)
+        by_type = dict(zip(first, head)) | dict(zip(rest, tail))
+        results = [by_type[rtype] for rtype, _ in self._QUERIES]
         failed = [r for r in results if isinstance(r, Exception)]
         if len(failed) == len(results):
             raise failed[0]  # nothing answered: the run failed, it did not find an empty name
