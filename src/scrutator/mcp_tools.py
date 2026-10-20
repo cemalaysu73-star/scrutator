@@ -151,7 +151,13 @@ class ToolSet:
         return {"notice": NOTICE, "scan": report["scan"], "candidates": shown, "leads": [{"kind": l["kind"], "claim": _clip(l["claim"]), "evidence_ids": l["evidence_ids"]} for l in report["leads"]["verified"]]}
 
     def verify_bundle(self, path: str) -> dict:
-        target = Path(path)
+        # A path from a client may have been suggested by text in a result. A UNC or device path (\\host\share\...,
+        # //host/share/..., \\?\...) would make Windows open an SMB connection to that host, and send the user's
+        # credentials, before anything is read: only local paths are accepted, checked before the file system is.
+        text = str(path)
+        if text.startswith(("\\\\", "//")) or "\x00" in text:
+            raise ToolError("path must be a local .scrutator file, not a network or device path")
+        target = Path(text)
         if target.suffix != ".scrutator" or not target.is_file():
             raise ToolError("path must be an existing .scrutator proof bundle")
         result = verify_bundle(target)

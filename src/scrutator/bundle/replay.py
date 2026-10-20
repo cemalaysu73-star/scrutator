@@ -183,11 +183,24 @@ def _same_dns(old: str, new: str) -> bool:
     return sorted(old.splitlines()) == sorted(new.splitlines())
 
 
+def subject_names(report: dict) -> set[str]:
+    """The names a bundle is about: its scope's domains and every name it did not mark out of scope. A DNS replay
+    stays inside them (and their children), so a bundle cannot make a verifier look up names of its choosing."""
+    names = {str(d) for d in (report.get("scope") or {}).get("domains", [])}
+    names |= {e["value"] for e in report.get("entities", []) if e.get("type") == "domain" and e.get("state") != "out"}
+    return names
+
+
+def _inside(name: str, subject: set[str]) -> bool:
+    return any(name == root or name.endswith("." + root) for root in subject)
+
+
 async def replay_evidence(
-    records: list[dict], http: httpx.AsyncClient, resolver: Resolver, *, concurrency: int = 4
+    records: list[dict], http: httpx.AsyncClient, resolver: Resolver, *, concurrency: int = 4, subject: set[str] | None = None
 ) -> list[ReplayResult]:
     """Re-issue each replayable request and say whether the source still supports the
-    recorded evidence. Drift is information, not failure: sources change and go down."""
+    recorded evidence. Drift is information, not failure: sources change and go down.
+    With `subject` (see subject_names), DNS lookups of names outside it are skipped."""
     semaphore = asyncio.Semaphore(concurrency)
     fetches: dict[str, asyncio.Future] = {}  # url -> (status, text): each distinct request is sent once
 
@@ -208,6 +221,8 @@ async def replay_evidence(
         parsed = parse_request(rec["request"])
         if parsed is None:
             return result("skipped", "request is not replayable")
+        if parsed[0] == "dns" and subject is not None and not _inside(parsed[2], subject):
+            return result("skipped", "name is outside the bundle's scope and entities")
         try:
             if parsed[0] == "http":
                 status, text = await fetch(parsed[1])

@@ -36,6 +36,12 @@ def validate_webhook(url: str) -> str:
     raise ValueError("webhook must be an https URL (plain http is allowed only for localhost)")
 
 
+def make_webhook_client() -> httpx.AsyncClient:
+    """The client webhooks are posted with: it never follows a redirect, so an endpoint cannot bounce a scan summary
+    to another host (an internal address, plain http) after `validate_webhook` accepted the first one."""
+    return httpx.AsyncClient(follow_redirects=False, timeout=15.0)
+
+
 def make_webhook_notifier(url: str, client: httpx.AsyncClient) -> Notifier:
     validate_webhook(url)
 

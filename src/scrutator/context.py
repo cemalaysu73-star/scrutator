@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 import httpx
 
 from scrutator import __version__
+from scrutator.egress import EgressGuard
 from scrutator.modules.base import ModuleContext
 from scrutator.resolver import DnsResolver
 from scrutator.retry import RetryingTransport
@@ -12,8 +13,9 @@ GIVE_UP_AFTER_S = 12.0  # a source asking for a longer wait than this is not wai
 
 
 @asynccontextmanager
-async def open_context() -> AsyncIterator[ModuleContext]:
-    """HTTP client for the data-source modules: follows redirects, retries transient failures."""
+async def open_context(*, egress: EgressGuard | None = None) -> AsyncIterator[ModuleContext]:
+    """HTTP client for the data-source modules: follows redirects, retries transient failures, and connects only
+    where the egress policy allows (scrutator.egress): the source hosts, and RDAP servers a redirect led to."""
     headers = {"User-Agent": f"scrutator/{__version__}"}
     transport = RetryingTransport(httpx.AsyncHTTPTransport(), give_up_after=GIVE_UP_AFTER_S)
     async with httpx.AsyncClient(
@@ -21,6 +23,7 @@ async def open_context() -> AsyncIterator[ModuleContext]:
         timeout=httpx.Timeout(60.0, connect=15.0),
         follow_redirects=True,
         headers=headers,
+        event_hooks=(egress or EgressGuard()).hooks(),
     ) as client:
         yield ModuleContext(http=client, resolver=DnsResolver(cache=True))
 

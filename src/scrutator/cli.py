@@ -4,7 +4,6 @@ import json
 from pathlib import Path
 from typing import Optional
 
-import httpx
 import typer
 import yaml
 
@@ -27,7 +26,7 @@ from scrutator.bundle.keys import (
     public_key_path,
 )
 from scrutator.bundle.reader import read_raw
-from scrutator.bundle.replay import replay_evidence
+from scrutator.bundle.replay import replay_evidence, subject_names
 from scrutator.bundle.verify import verify_bundle
 from scrutator.bundle.writer import create_bundle
 from scrutator.context import ai_client, open_context
@@ -48,7 +47,7 @@ from scrutator.sources import describe as describe_sources
 from scrutator.store import Store
 from scrutator.textsafe import terminal_safe
 from scrutator.verify.narrative import summarise
-from scrutator.watch import make_webhook_notifier, parse_interval, validate_webhook, watch_loop
+from scrutator.watch import make_webhook_client, make_webhook_notifier, parse_interval, validate_webhook, watch_loop
 
 app = typer.Typer(add_completion=False, no_args_is_help=True, help="Evidence-backed infrastructure OSINT.")
 ai_app = typer.Typer(no_args_is_help=True, help="Inspect and test the AI backends.")
@@ -434,11 +433,16 @@ def verify(
     if not replay:
         return
 
-    records = [json.loads(line) for line in read_raw(bundle).files["evidence.jsonl"].decode().splitlines() if line.strip()]
+    files = read_raw(bundle).files
+    records = [json.loads(line) for line in files["evidence.jsonl"].decode().splitlines() if line.strip()]
+    subject = subject_names(json.loads(files["report.json"]))
+    if pin is None:
+        _echo("Warning: replaying a bundle whose signer is not pinned; the requests it makes are whoever made it. "
+              "Replay contacts only the source hosts, and looks up only names inside the bundle's own scope.")
 
     async def go():
         async with open_context() as ctx:
-            return await replay_evidence(records, ctx.http, ctx.resolver)
+            return await replay_evidence(records, ctx.http, ctx.resolver, subject=subject)
 
     results = asyncio.run(go())
     tally = {s: sum(1 for r in results if r.status == s) for s in ("unchanged", "changed", "unavailable", "skipped")}
@@ -532,7 +536,7 @@ def watch(
         return scan_id
 
     async def go():
-        async with httpx.AsyncClient() as client:
+        async with make_webhook_client() as client:
             notify = make_webhook_notifier(webhook, client) if webhook else None
             await watch_loop(
                 run_once=run_once, store=store, seed=seed_entity.value, interval=interval,
