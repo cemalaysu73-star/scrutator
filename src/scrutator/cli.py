@@ -1,6 +1,8 @@
 import asyncio
 import ipaddress
 import json
+import os
+import sys
 from pathlib import Path
 from typing import Optional
 
@@ -18,11 +20,15 @@ from scrutator.attribution.model import band_rank
 from scrutator.attribution.promote import PromotionError
 from scrutator.attribution.promote import promote as promote_candidate
 from scrutator.bundle.keys import (
+    PASSPHRASE_ENV,
     fingerprint,
     generate_keypair,
+    is_encrypted,
     load_private_key,
     load_public_raw,
+    permission_problem,
     private_key_path,
+    protect_key,
     public_key_path,
 )
 from scrutator.bundle.reader import read_raw
@@ -144,11 +150,31 @@ def _source_policy(sources: Optional[str], exclude_sources: Optional[str], no_no
     return policy
 
 
+def _passphrase(purpose: str, *, confirm: bool = False) -> str:
+    """From SCRUTATOR_KEY_PASSPHRASE, or asked for on the terminal. Never a command-line argument: that would end up
+    in shell history and the process list."""
+    value = os.environ.get(PASSPHRASE_ENV)
+    if value:
+        return value
+    if not sys.stdin.isatty():
+        raise _fail(f"{purpose} needs a passphrase: set {PASSPHRASE_ENV} (no terminal to ask on)")
+    return typer.prompt(f"Passphrase for {purpose}", hide_input=True, confirmation_prompt=confirm)
+
+
 def _signing_key(key_dir: Optional[Path]):
     path = private_key_path(key_dir)
     if not path.exists():
         raise _fail(f"no signing key at {path}: run `scrutator keygen` first")
+    problem = permission_problem(path)
+    if problem:
+        _echo(f"Warning: {problem}", err=True)
     try:
+        if is_encrypted(path):
+            return load_private_key(path, _passphrase(f"the signing key {path}"))
+        _echo(
+            f"Warning: the signing key {path} is not encrypted; anyone who can read the file can sign as you. "
+            "Protect it with `scrutator protect-key`.", err=True,
+        )
         return load_private_key(path)
     except ValueError as exc:
         raise _fail(str(exc)) from exc
@@ -363,16 +389,37 @@ def list_sources(
 @app.command()
 def keygen(
     key_dir: Optional[Path] = typer.Option(None, "--key-dir", help="Where to write signing.key and signing.pub."),
+    passphrase: bool = typer.Option(False, "--passphrase/--no-passphrase", help=f"Encrypt the private key (scrypt + ChaCha20-Poly1305). The passphrase is read from {PASSPHRASE_ENV} or asked for, never taken as an argument."),
 ) -> None:
     """Create the Ed25519 key used to sign proof bundles."""
     target = key_dir or private_key_path().parent
+    secret = _passphrase("the new signing key", confirm=True) if passphrase else None
     try:
-        fp = generate_keypair(target)
-    except FileExistsError as exc:
+        fp = generate_keypair(target, secret)
+    except (FileExistsError, ValueError) as exc:
         raise _fail(str(exc)) from exc
     _echo(f"Wrote {private_key_path(target)} (keep it secret) and {public_key_path(target)} (share it).")
+    if secret is None:
+        _echo("The private key is not encrypted. `scrutator keygen --passphrase` (or `scrutator protect-key` later) seals it with a passphrase.")
     _echo(f"Key fingerprint: {fp}")
     _echo("Give readers the fingerprint or signing.pub through a channel they trust; they pin it with `scrutator verify --pin`.")
+
+
+@app.command("protect-key")
+def protect_key_cmd(
+    key_dir: Optional[Path] = typer.Option(None, "--key-dir", help="Directory with signing.key (default: ~/.config/scrutator)."),
+) -> None:
+    """Encrypt an existing signing key with a passphrase, in place. The key and its fingerprint stay the same."""
+    path = private_key_path(key_dir)
+    if not path.exists():
+        raise _fail(f"no signing key at {path}")
+    if is_encrypted(path):
+        raise _fail(f"{path} is already encrypted")
+    try:
+        fp = protect_key(path, _passphrase(f"the signing key {path}", confirm=True))
+    except ValueError as exc:
+        raise _fail(str(exc)) from exc
+    _echo(f"Encrypted {path} (fingerprint {fp}, unchanged). Signing now needs the passphrase ({PASSPHRASE_ENV} or a prompt).")
 
 
 @app.command()
