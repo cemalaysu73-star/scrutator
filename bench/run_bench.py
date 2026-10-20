@@ -408,6 +408,13 @@ def analyse_scrutator(ctx: "Ctx", report: dict, out: Path, target: str) -> dict:
         for name in names:
             claimed[name] = row["state"]
 
+    tiers: dict[str, str] = {}
+    for row in report.get("names", []):  # v0.7+: how well the evidence supports each name
+        if "tier" in row:
+            names, _ = normalise([row["name"]], target)
+            for name in names:
+                tiers[name] = row["tier"]
+
     backed = strict = 0
     unbacked: list[str] = []
     for name in reported:
@@ -423,6 +430,10 @@ def analyse_scrutator(ctx: "Ctx", report: dict, out: Path, target: str) -> dict:
         "_reported": sorted(reported),
         "states": {s: sum(1 for v in reported.values() if v == s) for s in sorted(set(reported.values()))},
         "name_states": claimed,
+        "name_tiers": tiers,
+        "headline": report.get("summary", {}).get("headline"),
+        "findings_by_tier": report.get("summary", {}).get("findings_by_tier"),
+        "source_policy": report.get("source_policy"),
         "hostnames_reported": len(reported),
         "evidence_backed": backed,
         "evidence_backed_strict": strict,
@@ -579,6 +590,21 @@ def score(results: list[ToolResult], target: str, truth_kind: str, axfr: dict | 
                 "precision_of_marked_live": pct(len(marked & live), len(marked)),
                 "recall_of_marked_live": pct(len(marked & truth), len(truth)),
             }
+    for r, row in zip(results, rows):
+        tiers = r.extra.get("name_tiers") if r.tool == "Scrutator" else None
+        if tiers:
+            verified = {n for n, t in tiers.items() if t == "verified" and n in found[r.tool]}
+            count_tier = {t: sum(1 for n, v in tiers.items() if v == t and n in found[r.tool]) for t in ("verified", "claimed", "stale", "wildcard")}
+            row["tiers"] = {
+                "counts": count_tier,
+                "verified_live": len(verified & live),
+                "verified_not_live": sorted(verified - live)[:20],
+                "live_not_verified": sorted((found[r.tool] & live) - verified)[:20],
+                "precision_of_verified": pct(len(verified & live), len(verified)),
+                "recall_of_verified": pct(len(verified & truth), len(truth)),
+                "verified_share_of_headline": pct(count_tier["verified"], count_tier["verified"] + count_tier["claimed"]),
+                "headline": r.extra.get("headline"),
+            }
     return {
         "target": target, "truth_kind": truth_kind, "truth_label": truth_label, "truth_size": len(truth),
         "truth_hosts_size": len(truth_hosts), "wildcard_dns": sorted(wildcard), "rows": rows,
@@ -614,6 +640,14 @@ def render_tables(scored: list[dict], results: dict[str, list[ToolResult]], meta
                       "| Marked live | Stale | Wildcard-covered | Unresolved | Marked live and live here | Marked live but not live here | Live here but not marked live | Precision of the live set | Recall of the live set |",
                       "|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
                       f"| {st['live']} | {st['stale']} | {st['wildcard']} | {st['unresolved']} | {c['confirmed_live']} | {len(c['marked_live_but_not_live'])}{'+' if len(c['marked_live_but_not_live']) >= 20 else ''} | {len(c['live_not_marked_live'])}{'+' if len(c['live_not_marked_live']) >= 20 else ''} | {c['precision_of_marked_live']} | {c['recall_of_marked_live']} |"]
+        tier_row = next((r for r in s["rows"] if r["tool"] == "Scrutator" and r.get("tiers")), None)
+        if tier_row:
+            t = tier_row["tiers"]
+            c = t["counts"]
+            lines += ["", "Scrutator's name tiers (v0.7), checked against this harness's resolver (apex excluded):", "",
+                      "| Headline | Verified | Claimed | Stale | Wildcard | Verified and live here | Precision of the verified set | Recall of the verified set | Verified share of verified+claimed | Live here but not verified |",
+                      "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|",
+                      f"| {t['headline']} | {c['verified']} | {c['claimed']} | {c['stale']} | {c['wildcard']} | {t['verified_live']} | {t['precision_of_verified']} | {t['recall_of_verified']} | {t['verified_share_of_headline']} | {len(t['live_not_verified'])}{'+' if len(t['live_not_verified']) >= 20 else ''} |"]
         if s["missed_by_all"]:
             lines += ["", f"Zone names no tool found (first {len(s['missed_by_all'])}): " + ", ".join(f"`{n}`" for n in s["missed_by_all"])]
         lines.append("")
