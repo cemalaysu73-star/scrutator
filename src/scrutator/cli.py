@@ -873,6 +873,30 @@ def mcp_cmd(
         raise _fail("the MCP SDK is not installed: run `pip install \"scrutator[mcp]\"`") from exc
 
 
+@app.command("bench")
+def bench_cmd(
+    out: Path = typer.Option(Path("scrutator-bench"), "--out", help="Where the lab scans, the bundle and bench.json/bench.md go."),
+    key_dir: Optional[Path] = typer.Option(None, "--key-dir", help="Sign the lab bundle with this key (default: a key made for the bench in <out>/keys)."),
+    verifier_model: Optional[str] = typer.Option(None, "--verifier-model", help="Also run the Hallucination Test with this Ollama model as the verifier (loopback only)."),
+    ollama_url: str = typer.Option("http://127.0.0.1:11434", "--ollama-url", help="Where Ollama answers; must be this machine."),
+    as_json: bool = typer.Option(False, "--json", help="Print bench.json instead of the table."),
+) -> None:
+    """OSINT-Bench v0, offline: planted risk lab, attribution lab, name tiers, bundle tamper and replay, scope
+    safety and the Hallucination Test. Exit status 1 when a threshold fails."""
+    from scrutator.benchlab.run import render_table, run_bench
+
+    key = _signing_key(key_dir) if key_dir is not None else None
+    try:
+        result = asyncio.run(run_bench(out, key=key, model=verifier_model, ollama_url=ollama_url))
+    except ValueError as exc:
+        raise _fail(str(exc)) from exc
+    _echo(json.dumps(result, indent=2, sort_keys=True) if as_json else render_table(result))
+    if not as_json:
+        _echo(f"Wrote {out / 'bench.json'} and {out / 'bench.md'}; the lab report and bundle are in {out / 'lab'}.")
+    if not result["pass"]:
+        raise typer.Exit(1)
+
+
 @packs_app.command("list")
 def packs_list(
     packs_dirs: list[Path] = typer.Option([], "--packs", help="Extra knowledge pack directory (repeatable)."),
