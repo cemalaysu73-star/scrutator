@@ -297,12 +297,12 @@ def test_watch_accepts_the_same_options(tmp_path, monkeypatch, seen):
     assert seen[0]["source_policy"].no_noncommercial and seen[0]["source_policy"].exclude == ("wayback",)
 
 
-def test_the_readme_lists_exactly_the_sources_that_no_noncommercial_turns_off(builtin):
+def test_the_docs_list_exactly_the_sources_that_no_noncommercial_turns_off(builtin):
+    """The sources table moved from the README to docs/sources.md (R4); the sentence there must name exactly the
+    modules the flag turns off."""
+    import re
     from pathlib import Path
 
-    readme = (Path(__file__).parent.parent / "README.md").read_text(encoding="utf-8")
-    sentence = readme.split("`--no-noncommercial` turns off", 1)[1].split("Nothing else changes", 1)[0]
-    shown = {"internetdb": "InternetDB", "ripestat": "RIPEstat", "asn": "RIPEstat", "certspotter": "CertSpotter", "subdomaincenter": "Subdomain Center"}
-    assert {m.name for m in builtin if m.noncommercial} == set(shown)
-    for label in set(shown.values()):
-        assert label in sentence, label
+    page = (Path(__file__).parent.parent / "docs" / "sources.md").read_text(encoding="utf-8")
+    sentence = page.split("`--no-noncommercial` turns off", 1)[1].split("Nothing else changes", 1)[0]
+    assert {m.name for m in builtin if m.noncommercial} == set(re.findall(r"`([a-z]+)`", sentence))

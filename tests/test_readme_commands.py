@@ -10,11 +10,14 @@ from scrutator import cli
 from scrutator.attribution import SIGNALS, evaluate
 
 README = (Path(__file__).parent.parent / "README.md").read_text(encoding="utf-8")
+SOURCES_PAGE = (Path(__file__).parent.parent / "docs" / "sources.md").read_text(encoding="utf-8")
 runner = CliRunner()
 COMMANDS = {
     "scan", "keygen", "export", "verify", "diff", "watch", "risk", "ai", "doctor", "packs", "list", "validate", "manifest",
-    "candidates", "attribution", "promote", "mcp", "sources",
+    "candidates", "attribution", "promote", "mcp", "sources", "bench", "protect-key",
 }
+# options of the program itself, not of a command (`scrutator --version`)
+ROOT_OPTIONS = {"--version", "--help"}
 
 
 def documented_commands():
@@ -50,6 +53,10 @@ def test_the_readme_shows_the_new_scan_options():
 
 @pytest.mark.parametrize("path, options, line", documented_commands())
 def test_every_documented_command_and_option_exists(path, options, line):
+    if not path and options and set(options) <= ROOT_OPTIONS:
+        result = runner.invoke(cli.app, options)
+        assert result.exit_code == 0, line
+        return
     assert path, f"not a command: {line}"
     result = runner.invoke(cli.app, [*path, "--help"])
     assert result.exit_code == 0, line
@@ -87,7 +94,8 @@ def test_the_mcp_tools_in_the_readme_are_the_tools_the_server_offers():
 
 
 def test_every_source_with_terms_is_in_the_sources_table():
-    """A module that carries a licence note must be documented, with its host, in the README."""
+    """A module that carries a licence note must be documented, with its host, in the sources table (docs/sources.md,
+    where the README's table moved in R4)."""
     import inspect
     import re
 
@@ -101,5 +109,5 @@ def test_every_source_with_terms_is_in_the_sources_table():
         hosts = set(re.findall(r"https://([a-z0-9.-]+)", inspect.getsource(type(module))))
         assert hosts, module.name
         for host in hosts:
-            assert host in README, f"{module.name}: {host} is not in the README sources table"
+            assert host in SOURCES_PAGE, f"{module.name}: {host} is not in the sources table of docs/sources.md"
     assert documented >= 5

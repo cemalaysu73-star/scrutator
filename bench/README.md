@@ -1,5 +1,16 @@
 # Scrutator benchmark
 
+There are two benchmarks, and they answer different questions:
+
+| | `scrutator bench` (OSINT-Bench v0) | `bench/run_bench.py` (this folder) |
+|---|---|---|
+| Question | does Scrutator do what it claims on planted ground truth: risks, attribution, name tiers, bundle tamper and replay, scope safety, unsupported statements | how does Scrutator's passive recall, precision and speed compare with other tools on real public targets |
+| Network | none | yes: public sources and the competitors' own sources, from your network |
+| Needs | `pip install scrutator` | Scrutator plus a venv with the competitors (below) |
+| Deterministic | yes (the Hallucination Test with `--verifier-model` is not) | no: public sources change, fail and rate-limit |
+| Third party can reproduce | all of it, in one command | the method, not the numbers: three of the four truth sets are pseudo-truth built from the tools' own output |
+| Covered in | [docs/benchmarks.md](../docs/benchmarks.md) | below, and `docs/benchmarks/` |
+
 A head-to-head, passive, keyless comparison of Scrutator with the subdomain/recon tools that can be
 installed from PyPI without downloading executables. One command reproduces it.
 

@@ -1,36 +1,109 @@
 # Scrutator
 
-Evidence-backed, AI-driven infrastructure OSINT. Point it at a domain; get a map of the
-organisation's internet-facing infrastructure in which every claim links to the raw record
-it came from. The AI is local-first: it runs on a model on your machine, and cloud models are
-an explicit, logged opt-in.
+**Infrastructure OSINT where every claim has a receipt.** Point it at a domain you are allowed to assess. It asks public
+sources what they know (certificate transparency, DNS, registration data, archives, passive-DNS aggregators), and
+gives you back a map of the organisation's internet-facing infrastructure in which every finding links to the raw
+record it came from, and the whole report can be shipped as a **signed proof bundle that a stranger can verify**.
 
-**Status: v0.7.** Passive scanning with a dozen keyless sources, a scan that always ends inside a deadline, a
-resolution state and an evidence **tier** for every name (`N verified, M claimed`, not one big count), a
-deny-by-default scope guard, an evidence store, JSON and HTML reports, a budgeted agent, an AI summary in which
-every statement is checked against evidence by a separate verifier, signed proof bundles that anyone can verify and
-replay, diff between scans, scheduled watching, knowledge packs, a dependency and risk analysis in which every risk
-cites its evidence and can be re-derived from a proof bundle, deterministic analyst detectors, SARIF export, an
-attribution engine (names outside the scope that probably belong to the organisation, with a score, a band and the
-evidence behind it), AI leads that must cite evidence, playbooks for the agent, and an MCP server. New in v0.7: the
-tiers, a pipelined scan (owasp.org: median 86 s to 36 s on the same bad day for the sources), a source policy
-(`--sources`, `--exclude-sources`, `--no-noncommercial`) that the bundle records and `verify` checks, optional keyed
-sources (implemented against the documented APIs, **not live-verified**) and `scrutator sources`. A benchmark
-against sublist3r, dnsrecon and knockpy is in `bench/`; its latest reading is in
-[docs/benchmarks/2026-10-17-after-v0.7.md](docs/benchmarks/2026-10-17-after-v0.7.md): on the four frozen targets
-Scrutator's recall is at least the best competitor's, every name is backed by evidence and the bundles verify, the
-verified names are exactly the live ones, and it is still about 10 times slower than knockpy.
+Passive only: it never port-scans, never probes the target, never brute-forces names, never looks up a person.
+
+## Why it is different
+
+Most recon tools print a list of names. The list is hard to use for three reasons, and Scrutator is built around them.
+
+- **A list is not a result.** `example.com` has one live website; an aggregator will happily list five hundred names
+  for it. Scrutator gives every name a **tier**, derived from evidence: *verified* (DNS resolves it, or a dated
+  certificate names it) or only *claimed* (a list says so, DNS shows nothing). The headline is `2 verified, 498
+  claimed`, not `500 subdomains`.
+- **A claim without a source is a rumour.** Every finding, risk and AI statement cites the evidence ids it rests on;
+  the evidence is the raw answer of the source, stored once and addressed by its hash. Click a finding in the report
+  and the DNS answer, the certificate or the RDAP record appears. "No such record" is evidence too; a timeout never
+  becomes a finding.
+- **A report you cannot check is an opinion.** `scrutator scan --bundle` writes a zip with the report, every raw
+  record, a hash-chained audit log and an Ed25519 signature. `scrutator verify` re-derives the findings, risks, name
+  tiers and attribution from the evidence and fails, naming the check, if a single byte was changed or a risk was
+  quietly removed. It is built to be run on files from people you do not trust.
+
+And the AI, if you use it, has to show receipts too: it runs on a model on your machine by default, cloud is an
+explicit logged opt-in, and nothing a model writes reaches the report unless it passes a deterministic check and an
+independent verifier.
+
+## A real run
+
+`example.com` is reserved for documentation, so it is a safe target. This is the unedited output of
+`python demo/run_demo.py --live` on 2026-10-20 (the scan step; [full transcript](demo/transcripts/live.txt)):
+
+```
+$ scrutator scan example.com --ai off --bundle --key-dir keys
+Scan #1 of example.com: 2 verified, 498 claimed (0 stale, 0 wildcard-covered).
+541 entities, 558 relations, 558 findings (526 module runs, 3 rounds).
+Findings: 51 about verified names and 9 about addresses and registrations; 498 more about claimed (498), stale (0) or wildcard-covered (0) names, kept in the report and collapsed in the HTML.
+Names: 2 live, 498 stale, 0 wildcard-covered, 0 unresolved.
+Risks: 2 (0 high, 0 medium, 2 low, 0 info). Run `scrutator risk` for the list.
+3 source run(s) failed after retries; see Source coverage in the report.
+AI: off (no local model found, or --ai off). Deterministic mode.
+Wrote report.json, report.html to demo-out\live
+Proof bundle: demo-out\live\proof.scrutator (signing key 3d0f002d59884ecdeb75198fe7c36afbb6c35136ab02b1ddc4e36a829e35699f)
+```
+
+then, in the same run, `scrutator verify proof.scrutator --pin signing.pub` passes nineteen named checks, and the same
+command on a copy with one bit flipped ends:
+
+```
+FAIL  file hashes  (report.json does not match the manifest)
+FAIL  findings derivable  (the findings are not what the cited evidence implies)
+Verification FAILED: do not rely on this bundle.
+```
+
+Run it yourself in about 40 seconds (or offline, in 30, on a planted fixture zone): [demo/README.md](demo/README.md).
+
+## Honest limits
+
+Read these before you rely on it. They are also in [docs/security.md](docs/security.md) and
+[the benchmark](docs/benchmarks/v1.0-candidate.md).
+
+- **Passive recall is limited by what passive sources have seen.** On the one benchmark target with a real truth set
+  (`zonetransfer.me`, 31 names in its published zone) Scrutator and every competitor we could run reach a small part
+  of it. Names that no certificate, archive or aggregator holds are not found.
+- **It is not fast.** A scan takes tens of seconds to minutes (rate-limited sources, DNS, RDAP); `knockpy` finishes
+  the same targets in seconds because it asks fewer things.
+- **Attribution is a lead, not a finding.** Its weights are chosen by hand and calibrated on nothing but a synthetic
+  lab written by the author of the scoring.
+- **A signed bundle proves integrity, not truth and not time.** There is no trusted timestamp (RFC 3161), and without
+  `--pin` anyone can sign a forged bundle with their own key. If a source lied, the bundle faithfully contains the lie.
+- **The AI layer is a filter, not an oracle.** A deterministic check stops invented hosts, addresses, numbers,
+  alarm words, negations and copied record text even from a verifier that agrees with everything; an invention in plain
+  words about a name the facts know still needs the verifier model to catch it.
+- **Not tested against the real services:** the three keyed sources (VirusTotal, SecurityTrails, Shodan DNS) and the MCP
+  server with Claude Desktop itself.
+- **Not released.** Not on PyPI, no signed releases, no private beta yet. v1.0 is a candidate, not a release.
 
 ## Install
 
 ```bash
-pipx install scrutator
-pipx install "scrutator[mcp]"     # with the MCP server
+pipx install scrutator            # once published; until then, from a checkout:
+pip install -e .                  # Python 3.11 or newer; Windows, macOS and Linux
+pip install -e ".[mcp]"           # with the MCP server
+scrutator --version
+scrutator scan example.com        # passive; writes scrutator-out/report.html, report.json, scrutator.db
+scrutator bench                   # the offline benchmark: no network, exits non-zero if a threshold fails
 ```
 
-From a checkout: `pip install -e ".[dev]"` (this includes the MCP SDK; without it the MCP tests skip).
+From a checkout for development: `pip install -e ".[dev]"` (includes the MCP SDK; without it the MCP tests skip).
+The built wheel has been installed into a clean virtual environment and smoke-tested on Windows (`tools/wheel_smoke.py`);
+CI does the same on Linux and Windows.
 
-## Use
+## Documentation
+
+[Quickstart](docs/quickstart.md) · [Concepts](docs/concepts.md) · [Reading a report](docs/reading-a-report.md) ·
+[Proof bundles](docs/proof-bundles.md) · [Sources and terms](docs/sources.md) · [AI modes and privacy](docs/ai-and-privacy.md) ·
+[MCP](docs/mcp.md) · [Knowledge packs](docs/knowledge-packs.md) · [Writing a module](docs/writing-a-module.md) ·
+[Security model](docs/security.md) · [Benchmark](docs/benchmarks.md) · [Demo](demo/README.md) ·
+[CHANGELOG](CHANGELOG.md) · [SECURITY](SECURITY.md) · [CONTRIBUTING](CONTRIBUTING.md)
+
+The rest of this file is the reference for every command and option.
+
+## Reference: scanning
 
 ```bash
 scrutator scan example.com
@@ -70,98 +143,22 @@ scrutator scan example.com --deadline 0                 # no time limit
 
 ### Sources and their terms
 
-Every source is public and keyless. Their terms are theirs, not ours; read them before relying on a
-source in a commercial engagement.
-
-| Source | Gives | Terms in short |
-|---|---|---|
-| crt.sh | Certificate Transparency names | Public service of Sectigo; no stated limit; often slow or 502. |
-| CertSpotter (`api.certspotter.com`) | Second CT view: names, issuer, key hash, revocation | Unauthenticated API is for personal or evaluation use; production needs an SSLMate account; the free tier may change at any time. At most 2 pages per scan. |
-| Subdomain Center (`api.subdomain.center`) | Names from web crawling, real-time CT ingestion and correlation, **including names that do not resolve** | Terms grant a limited licence for personal, non-commercial use. Free anonymous tier: up to 500 names per query, random order. Its names are one source's claim until DNS or a certificate agrees. |
-| HackerTarget (`api.hackertarget.com`, `hostsearch`) | Hostnames and addresses from its DNS data | Free API: 50 calls per day per IP address (shared with everything else you run from it), 2 per second, 500 lines. One call per scan; a used-up quota is reported as the source being unavailable, never as "no names". |
-| urlscan.io (search) | Hostnames it has scanned under the domain, with the IP, ASN, server and status that served them on a date | Anonymous search: 30 requests per minute; scans are submitted by third parties, so only metadata is kept (no screenshots, titles or page content). One call per scan. |
-| mnemonic passive DNS (`api.mnemonic.no`) | DNS history of the apex with first and last seen: old addresses, name servers, mail servers, aliases | TLP:white rows; terms of use could not be retrieved, so best effort. It answers for one exact name and cannot list subdomains. History is recorded under its own relations and is never scanned. |
-| DNS | A, AAAA, CNAME, MX, NS, TXT, CAA, with NXDOMAIN/NODATA as evidence | Your resolver. |
-| RDAP (`rdap.org`) | Registrar, name servers, network owner | Public redirector to the registries' RDAP servers. |
-| RIPEstat (`stat.ripe.net`) | IP to ASN, the abuse contact and the network name, description and country of an address | RIPE NCC terms: non-commercial use, no redistribution of the data without permission, credit RIPE NCC and the original source. Requests identify the application (`sourceapp=scrutator`). Bundles that embed RIPEstat responses inherit this. |
-| Shodan InternetDB (`internetdb.shodan.io`) | For in-scope and linked addresses only: open ports, product names (CPE), CVE ids Shodan associates with them, host names it has seen | **Free for non-commercial use only**; revenue-generating use needs a Shodan enterprise licence. It is Shodan's earlier scan, nothing is sent to the address. Bundles that embed its data inherit this. |
-| Wayback Machine | Hostnames seen in the Internet Archive | Public CDX API; fair use. |
-| Common Crawl | Hostnames seen in the latest crawl | Public index; fair use. |
-
-Looked at and **not** used: RapidDNS (its own pricing page gives anonymous users no API access and 100
-records, so scraping its pages goes beyond what it offers, and it does not say where its data comes from);
-BufferOver, Anubis, ThreatMiner and BGPView (dead, blocked or keyed when probed on 2026-10-17, see
-`docs/superpowers/research/2026-10-17-v06-keyless-sources.md`).
-
-Sources that list names (crt.sh, CertSpotter, Subdomain Center, HackerTarget, urlscan, Wayback, Common
-Crawl) are asked once per scan, about the apex. Replay (`scrutator verify --replay`) contacts only the hosts
-in this table and the RIR RDAP servers `rdap.org` redirects to.
-
-### Choosing sources
-
-Which sources a scan may use is your decision, not the tool's:
+Every keyless source is public; three optional sources need a key you hold. Their terms are theirs, not ours: read
+them before relying on a source in a commercial engagement. The table of every source (what it gives, its terms in
+short, whether its free tier is non-commercial, whether it can be replayed) is in [docs/sources.md](docs/sources.md),
+and `scrutator sources` prints the same list with how each source fared in your last scan.
 
 ```bash
+scrutator sources                                            # on or off and why, last scan's outcome
 scrutator scan example.com --sources crtsh,dns,rdap          # only these
 scrutator scan example.com --exclude-sources wayback,commoncrawl
-scrutator scan example.com --no-noncommercial                # for work the free tiers' terms do not cover
+scrutator scan example.com --no-noncommercial                # leave out the non-commercial free tiers
 ```
 
-A name is a module (`asn`) or the source it belongs to (`ripestat` covers the `asn` and `ripestat` modules, `dns`
-covers the resolver and the wildcard probe). An unknown name is an error that lists the valid ones, so a typo
-cannot quietly leave a source on. `--exclude-sources` wins over `--sources`.
-
-`--no-noncommercial` turns off every source in the table above whose free tier is for non-commercial (or
-evaluation) use only: InternetDB, RIPEstat (the `asn` and `ripestat` modules), CertSpotter and Subdomain Center.
-Nothing else changes: the other sources and the deterministic analysis run as before, and the report says what
-was not asked, so a smaller result is never mistaken for a cleaner one.
-
-The policy is recorded three times: in the report (`source_policy`: the options, the sources enabled, and each
-disabled source with its reason), in the signed manifest, and as the first record of the hash-chained audit log.
-`scrutator verify` checks that the three agree and that no lookup in the audit log and no evidence record comes
-from a source the policy forbids (check `source policy honoured`); it re-derives what `--no-noncommercial`
-forbids from its own list of sources, so a bundle cannot narrow the list it records. Bundles made before v0.7 have
-no policy and are not checked.
-
-### Keyed sources (optional, off by default)
-
-Three sources need an API key you hold yourself. They are **implemented against each service's documented API and
-not live-verified**: no key was available to the author and no account was created to get one, so their tests use
-fake answers in the documented shapes. Treat your first real run as the real test.
-
-| Source | Variable | Host | What it adds |
-|---|---|---|---|
-| `virustotal` | `SCRUTATOR_VIRUSTOTAL_KEY` | `www.virustotal.com` | Subdomains VirusTotal holds (`/api/v3/domains/{domain}/subdomains`, up to 5 pages of 40) |
-| `securitytrails` | `SCRUTATOR_SECURITYTRAILS_KEY` | `api.securitytrails.com` | Subdomains (`/v1/domain/{domain}/subdomains`) |
-| `shodan` | `SCRUTATOR_SHODAN_KEY` | `api.shodan.io` | Shodan's DNS data for the domain (`/dns/domain/{domain}`, up to 2 pages, one query credit each); not the keyless InternetDB |
-
-Censys is not offered: its search API is being replaced by a new platform API, so there is no stable documented
-shape to implement against yet.
-
-The rules, each covered by a test:
-
-- A key comes **only from its environment variable**. There is no command-line option, config-file field or prompt
-  for a key, so it cannot reach shell history or a process list. A source without its variable is off, and the
-  report says so with the variable's name (never a value). Asking for one by name (`--sources shodan`) without its
-  variable is an error.
-- The key is read when a lookup runs and sent as the service requires (a header; Shodan insists on a query
-  parameter). It is **never stored**: the evidence records the request without it, and the report, HTML, signed
-  bundle, audit log and database contain no key. Error messages go through a redaction that replaces any
-  configured key, also percent-encoded, with `[redacted]`.
-- Keyed sources are scope-gated and passive like the others, and their names are claims until DNS or a certificate
-  agrees. Their hosts are not on the replay allowlist (a replay would need your key), so `verify --replay` skips
-  their evidence.
-- Terms depend on the plan your key belongs to; you hold the key, so you hold the licence. They are not marked
-  non-commercial, so check your plan before using them in commercial work.
-
-`scrutator sources` lists every source: keyless or keyed (with its variable), on or off and why, whether its free
-tier is non-commercial, and how it fared in the latest scan of the database (answered, failing, or marked down by
-the circuit breaker). It also previews a policy:
-
-```bash
-scrutator sources
-scrutator sources --no-noncommercial --json
-```
+The policy is recorded in the report, the signed manifest and the audit log, and `verify` checks that no lookup came
+from a source it forbids. Keys (`SCRUTATOR_VIRUSTOTAL_KEY`, `SCRUTATOR_SECURITYTRAILS_KEY`, `SCRUTATOR_SHODAN_KEY`)
+come only from environment variables, are never stored, and are implemented against the documented APIs but **not
+live-verified**. Details: [docs/sources.md](docs/sources.md).
 
 ### Scope
 
@@ -364,7 +361,7 @@ It also checks that the report's promotions are exactly those in the signed audi
 
 ### How well does it work?
 
-Measured on the planted lab (`tests/attrlab.py`): an organisation with 16 names of its own and a set of
+Measured on the planted lab (`src/scrutator/benchlab/attrlab.py`, run by `scrutator bench`): an organisation with 16 names of its own and a set of
 decoys, answered by a fake resolver and mocked sources, no network. It is a synthetic zone written by the
 author of the scoring: it shows the scoring behaves as designed on the cases its author thought of, not
 how accurate it is on real organisations. The decoys are the cases the design discounts (Cloudflare name
@@ -686,7 +683,9 @@ beyond passive lookups before then. Takeover confirmation by an active check is 
 
 ```bash
 pip install -e ".[dev]"
-pytest
+python -m pytest -q -p no:cacheprovider    # no network; about 4 minutes
+scrutator bench --out scrutator-bench       # OSINT-Bench v0, offline
+python bench/run_bench.py                   # the live competitor benchmark (network)
 ```
 
-Licence: to be confirmed (Apache-2.0 is the intended default).
+Licence: Apache-2.0 (see `LICENSE`). Contributing: [CONTRIBUTING.md](CONTRIBUTING.md). Security: [SECURITY.md](SECURITY.md).
