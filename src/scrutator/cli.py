@@ -898,7 +898,15 @@ def exposure_cmd(
     publishes, their naming pattern, which functions are visible, and what an attacker could infer. Aggregate only,
     unless --detail."""
     from scrutator.engagement import EngagementError, check_seed, load_engagement
-    from scrutator.exposure_scan import exposure_scope, run_exposure, write_detail
+    from scrutator.exposure_scan import PREVIEW_VARIABLE, exposure_scope, run_exposure, write_detail
+
+    if os.environ.get(PREVIEW_VARIABLE) != "1":
+        # the design's release gate: a legal and ethics review before this ships. Until then it is a preview that
+        # runs only when asked for twice: this variable, and an engagement file.
+        raise _fail(
+            "organisation exposure is a preview: it has not had the legal and ethics review its design requires "
+            f"(docs/security.md). Set {PREVIEW_VARIABLE}=1 to run it, with an engagement file."
+        )
     from scrutator.web import open_web, scope_guard
 
     try:

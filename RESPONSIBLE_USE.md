@@ -36,7 +36,7 @@ do, and what you owe the people and services on the other side.
   the work, dates, purpose), refuses a person as the seed, reports aggregates (how many work addresses are public,
   their naming pattern, which functions are visible) and shows per-person detail only with `--detail`, which is written
   to the audit log. It is meant for authorised red-team and defensive assessments. **It has not had the legal and
-  ethics review the design requires before release**; treat it as a preview and check the law where you work (for
+  ethics review the design requires before release**, so it runs only with `SCRUTATOR_PREVIEW_EXPOSURE=1` set; treat it as a preview and check the law where you work (for
   example the GDPR in the EU) before using it on real data.
 
 ## If you find misuse or a way around these limits

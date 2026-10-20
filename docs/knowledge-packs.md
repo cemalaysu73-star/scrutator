@@ -9,6 +9,7 @@ matching nothing. Adding a provider is one data entry and one fixture, no code.
 | `providers.yaml` (`providers`) | name server, mail, CDN, hosting and certificate-authority patterns, AS numbers | the dependency map; risk rules (concentration); attribution (a shared provider's signals count 0) |
 | `takeover.yaml` (`takeover`) | services whose names can be claimed when a CNAME to them dangles | `dangling-cname-*` risks |
 | `signals.yaml` (`signals`) | how often an attribution signal shows up in unrelated organisations (empty: no measured corpus exists) | attribution weights |
+| `platforms.yaml` (`platforms`) | public platforms an organisation may link to: profile URL template, how a link to an account looks, the handle's characters and length, and whether the profile page's HTTP status tells existence (with the behaviour observed live) | brand presence (`scan --brand`) and its two risks; templates and character sets only, never regular expressions |
 | `playbooks.yaml` (`playbooks`) | short recipes offered to the agent's planner by the situation of the investigation | the planner only; no result depends on them |
 
 ```bash

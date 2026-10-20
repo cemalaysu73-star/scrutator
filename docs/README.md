@@ -13,6 +13,8 @@
 | [Writing a module](writing-a-module.md) | add a data source |
 | [Security model and known limits](security.md) | the guarantees, how they are tested, what is not guaranteed |
 | [Benchmark](benchmarks.md) | OSINT-Bench v0 (`scrutator bench`), the competitor comparison, how to reproduce either |
+| [Brand presence](../README.md#brand-presence) and [organisation exposure](../README.md#organisation-exposure-authorised-aggregate) | the two opt-in modules (`scan --brand`, `scrutator exposure`), what they contact and what they never do |
+| [Responsible use](../RESPONSIBLE_USE.md) | what the tool may be used for, what it will not do, the two opt-in modules |
 
 Also: [README](../README.md), [CHANGELOG](../CHANGELOG.md), [SECURITY](../SECURITY.md),
 [CONTRIBUTING](../CONTRIBUTING.md), [demo](../demo/README.md).

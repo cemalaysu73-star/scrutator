@@ -22,6 +22,9 @@ from scrutator.sources import SourcePolicy
 from scrutator.store import Store
 
 
+PREVIEW_VARIABLE = "SCRUTATOR_PREVIEW_EXPOSURE"  # must be "1" for `scrutator exposure` to run (see the CLI)
+
+
 @dataclass
 class ExposureRun:
     """What the exposure modules read from the context (ctx.engagement)."""

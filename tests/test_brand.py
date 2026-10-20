@@ -18,7 +18,7 @@ from scrutator.egress import EgressDenied
 from scrutator.model import Entity, EntityType
 from scrutator.modules.base import ModuleContext
 from scrutator.modules.registry import load_builtin_modules
-from scrutator.packs import PackError, load_packs
+from scrutator.packs import load_packs
 from scrutator.packs.schema import PlatformEntry
 from scrutator.report import build_report, render_html
 from scrutator.report.sarif import to_sarif
@@ -231,7 +231,7 @@ async def test_profile_records_replay_by_status(tmp_path):
     records = [{"id": i, **r} for i, r in report["evidence"].items()]
     profiles = [r for r in records if r["request"].startswith("PROFILE ")]
     pages = [r for r in records if r["request"].startswith(("PAGE ", "ROBOTS ", "SITE "))]
-    assert profiles and all(parse_request(r["request"]) for r in profiles if "gitlab.com" not in r["request"] or True)
+    assert profiles and all(parse_request(r["request"]) for r in profiles)
     assert all(parse_request(r["request"]) is None for r in pages)  # the organisation's own site is never replayed
     lab = brandlab.router()
     async with httpx.AsyncClient(transport=lab.transport()) as http:

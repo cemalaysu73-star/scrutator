@@ -1,6 +1,6 @@
 """`scrutator bench`: OSINT-Bench v0, offline, one command.
 
-Six sections, each a set of metrics with thresholds:
+Eight sections, each a set of metrics with thresholds:
 
 - risk_rules: the planted risk lab (every rule planted at least once) and a clean zone (no risk expected).
 - attribution: the planted attribution lab, precision and recall by band.
@@ -11,8 +11,11 @@ Six sections, each a set of metrics with thresholds:
   attribution lab, the candidates it selected): none may fall outside.
 - hallucination: verify/grounding.py and the verifier against a writer that asserts unsupported things
   (see benchlab/halluc.py).
+- brand: brand presence (`scan --brand`) on a planted site and planted platform answers (benchlab/brandlab.py).
+- org_exposure: organisation exposure (`scrutator exposure`) on a planted organisation (benchlab/exposurelab.py):
+  refusals, aggregate, personal data in outputs, detail logged, scope, the signed engagement.
 
-The JSON written has a stable shape (`schema: "scrutator-bench/1"`); the exit status is 1 if any threshold fails.
+The JSON written has a stable shape (`schema: "scrutator-bench/2"`); the exit status is 1 if any threshold fails.
 Nothing here touches the network, except `--verifier-model`, which asks a model server on this machine (loopback
 only)."""
 
@@ -48,7 +51,7 @@ from scrutator.scan import run_scan
 from scrutator.scope import ScopePolicy
 from scrutator.store import Store
 
-SCHEMA = "scrutator-bench/1"
+SCHEMA = "scrutator-bench/2"  # 2: sections brand and org_exposure (R5)
 SEED = Entity(type=EntityType.DOMAIN, value="example.com")
 KEYLESS = {m.name for m in load_builtin_modules() if not m.needs_key}
 
@@ -383,6 +386,192 @@ async def hallucination(work: Path, state: dict, model: str | None, ollama_url: 
     return _section(metrics, notes, started)
 
 
+async def brand(work: Path, state: dict, key) -> dict:
+    """Brand presence on the planted lab (benchlab/brandlab.py): what was planted is found, nothing else is flagged, an
+    answer the rules do not read is never called absent, no platform is asked that may not be, robots.txt is obeyed,
+    and the bundle re-derives the section and catches a changed one."""
+    from scrutator.benchlab import brandlab
+    from scrutator.modules import brand as brand_module
+    from scrutator.sources import SourcePolicy
+    from scrutator.web import open_web, scope_guard
+
+    started = time.perf_counter()
+    packs = load_packs()
+    module = [m for m in load_builtin_modules() if m.name == "brand"]
+    paced, brand_module.PACE = brand_module.PACE, 100_000.0  # the lab answers at once; the real module waits a second per host
+
+    async def scan(name: str, lab):
+        (work / name).mkdir(parents=True, exist_ok=True)
+        for old in (work / name).glob("*.db"):
+            old.unlink()
+        store = Store(work / name / "scrutator.db")
+        scope = ScopePolicy(domains=[brandlab.SITE])
+        async with httpx.AsyncClient(transport=lab.transport()) as http, open_web(
+            scope_guard(scope, packs, resolve=brandlab.public_resolve), transport=lab.transport()
+        ) as web:
+            ctx = ModuleContext(http=http, resolver=tierlab.resolver(), web=web)
+            scan_id, _ = await run_scan(SEED, scope, store, ctx, modules=module, packs=packs, source_policy=SourcePolicy().opt("brand"))
+        return store, scan_id
+
+    try:
+        lab = brandlab.router()
+        store, scan_id = await scan("brand", lab)
+        forbidden = brandlab.router(robots="User-agent: *\nDisallow: /\n")
+        f_store, _ = await scan("brand-robots", forbidden)
+        f_store.close()
+    finally:
+        brand_module.PACE = paced
+    report = build_report(store, scan_id)
+    (work / "brand" / "report.html").write_text(render_html(report), encoding="utf-8")
+    site = report["brand"]["domains"][0]
+    official = {(o["platform"], o["handle"]): o["state"] for o in site["official"]}
+    found = {(r["rule_id"], r["entity_ids"][1], r["severity"]) for r in report["risks"] if r["rule_id"].startswith("brand-")}
+    entries = {e.id: e for e in packs.platforms}
+    wrongly_absent = [c for c in [*site["official"], *site["checks"]] if c["state"] == "absent"
+                      and not (entries[c["platform"]].presence == "status" and c.get("status", 404) in entries[c["platform"]].absent)]
+    hosts = {r.url.host for r in lab.calls}
+    path = work / "brand" / "proof.scrutator"
+    create_bundle(store, scan_id, key, path)
+    store.close()
+    pin = fingerprint(public_raw_from_private(key))
+    genuine = verify_bundle(path, pinned_fingerprint=pin)
+
+    def flip_state(data: bytes) -> bytes:
+        body = json.loads(data)
+        item = body["brand"]["domains"][0]["official"][0]
+        item["state"] = "absent" if item["state"] != "absent" else "exists"
+        return json.dumps(body, sort_keys=True, indent=2).encode()
+
+    forged = verify_bundle(_forge(path, work / "brand" / "forged.scrutator", key, {"report.json": flip_state}), pinned_fingerprint=pin)
+    checks = {c.name: c.ok for c in genuine.checks}
+    metrics = {
+        "official_accounts_planted": _metric(len(brandlab.TRUTH_OFFICIAL)),
+        "official_accounts_right": _metric(sum(official.get(k) == v for k, v in brandlab.TRUTH_OFFICIAL.items()), f"= {len(brandlab.TRUTH_OFFICIAL)}",
+                                           official == brandlab.TRUTH_OFFICIAL),
+        "planted_risks": _metric(len(brandlab.TRUTH_RISKS)),
+        "planted_risks_found": _metric(len(found & brandlab.TRUTH_RISKS), f"= {len(brandlab.TRUTH_RISKS)}", brandlab.TRUTH_RISKS <= found),
+        "risks_not_planted": _metric(len(found - brandlab.TRUTH_RISKS), "= 0", not found - brandlab.TRUTH_RISKS),
+        "unverifiable_reported_absent": _metric(len(wrongly_absent), "= 0", not wrongly_absent),
+        "lookalikes_checked": _metric(report["brand"]["summary"]["lookalikes_checked"]),
+        "requests": _metric(len(lab.calls)),
+        "requests_to_platforms_not_to_ask": _metric(len(hosts & brandlab.NEVER_HOSTS), "= 0", not hosts & brandlab.NEVER_HOSTS),
+        "requests_outside_scope_and_platforms": _metric(len(hosts - brandlab.ALLOWED_HOSTS), "= 0", not hosts - brandlab.ALLOWED_HOSTS),
+        "requests_robots_txt_forbade": _metric(len([r for r in forbidden.calls if r.url.path != "/robots.txt"]), "= 0",
+                                               all(r.url.path == "/robots.txt" for r in forbidden.calls)),
+        "bundle_verifies_brand_derivable": _metric(genuine.ok and checks.get("brand derivable", False), "= true", genuine.ok and checks.get("brand derivable", False)),
+        "changed_brand_section_detected": _metric(not forged.ok, "= true", not forged.ok),
+    }
+    notes = ["a lab written by the author of the module; the platforms' behaviour in the pack was observed live once (2026-10-20, two requests each)",
+             "the lab's GitLab answers every unknown handle with a sign-in redirect, as gitlab.com did: those checks must stay unverifiable"]
+    return _section(metrics, notes, started)
+
+
+async def org_exposure_section(work: Path, state: dict, key) -> dict:
+    """Organisation exposure on the planted lab (benchlab/exposurelab.py): refusals, aggregate correctness, no personal
+    data in any output, detail separate and logged, nothing outside the engagement, the engagement on the signed record."""
+    from datetime import date
+
+    from scrutator.benchlab import exposurelab
+    from scrutator.engagement import EngagementError, check_seed, load_engagement
+    from scrutator.exposure_scan import exposure_scope, run_exposure, write_detail
+    from scrutator.modules import exposure as exposure_modules
+    from scrutator.web import open_web, scope_guard
+
+    started = time.perf_counter()
+    folder = work / "exposure"
+    folder.mkdir(parents=True, exist_ok=True)
+    for old in folder.glob("*.db"):
+        old.unlink()
+    good = folder / "engagement.yaml"
+    good.write_text(exposurelab.ENGAGEMENT_YAML, encoding="utf-8")
+    today = date(2027, 6, 1)  # inside the lab engagement's dates, so the bench gives the same answer on any day
+    refusals = {
+        "no engagement file": (folder / "missing.yaml", "example.com"),
+        "engagement not in force": (good, "example.com", date(2031, 1, 1)),
+        "a public mail provider as a domain": (_write(folder / "webmail.yaml", exposurelab.ENGAGEMENT_YAML.replace("[example.com]", "[gmail.com]")), "gmail.com"),
+        "a domain outside the engagement": (good, "example.net"),
+        "a person's name as the seed": (good, "Jane Doe"),
+        "an e-mail address as the seed": (good, "jane.doe@example.com"),
+        "a phone number as the seed": (good, "+31 20 555 0123"),
+        "a handle as the seed": (good, "@janedoe"),
+    }
+    refused = 0
+    for label, (path, seed, *when) in refusals.items():
+        try:
+            check_seed(seed, load_engagement(path, today=when[0] if when else today).engagement)
+        except EngagementError:
+            refused += 1
+    loaded = load_engagement(good, today=today)
+    lab, resolver = exposurelab.router(), exposurelab.Resolver()
+    store = Store(folder / "scrutator.db")
+    paced, exposure_modules.PACE = exposure_modules.PACE, 100_000.0
+    try:
+        guard = scope_guard(exposure_scope(loaded.engagement), resolve=exposurelab.public_resolve)
+        async with httpx.AsyncClient(transport=lab.transport()) as http, open_web(guard, transport=lab.transport()) as web:
+            ctx = ModuleContext(http=http, resolver=resolver, web=web)
+            scan_id, run = await run_exposure(loaded, "example.com", store, ctx, confirmed="bench", detail=True)
+    finally:
+        exposure_modules.PACE = paced
+    _, detail_rows = write_detail(store, scan_id, run, loaded, folder, by="bench")
+    report = build_report(store, scan_id)
+    (folder / "report.json").write_text(render_json(report), encoding="utf-8")
+    (folder / "report.html").write_text(render_html(report), encoding="utf-8")
+    path = folder / "proof.scrutator"
+    create_bundle(store, scan_id, key, path)
+    audit = store.audit_log(scan_id)
+    store.close()
+    texts = [(folder / "report.json").read_text(encoding="utf-8"), (folder / "report.html").read_text(encoding="utf-8")]
+    texts += [data.decode("utf-8", "replace") for data in read_raw(path).files.values()]
+    blob = (folder / "scrutator.db").read_bytes()
+    leaks = sorted({p for p in exposurelab.PERSONAL_EXCEPT_ENGAGEMENT if any(p in t for t in texts) or p.encode() in blob})
+    org = report["org_exposure"]
+    truth = exposurelab.TRUTH
+    right = {
+        "role mailboxes": org["addresses"]["role"] == truth["role"],
+        "person-like addresses": org["addresses"]["person_like"] == truth["person_like"],
+        "outside dropped": org["addresses"]["outside_engagement_dropped"] == truth["outside"],
+        "functions": org["functions"] == truth["functions"],
+        "top naming pattern": bool(org["naming_patterns"]) and org["naming_patterns"][0]["shape"] == truth["top_shape"],
+    }
+    hosts = {r.url.host for r in lab.calls}
+    names_outside = [n for n, _ in resolver.calls if not loaded.engagement.covers(n)]
+    pin = fingerprint(public_raw_from_private(key))
+    genuine = verify_bundle(path, pinned_fingerprint=pin)
+    checks = {c.name: c.ok for c in genuine.checks}
+
+    def hide_people(data: bytes) -> bytes:
+        body = json.loads(data)
+        body["org_exposure"]["addresses"]["person_like"] = 0
+        return json.dumps(body, sort_keys=True, indent=2).encode()
+
+    forged = verify_bundle(_forge(path, folder / "forged.scrutator", key, {"report.json": hide_people}), pinned_fingerprint=pin)
+    events = [r.get("event") for r in audit]
+    first_lookup = next(i for i, r in enumerate(audit) if r.get("module"))
+    metrics = {
+        "refusal_cases": _metric(len(refusals)),
+        "refused": _metric(refused, f"= {len(refusals)}", refused == len(refusals)),
+        "aggregate_right": _metric(sum(right.values()), f"= {len(right)}", all(right.values())),
+        "personal_data_in_outputs": _metric(len(leaks), "= 0", not leaks),
+        "detail_rows_separate_file": _metric(len(detail_rows), f"= {truth['person_like']}", len(detail_rows) == truth["person_like"]),
+        "detail_logged_in_audit": _metric("exposure_detail" in events, "= true", "exposure_detail" in events),
+        "engagement_recorded_before_lookups": _metric(events.index("engagement") < first_lookup, "= true", events.index("engagement") < first_lookup),
+        "requests_outside_engagement": _metric(len(hosts - exposurelab.ALLOWED_HOSTS), "= 0", not hosts - exposurelab.ALLOWED_HOSTS),
+        "dns_names_outside_engagement": _metric(len(names_outside), "= 0", not names_outside),
+        "bundle_verifies_engagement_and_aggregate": _metric(genuine.ok and checks.get("engagement recorded", False) and checks.get("org exposure derivable", False), "= true",
+                                                         genuine.ok and checks.get("engagement recorded", False) and checks.get("org exposure derivable", False)),
+        "changed_aggregate_detected": _metric(not forged.ok, "= true", not forged.ok),
+    }
+    notes = [f"wrong: {', '.join(k for k, v in right.items() if not v)}"] if not all(right.values()) else []
+    notes += [f"leaked: {', '.join(leaks)}"] if leaks else []
+    notes += ["a lab written by the author of the module; it measures the guarantees, not real-world coverage"]
+    return _section(metrics, notes, started)
+
+
+def _write(path: Path, text: str) -> Path:
+    path.write_text(text, encoding="utf-8")
+    return path
+
+
 # ------------------------------------------------------------------------------------------ the whole run
 
 
@@ -435,6 +624,8 @@ async def _sections(out: Path, state: dict, key, model, ollama_url) -> dict:
         "bundles": await bundles(out, state, key),
         "scope_safety": await scope_safety(out, state),
         "hallucination": await hallucination(out, state, model, ollama_url),
+        "brand": await brand(out, state, key),
+        "org_exposure": await org_exposure_section(out, state, key),
     }
 
 

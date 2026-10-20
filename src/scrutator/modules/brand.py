@@ -97,7 +97,8 @@ class BrandPresence(Module):
                 hops.append(current)
                 current = target
                 continue
-            body = await read_text(response) if "html" in response.headers.get("content-type", "html") else ""
+            # links are read only from a page that was served (200) as HTML; an error page is not the organisation's
+            body = await read_text(response) if response.status_code == 200 and "html" in response.headers.get("content-type", "html") else ""
             links = [link for link in page_links(body, str(response.url)) if _platform_host(packs, link)]
             out.append(self._fact(f"PAGE {current}", {"status": response.status_code, "hops": hops, "links": links}))
             break

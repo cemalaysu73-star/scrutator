@@ -19,20 +19,23 @@ scrutator bench --json                       # the JSON on stdout
 scrutator bench --verifier-model qwen3:8b    # also: a model on this machine as the verifier in the Hallucination Test
 ```
 
-Six sections, each a set of metrics with thresholds. The labs are fixtures: fake DNS, recorded answers of the public
+Eight sections, each a set of metrics with thresholds. The labs are fixtures: fake DNS, recorded answers of the public
 sources, reserved names (`example.com`, `*.test`, documentation address ranges). The labs and the scoring live in
 `src/scrutator/benchlab/`; the same labs back the test suite.
 
 | Section | What is planted | Metrics (threshold) |
 |---|---|---|
-| `risk_rules` | a zone with 22 planted issues covering all 21 risk rules, and a clean zone | every planted issue detected (22 of 22); every rule exercised; risks without evidence = 0; risks in the clean zone = 0 |
+| `risk_rules` | a zone with 22 planted issues covering the 21 risk rules that read DNS, certificate and registration data (the two brand rules are planted in `brand`), and a clean zone | every planted issue detected (22 of 22); every rule exercised; risks without evidence = 0; risks in the clean zone = 0 |
 | `attribution` | an organisation with 16 names of its own and decoys: Cloudflare name servers, a shared hosting AS, a 28-name certificate, a vendor in the SPF record, a partner, an old certificate, and one false positive no DNS signal can remove | precision by band, recall by band; `probable` precision >= 0.9 |
 | `name_tiers` | two zones, one with a wildcard and one without; 13 names whose tier is known | every name lands in its expected tier (accuracy = 1.0); the wildcard is detected; no wildcard is invented |
 | `bundles` | a signed bundle of the risk lab, ten tamper cases, and a replay | the genuine bundle verifies with the signer pinned; all 10 tamper cases fail (flipped bytes in each file, an edited manifest, a hidden risk re-signed with the real key, a raised confidence, a dropped or altered evidence record, a truncated audit log, a forgery signed with another key); replay finds every replayable record unchanged |
 | `scope_safety` | every DNS question and HTTP request made by the lab scans, audited against the scope | questions or requests outside the scope = 0; names of a third-party organisation queried = 0 |
 | `hallucination` | see below | unsupported statements published by the gated row = 0; supported statements kept >= 0.8 |
+| `brand` | `scan --brand` on a planted site that links five platform accounts (one missing, two on platforms that are never asked, one on a platform that answers every unknown handle with a sign-in redirect) and planted look-alike handles; a second site whose robots.txt forbids everything | the five official accounts in the right state; the five planted risks found and no other (= 0); an answer the rules do not read reported as absent = 0; requests to platforms that must not be asked = 0; requests outside the scope and the allowed platforms = 0; requests robots.txt forbade = 0; the bundle re-derives the section; a changed section is caught |
+| `org_exposure` | `scrutator exposure` on a planted organisation that publishes six role mailboxes and five people's work addresses in its security.txt, pages, DMARC, SOA, RDAP and commits, plus names, phone numbers, a street address, a private address and a handle that must never come out; eight refusal cases | refused = 8 of 8 (no file, expired, a public mail provider, a domain outside the engagement, a name, an e-mail address, a phone number, a handle as the seed); the aggregate right (5 of 5); personal data in the report, HTML, bundle and database = 0; detail in its own file and in the audit log; requests and DNS names outside the engagement = 0; the engagement recorded before the first lookup; the bundle re-derives the aggregate; a changed aggregate is caught |
 
-Output: a table, `bench.md`, and `bench.json` with `"schema": "scrutator-bench/1"`:
+Output: a table, `bench.md`, and `bench.json` with `"schema": "scrutator-bench/2"` (2 added the sections `brand`
+and `org_exposure`):
 
 ```
 {"schema", "tool", "created_at", "seconds", "signing_key", "pass",
@@ -40,7 +43,8 @@ Output: a table, `bench.md`, and `bench.json` with `"schema": "scrutator-bench/1
  "hallucination_detail": {...}}
 ```
 
-The schema version changes when a key is renamed or removed; adding metrics does not change it.
+The schema version changes when a key or a section is added, renamed or removed; adding a metric to a section does
+not change it.
 
 ### The Hallucination Test
 

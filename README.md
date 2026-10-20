@@ -78,6 +78,9 @@ Read these before you rely on it. They are also in [docs/security.md](docs/secur
   words about a name the facts know still needs the verifier model to catch it.
 - **Not tested against the real services:** the three keyed sources (VirusTotal, SecurityTrails, Shodan DNS) and the MCP
   server with Claude Desktop itself.
+- **The two opt-in modules are narrow on purpose.** Brand presence knows only what a profile page's HTTP status says
+  (a suspended account can look like a missing one); organisation exposure is a preview that has not had the legal
+  and ethics review its design requires, and runs only when you set `SCRUTATOR_PREVIEW_EXPOSURE=1`.
 - **Not released.** Not on PyPI, no signed releases, no private beta yet. v1.0 is a candidate, not a release.
 
 ## Install
@@ -340,6 +343,9 @@ end: 2026-12-31
 purpose: External red-team assessment of phishing exposure
 github_orgs: [example]          # optional: public code organisations the organisation owns
 ```
+
+It is a preview until it has had the legal and ethics review its design requires: it runs only with the environment
+variable `SCRUTATOR_PREVIEW_EXPOSURE=1` set, as well as the engagement file.
 
 ```bash
 scrutator exposure example.com --engagement engagement.yaml            # shows the attestation and asks to confirm

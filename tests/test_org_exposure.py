@@ -42,6 +42,7 @@ def lab(monkeypatch):
 
     monkeypatch.setattr(cli, "open_context", fake_context)
     monkeypatch.setattr(web_module, "open_web", lab_web)
+    monkeypatch.setenv("SCRUTATOR_PREVIEW_EXPOSURE", "1")
     monkeypatch.setattr("scrutator.modules.exposure.PACE", 100_000.0)
     return router, resolver
 
@@ -58,6 +59,13 @@ def run(tmp_path, engagement, *extra, seed="example.com"):
 
 
 # ------------------------------------------------------------------------------------------- refusals
+
+
+def test_it_is_a_preview_that_needs_the_variable(tmp_path, lab, engagement, monkeypatch):
+    monkeypatch.delenv("SCRUTATOR_PREVIEW_EXPOSURE")
+    result = run(tmp_path, engagement)
+    assert result.exit_code == 2 and "preview" in result.output and "legal and ethics review" in result.output
+    assert lab[0].calls == [] and lab[1].calls == []
 
 
 def test_it_refuses_without_an_engagement_file(tmp_path, lab):
@@ -262,9 +270,10 @@ def test_the_minimiser_keeps_no_person_and_drops_outsiders():
     kinds = sorted(a["kind"] for a in reduced["addresses"])
     assert kinds == ["person", "role"]  # one person (seen twice), one role
     assert "jane" not in json.dumps(reduced)
-    assert [d["address"] for d in detail] == ["jane.doe@example.com", "jane.doe@example.com"]
+    assert [(d["address"], d["found_at"]) for d in detail] == [("jane.doe@example.com", ["here"])]  # one row per address
+    person = next(a for a in reduced["addresses"] if a["kind"] == "person")
     other = Minimiser(lambda d: True, b"j" * 32).reduce(["jane.doe@example.com"], "here")
-    assert other["addresses"][0]["ref"] != reduced["addresses"][0].get("ref") or True  # a new key, a new pseudonym
+    assert other["addresses"][0]["ref"] != person["ref"]  # a new key, a new pseudonym: runs cannot be linked
 
 
 def test_breach_counts_keep_numbers_only():

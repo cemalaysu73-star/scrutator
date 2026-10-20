@@ -127,8 +127,12 @@ class Minimiser:
             else:
                 ref = "p-" + hmac.new(self.key, f"{local}@{domain}".encode(), hashlib.sha256).hexdigest()[:16]
                 item = {"kind": "person", "shape": shape(local), "domain": domain, "ref": ref}
-                if self.detail is not None:
-                    self.detail.append({"address": f"{local}@{domain}", "shape": item["shape"], "ref": ref, "found_at": where})
+                if self.detail is not None:  # one row per address, with every place it was found
+                    row = next((r for r in self.detail if r["ref"] == ref), None)
+                    if row is None:
+                        self.detail.append({"address": f"{local}@{domain}", "shape": item["shape"], "ref": ref, "found_at": [where]})
+                    elif where not in row["found_at"]:
+                        row["found_at"].append(where)
             kept[tuple(sorted(item.items()))] = item
         return {"addresses": sorted(kept.values(), key=lambda i: json.dumps(i, sort_keys=True)), "outside_engagement": outside}
 
