@@ -10,12 +10,17 @@ from typing import Any
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from scrutator import __version__
+from scrutator.bundle import reader
 from scrutator.bundle.keys import fingerprint, public_raw_from_private, sign
 from scrutator.report import build_report, render_json
 from scrutator.risk.engine import RULESET_VERSION
 from scrutator.store import Store
 
 FORMAT_VERSION = 1
+
+
+class BundleTooLarge(ValueError):
+    """The scan is too large for a bundle the verifier would accept. Nothing was written."""
 DATA_FILES = ("report.json", "evidence.jsonl", "audit.jsonl")
 
 
@@ -67,6 +72,13 @@ def create_bundle(
         ),
         "audit.jsonl": _jsonl(store.audit_rows(scan_id)),
     }
+    sizes = {name: len(data) for name, data in files.items()}
+    too_big = [f"{name} ({size // 2**20} MiB)" for name, size in sizes.items() if size > reader.MAX_FILE_BYTES]
+    if too_big or sum(sizes.values()) > reader.MAX_TOTAL_BYTES:
+        raise BundleTooLarge(
+            f"the bundle would exceed what `scrutator verify` reads ({', '.join(too_big) or 'all files together'}; limits "
+            f"{reader.MAX_FILE_BYTES // 2**20} MiB per file, {reader.MAX_TOTAL_BYTES // 2**20} MiB in all): scan with a lower --max-entities"
+        )
     public_raw = public_raw_from_private(private_key)
     manifest = {
         "format": FORMAT_VERSION,

@@ -7,8 +7,10 @@ before a byte is decompressed (the zip library stops at the declared size and fa
 so a header that lies cannot inflate past it). Nothing is extracted to disk, so names like `../x` or symbolic-link
 entries cannot write or point anywhere: a member is only ever bytes in memory.
 
-Limits (a real bundle of a large scan is a few MB): each data file 128 MiB, the manifest 1 MiB, the signature
-4 KiB, all members together 256 MiB, the bundle file on disk 256 MiB."""
+Limits: each data file 256 MiB, the manifest 1 MiB, the signature 4 KiB, all members together 512 MiB, the bundle
+file on disk 512 MiB. A scan of a few hundred names makes a bundle of about 1 MB; a scan that records 50,000 names
+(`--max-entities 60000`) makes a 128 MiB report, inside the limits. The writer refuses a bundle the reader would
+refuse (bundle/writer.py), so a bundle this tool makes can always be verified by it."""
 
 import struct
 import zipfile
@@ -16,10 +18,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 ALLOWED = ("manifest.json", "manifest.sig", "report.json", "evidence.jsonl", "audit.jsonl")
-MAX_FILE_BYTES = 128 * 1024 * 1024
+MAX_FILE_BYTES = 256 * 1024 * 1024
 MAX_MEMBER_BYTES = {"manifest.json": 1024 * 1024, "manifest.sig": 4096}
-MAX_TOTAL_BYTES = 256 * 1024 * 1024
-MAX_BUNDLE_BYTES = 256 * 1024 * 1024
+MAX_TOTAL_BYTES = 512 * 1024 * 1024
+MAX_BUNDLE_BYTES = 512 * 1024 * 1024
 MAX_ENTRIES = 16  # five are expected; the count is read before the zip library lists them
 _EOCD = b"PK\x05\x06"
 _EOCD64_LOCATOR = b"PK\x06\x07"

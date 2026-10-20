@@ -41,6 +41,7 @@ def fails_cleanly(path, expect: str):
 
 
 def test_a_zip_bomb_is_refused_from_its_declared_size_without_inflating_it(tmp_path):
+    """A member that inflates to more than the per-file limit (256 MiB) from a few hundred KiB on disk."""
     good = members(make_bundle(tmp_path).path)
     bomb = tmp_path / "bomb.scrutator"
     with zipfile.ZipFile(bomb, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
@@ -49,7 +50,7 @@ def test_a_zip_bomb_is_refused_from_its_declared_size_without_inflating_it(tmp_p
                 archive.writestr(name, data)
         with archive.open("evidence.jsonl", "w", force_zip64=False) as handle:
             chunk = b"\0" * (1024 * 1024)
-            for _ in range(200):  # 200 MiB of zeros, about 200 KiB on disk
+            for _ in range(reader.MAX_FILE_BYTES // len(chunk) + 16):  # just over the limit in zeros, about 300 KiB on disk
                 handle.write(chunk)
     assert bomb.stat().st_size < 2 * 1024 * 1024
     tracemalloc.start()

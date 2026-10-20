@@ -34,7 +34,7 @@ from scrutator.bundle.keys import (
 from scrutator.bundle.reader import read_raw
 from scrutator.bundle.replay import replay_evidence, subject_names
 from scrutator.bundle.verify import verify_bundle
-from scrutator.bundle.writer import create_bundle
+from scrutator.bundle.writer import BundleTooLarge, create_bundle
 from scrutator.context import ai_client, open_context
 from scrutator.deadline import DEFAULT_DEADLINE_S, Deadline
 from scrutator.engine import DEFAULT_BREAKER_THRESHOLD
@@ -71,8 +71,18 @@ def _echo(message: object = "", **kwargs) -> None:
     typer.echo(terminal_safe(str(message)), **kwargs)
 
 
+def _show_version(value: bool) -> None:
+    if value:
+        from scrutator import __version__
+
+        _echo(f"scrutator {__version__}")
+        raise typer.Exit()
+
+
 @app.callback()
-def main() -> None:
+def main(
+    version: bool = typer.Option(False, "--version", callback=_show_version, is_eager=True, help="Print the version and exit."),
+) -> None:
     """Scrutator."""
 
 
@@ -280,10 +290,13 @@ def scan(
     if "html" in wanted:
         (out / "report.html").write_text(render_html(report), encoding="utf-8")
         written.append("report.html")
-    bundle_path = None
+    bundle_path, bundle_problem = None, ""
     if signing_key is not None:
-        bundle_path = out / "proof.scrutator"
-        manifest = create_bundle(store, scan_id, signing_key, bundle_path)
+        try:
+            manifest = create_bundle(store, scan_id, signing_key, out / "proof.scrutator")
+            bundle_path = out / "proof.scrutator"
+        except BundleTooLarge as exc:
+            bundle_problem = str(exc)
     store.close()
 
     counts = report["summary"]
@@ -349,6 +362,9 @@ def scan(
     _echo(f"Wrote {', '.join(written)} to {out}")
     if bundle_path is not None:
         _echo(f"Proof bundle: {bundle_path} (signing key {manifest['key_fingerprint']})")
+    if bundle_problem:
+        _echo(f"error: no proof bundle was written: {bundle_problem}", err=True)
+        raise typer.Exit(2)
 
 
 @app.command(name="sources")
@@ -446,7 +462,7 @@ def export(
     chosen = scan_id if scan_id is not None else scans[-1]["id"]
     try:
         manifest = create_bundle(store, chosen, key, bundle)
-    except KeyError as exc:
+    except (KeyError, BundleTooLarge) as exc:
         raise _fail(str(exc)) from exc
     finally:
         store.close()

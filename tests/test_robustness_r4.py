@@ -250,3 +250,18 @@ def test_a_damaged_database_is_a_clear_usage_error(tmp_path):
     assert done.returncode == 2 and "Traceback" not in done.stderr and "damaged.db" in done.stderr, (done.stdout, done.stderr)
 
 
+
+
+def test_a_scan_too_large_for_a_verifiable_bundle_gets_no_bundle_and_a_clear_error(tmp_path, monkeypatch):
+    from scrutator.bundle import reader
+    from scrutator.bundle.writer import BundleTooLarge
+
+    store = Store(":memory:")
+    scan = store.create_scan("example.com")
+    for i in range(50):
+        store.add_evidence(Evidence.create("x", f"GET https://x.test/{i}", "y" * 1000))
+        store.add_scan_evidence(scan, Evidence.create("x", f"GET https://x.test/{i}", "y" * 1000).id)
+    monkeypatch.setattr(reader, "MAX_FILE_BYTES", 10_000)
+    with pytest.raises(BundleTooLarge, match="--max-entities"):
+        create_bundle(store, scan, key(tmp_path), tmp_path / "big.scrutator")
+    assert not (tmp_path / "big.scrutator").exists()
