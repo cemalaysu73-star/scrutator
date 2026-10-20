@@ -5,20 +5,21 @@ organisation's internet-facing infrastructure in which every claim links to the 
 it came from. The AI is local-first: it runs on a model on your machine, and cloud models are
 an explicit, logged opt-in.
 
-**Status: v0.6.** Passive scanning with a dozen keyless sources (v0.6 added CertSpotter, passive DNS,
-three name aggregators, address enrichment and a wildcard probe), a scan that always ends inside a
-deadline, a resolution state for every name, a deny-by-default scope guard,
-an evidence store, JSON and HTML reports, a budgeted agent, an AI summary in which every
-statement is checked against evidence by a separate verifier, signed proof bundles that anyone
-can verify and replay, diff between scans, scheduled watching, knowledge packs, a dependency
-and risk analysis in which every risk cites its evidence and can be re-derived from a proof
-bundle, deterministic analyst detectors, SARIF export, and now an attribution engine (names
-outside the scope that probably belong to the organisation, with a score, a band and the evidence
-behind it), AI leads that must cite evidence, playbooks for the agent, and an MCP server. A
-benchmark against sublist3r, dnsrecon and knockpy is in `bench/`; its latest reading is in
-[docs/benchmarks/2026-10-17-after-v0.6.md](docs/benchmarks/2026-10-17-after-v0.6.md): on the four frozen
-targets Scrutator's recall is at least the best competitor's, every name is backed by evidence and the
-bundles verify, and it is still 20 to 40 times slower than knockpy.
+**Status: v0.7.** Passive scanning with a dozen keyless sources, a scan that always ends inside a deadline, a
+resolution state and an evidence **tier** for every name (`N verified, M claimed`, not one big count), a
+deny-by-default scope guard, an evidence store, JSON and HTML reports, a budgeted agent, an AI summary in which
+every statement is checked against evidence by a separate verifier, signed proof bundles that anyone can verify and
+replay, diff between scans, scheduled watching, knowledge packs, a dependency and risk analysis in which every risk
+cites its evidence and can be re-derived from a proof bundle, deterministic analyst detectors, SARIF export, an
+attribution engine (names outside the scope that probably belong to the organisation, with a score, a band and the
+evidence behind it), AI leads that must cite evidence, playbooks for the agent, and an MCP server. New in v0.7: the
+tiers, a pipelined scan (owasp.org: median 86 s to 36 s on the same bad day for the sources), a source policy
+(`--sources`, `--exclude-sources`, `--no-noncommercial`) that the bundle records and `verify` checks, optional keyed
+sources (implemented against the documented APIs, **not live-verified**) and `scrutator sources`. A benchmark
+against sublist3r, dnsrecon and knockpy is in `bench/`; its latest reading is in
+[docs/benchmarks/2026-10-17-after-v0.7.md](docs/benchmarks/2026-10-17-after-v0.7.md): on the four frozen targets
+Scrutator's recall is at least the best competitor's, every name is backed by evidence and the bundles verify, the
+verified names are exactly the live ones, and it is still about 10 times slower than knockpy.
 
 ## Install
 
@@ -49,6 +50,18 @@ is written with what was collected and a note that it is partial. A source that 
 scan and not asked again; Source coverage shows it as down, so it is never mistaken for a source with
 nothing to say. Sources that list every name under a domain are asked once, about the apex, not once
 per discovered name. Ctrl-C also writes a (partial) report.
+
+**Speed.** Without a planner model a lookup starts the moment the thing it is about is known (a name a fast source
+lists is resolved while a slow source is still waiting), a lookup's results are written in one transaction, DNS goes
+through a bounded pool that starts with the fastest of your name servers, a name that does not exist costs two
+queries instead of six, RDAP is asked once per network (neighbouring addresses cite that record; `rdap.org` refuses
+more than about ten requests in ten seconds, so they are paced), and a source that answers 429 or 5xx with a
+`Retry-After` above 12 s is not waited for. Measured on owasp.org with the benchmark's command, three runs of each
+version taking turns five minutes apart on a day when crt.sh, Common Crawl, CertSpotter and HackerTarget were all
+failing: v0.6 75.8, 86.1 and 117.5 s (median 86.1), v0.7 36.9, 36.1 and 21.7 s (median 36.1), the same 48 live
+names. What is left is mostly the RDAP rate limit; `--exclude-sources rdap` leaves it out, at the price of no
+network owners. `python bench/profile_scan.py owasp.org` shows where the seconds of a scan go. With a planner model
+the agent keeps its round structure, because the planner ranks the lookups of a round.
 
 ```bash
 scrutator scan example.com --deadline 300 --breaker 5   # five minutes at most; mark a source down after five failures in a row
