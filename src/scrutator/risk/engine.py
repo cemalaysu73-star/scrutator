@@ -9,6 +9,7 @@ and compare them with what the bundle claims.
 from scrutator.model import Finding
 from scrutator.packs import PackSet
 from scrutator.risk.analyst import ANALYST_RULES
+from scrutator.risk.brand import brand_risks
 from scrutator.risk.concentration import concentration_risks
 from scrutator.risk.dependency import build_dependency_map
 from scrutator.risk.hygiene import HYGIENE_RULES
@@ -16,7 +17,16 @@ from scrutator.risk.services import exposed_services
 from scrutator.risk.model import Risk
 from scrutator.risk.view import View
 
-RULESET_VERSION = 2  # 2: exposed-risky-service; certspotter counts as a certificate source
+RULESET_VERSION = 3  # 2: exposed-risky-service; certspotter counts as a certificate source. 3: brand presence rules
+
+
+def comparable(ruleset, report: dict) -> bool:
+    """Can this tool re-derive risks a report says were made by `ruleset`?"""
+    if ruleset == RULESET_VERSION:
+        return True
+    if ruleset == 2:
+        return not any(isinstance(r, dict) and r.get("source") == "brand" for r in (report.get("evidence") or {}).values())
+    return False
 
 
 def analyze(report: dict, packs: PackSet | None = None) -> dict:
@@ -29,6 +39,7 @@ def analyze(report: dict, packs: PackSet | None = None) -> dict:
         risks.extend(rule(view))
     risks.extend(concentration_risks(view, deps))
     risks.extend(exposed_services(report))
+    risks.extend(brand_risks(report, packs))
     for rule in ANALYST_RULES:
         risks.extend(rule(view))
     risks.sort(key=lambda r: (*r.sort_key, r.fingerprint))

@@ -32,7 +32,8 @@ from scrutator.bundle.keys import (
     public_key_path,
 )
 from scrutator.bundle.reader import read_raw
-from scrutator.bundle.replay import MAX_RECORDS, replay_evidence, subject_names
+from scrutator.bundle.replay import MAX_RECORDS, PROFILE_HOSTS, replay_evidence, subject_names
+from scrutator.egress import SOURCE_HOSTS, EgressGuard
 from scrutator.bundle.verify import verify_bundle
 from scrutator.bundle.writer import BundleTooLarge, create_bundle
 from scrutator.context import ai_client, open_context
@@ -216,9 +217,12 @@ def scan(
     sources: Optional[str] = typer.Option(None, "--sources", help="Use only these sources (comma-separated; see `scrutator sources`).", rich_help_panel="Source policy"),
     exclude_sources: Optional[str] = typer.Option(None, "--exclude-sources", help="Do not use these sources (comma-separated).", rich_help_panel="Source policy"),
     noncommercial: bool = typer.Option(True, "--noncommercial/--no-noncommercial", help="--no-noncommercial: leave out sources whose free tier is for non-commercial use only (InternetDB, RIPEstat, CertSpotter, Subdomain Center).", rich_help_panel="Source policy"),
+    brand: bool = typer.Option(False, "--brand", help="Brand presence (off by default; contacts the organisation's site): read the platform links on its home page (robots.txt honoured), check whether those accounts and look-alikes of the brand name exist (profile page status only). For an organisation's domain.", rich_help_panel="Source policy"),
 ) -> None:
     """Run a passive scan and write evidence-backed reports."""
     policy = _source_policy(sources, exclude_sources, not noncommercial)
+    if brand:
+        policy = policy.opt("brand")
     wanted = {f.strip() for f in formats.split(",") if f.strip()}
     if not wanted or not wanted <= _FORMATS:
         raise _fail(f"--format must be a comma-separated subset of {sorted(_FORMATS)}")
@@ -251,7 +255,9 @@ def scan(
             return None
 
     async def go():
-        async with open_context() as ctx, ai_client() as ai_http:
+        async with open_context() as ctx, ai_client() as ai_http, _web_client(brand, scope, packs) as web:
+            if ctx is not None:  # a test may stand in for the whole context
+                ctx.web = web
             runtime, used = await build_runtime(
                 config, cli_mode=mode, model=model, consent_cloud=True, redact=redact,
                 client=ai_http, apex_domains=apexes,
@@ -312,6 +318,8 @@ def scan(
     if off:
         _echo(off)
     _echo(_risk_line(report["risks"]) + " Run `scrutator risk` for the list.")
+    if brand:
+        _echo(_brand_line(report.get("brand")))
     if attribute:
         _echo(_candidate_line(report["attribution"]) + " Run `scrutator candidates` for the list.")
     if interrupted:
@@ -365,6 +373,15 @@ def scan(
     if bundle_problem:
         _echo(f"error: no proof bundle was written: {bundle_problem}", err=True)
         raise typer.Exit(2)
+
+
+def _web_client(wanted: bool, scope: ScopePolicy, packs):
+    """The guarded client of the opt-in modules (scrutator.web), or nothing when they were not asked for."""
+    from contextlib import nullcontext
+
+    from scrutator.web import open_web, scope_guard
+
+    return open_web(scope_guard(scope, packs or load_packs())) if wanted else nullcontext(None)
 
 
 @app.command(name="sources")
@@ -511,7 +528,8 @@ def verify(
               "Replay contacts only the source hosts, and looks up only names inside the bundle's own scope.")
 
     async def go():
-        async with open_context() as ctx:
+        # the source hosts, and the fixed profile hosts of brand presence (bundle/replay.py)
+        async with open_context(egress=EgressGuard(SOURCE_HOSTS | PROFILE_HOSTS)) as ctx:
             return await replay_evidence(records, ctx.http, ctx.resolver, subject=subject, max_records=replay_limit)
 
     results = asyncio.run(go())
@@ -650,6 +668,20 @@ def _findings_line(by_tier: dict[str, int], total: int) -> str:
         + (f" and {by_tier['other']} about addresses and registrations" if by_tier["other"] else "")
         + f"; {total - solid} more about claimed ({by_tier['claimed']}), stale ({by_tier['stale']}) or "
         f"wildcard-covered ({by_tier['wildcard']}) names, kept in the report and collapsed in the HTML."
+    )
+
+
+def _brand_line(section: dict | None) -> str:
+    if not section:
+        return "Brand: no result (the site could not be read, or robots.txt does not allow it); see Source coverage."
+    total = section["summary"]
+    linked = total["official"]
+    if not linked:
+        return "Brand: the home page links to no known platform account, so no platform was asked about."
+    return (
+        f"Brand: {linked} account(s) linked from the site ({total['official_absent']} answer as not existing), "
+        f"{total['brand_unregistered']} unregistered brand handle(s), {total['lookalikes_existing']} of "
+        f"{total['lookalikes_checked']} look-alike handle(s) exist, {total['unverifiable']} unverifiable."
     )
 
 
@@ -937,7 +969,8 @@ def packs_manifest(
     if not directory.is_dir():
         raise _fail(f"{directory} is not a directory")
     manifest = build_manifest(directory)
-    (directory / "manifest.json").write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    # LF on every platform: the file is committed, and a CRLF copy written on Windows would show as a change
+    (directory / "manifest.json").write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8", newline="\n")
     _echo(f"Wrote {directory / 'manifest.json'} ({len(manifest['files'])} file(s)).")
 
 

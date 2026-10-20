@@ -34,7 +34,7 @@ def test_a_genuine_bundle_carries_risks_and_passes_every_check(tmp_path):
     analysis = manifest["analysis"]
     assert analysis["ruleset"] == RULESET_VERSION and analysis["risks"] == 3
     assert analysis["effective_sha256"] == data["packs"]["effective_sha256"]
-    assert {p["name"] for p in analysis["packs"]} == {"providers.yaml", "takeover.yaml", "signals.yaml", "playbooks.yaml"}
+    assert {p["name"] for p in analysis["packs"]} == {"providers.yaml", "takeover.yaml", "signals.yaml", "playbooks.yaml", "platforms.yaml"}
     assert len(report.warnings) == 1 and "not pinned" in report.warnings[0]
 
 

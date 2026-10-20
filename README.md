@@ -5,7 +5,9 @@ sources what they know (certificate transparency, DNS, registration data, archiv
 gives you back a map of the organisation's internet-facing infrastructure in which every finding links to the raw
 record it came from, and the whole report can be shipped as a **signed proof bundle that a stranger can verify**.
 
-Passive only: it never port-scans, never probes the target, never brute-forces names, never looks up a person.
+Passive by default: it never port-scans, never probes the target, never brute-forces names, never looks up a person.
+(The one opt-in exception, `scan --brand`, reads the organisation's own home page with robots.txt honoured: see
+[brand presence](#brand-presence).)
 
 ## Why it is different
 
@@ -272,6 +274,8 @@ to its raw evidence.
 | `ghost-hostname` (analyst) | info | A certificate or archive names an in-scope host and DNS says NXDOMAIN. |
 | `numbering-gap` (analyst) | info | `app1`, `app2`, `app4`: a number in a series is missing. |
 | `source-disagreement` (analyst) | low | RDAP and the zone list different name servers. |
+| `brand-handle-unregistered` | medium or low (low confidence) | Only with `--brand`. An account the organisation's home page links to (medium), or the bare brand name on a platform it links to (low), answers as not existing on the public profile page. |
+| `brand-lookalike-handle` | low (low confidence) | Only with `--brand`. A look-alike of the brand name exists on a platform the home page links to; ownership unknown. |
 
 The **analyst** category is layer 1 of the analyst in the design: deterministic detectors for the
 subtle things a reviewer skips. There is no AI in any detector. With an AI summary, risks are given to
@@ -290,6 +294,34 @@ database, an unknown option value, a pack directory that fails validation.
 location. Uploaders that need one (GitHub code scanning does) must supply it; that belongs to a later CI
 integration. Each result has a stable `partialFingerprints` entry made of the rule and the entities, so
 a later run can recognise the same finding and update its ticket instead of opening a new one.
+
+## Brand presence
+
+Off by default. `--brand` adds one module to a scan of an organisation's domain:
+
+```bash
+scrutator scan example.com --brand
+```
+
+1. It reads `robots.txt` of the site (user agent `scrutator`; a robots.txt that cannot be read counts as "disallow
+   everything") and, if allowed, the home page, one request a second, no login, at most three redirects and only inside
+   the scope. From the page it keeps only the links to platforms the knowledge pack `platforms` knows.
+2. For each linked platform whose public profile page tells existence by its HTTP status (GitHub, GitLab,
+   mastodon.social, Hugging Face, Codeberg, Docker Hub), it asks whether the linked accounts exist, whether the bare
+   brand name (the first label of the domain, never free text) is taken, and whether up to 20 look-alikes of the brand
+   name exist (homoglyphs, added words, separators, keyboard typos). Status only; nothing is read from the page;
+   redirects are not followed.
+3. Platforms the site does not link to are never asked about. X, LinkedIn, Facebook, Instagram, TikTok, YouTube and the
+   others whose terms restrict automated access, or whose page answers the same for any handle, are never requested: a
+   link to them is listed as *unverifiable*. An answer that does not match the platform's rules (a redirect to a sign-in
+   page, a 403, a timeout) is *unverifiable* too, never *absent*.
+
+The result is the report's `brand` section (and a table in the HTML), and two risks: `brand-handle-unregistered` and
+`brand-lookalike-handle`, both low confidence, because the status of a profile page is all the evidence there is (a
+suspended account can look like a missing one; a look-alike may be the organisation's own, a fan's or an
+impersonator's). The behaviour of each platform was observed live on 2026-10-20 from one network (two requests each)
+and is recorded with the entry; platforms change. `verify` re-derives the section from the evidence and the
+embedded pack (`brand derivable`); `verify --replay` re-asks the profile pages, never the organisation's site.
 
 ## Attribution
 

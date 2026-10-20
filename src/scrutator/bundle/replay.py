@@ -30,6 +30,11 @@ ALLOWED_HTTP_HOSTS = frozenset(
     }
 )
 _DNS = re.compile(r"DNS (A|AAAA|CNAME|MX|NS|TXT|CAA) (\S+)")
+# Brand presence asks public profile pages for their HTTP status (scrutator/brand.py). A replay may re-ask, but only these
+# hosts (the bundled platforms whose status tells; fixed here, never taken from a bundle's packs) and only a path that
+# has the shape of a profile page: one handle, optionally after "@" or "u/", nothing else.
+PROFILE_HOSTS = frozenset({"github.com", "gitlab.com", "mastodon.social", "huggingface.co", "codeberg.org", "hub.docker.com"})
+_PROFILE_PATH = re.compile(r"/(?:@|u/)?[A-Za-z0-9_][A-Za-z0-9._-]{0,63}/?")
 
 # Top-level response-envelope fields that differ on every call and say nothing about the data
 # (RIPEstat adds timings, a query id and the answering server to every reply).
@@ -67,6 +72,20 @@ def parse_request(request: str) -> tuple[str, ...] | None:
             and port in (None, 443)
         ):
             return ("http", url)
+        return None
+    if request.startswith("PROFILE "):
+        url = request[len("PROFILE "):]
+        try:
+            parts = urlsplit(url)
+            port = parts.port
+        except ValueError:
+            return None
+        if (
+            parts.scheme == "https" and parts.hostname in PROFILE_HOSTS and parts.username is None and port is None
+            and not parts.query and not parts.fragment and _PROFILE_PATH.fullmatch(parts.path) and ".." not in parts.path
+            and url == f"https://{parts.hostname}{parts.path}"
+        ):
+            return ("profile", url)
         return None
     match = _DNS.fullmatch(request)
     if match:
@@ -237,12 +256,21 @@ async def replay_evidence(
             return result("skipped", "name is outside the bundle's scope and entities")
         if attempted >= max_records:
             return result("skipped", f"replay limit: only the first {max_records} records are replayed")
-        if parsed[0] == "http" and parsed[1] not in urls:
+        if parsed[0] in ("http", "profile") and parsed[1] not in urls:
             if len(urls) >= max_http:
                 return result("skipped", f"replay limit: only {max_http} distinct requests are sent")
             urls.add(parsed[1])
         attempted += 1  # no await between the checks and the count: the decision is made in record order
         try:
+            if parsed[0] == "profile":
+                async with semaphore:
+                    response = await http.get(parsed[1], follow_redirects=False)
+                try:
+                    recorded = json.loads(rec["payload"]).get("status")
+                except (ValueError, AttributeError):
+                    recorded = None
+                return result("unchanged" if recorded == response.status_code else "changed",
+                              "" if recorded == response.status_code else f"HTTP {recorded} then, {response.status_code} now")
             if parsed[0] == "http":
                 status, text = await fetch(parsed[1])
                 if status != 200:

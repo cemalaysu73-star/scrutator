@@ -5,7 +5,9 @@ returns what the service said, as evidence. About thirty minutes for a service w
 
 ## What a module is allowed to be
 
-- **Passive.** It asks a third-party service about the target; it never contacts the target. Active modules do not
+- **Passive.** It asks a third-party service about the target; it never contacts the target (the opt-in modules
+  `brand` and the organisation-exposure set are the documented exceptions, behind their own flag or command and
+  `scrutator.web.WebGuard`). Active modules do not
   exist in v1.0.
 - **Keyless, or keyed through the environment.** No accounts are created for users, and keys come only from an
   environment variable ([sources](sources.md#keyed-sources-optional-off-by-default)).

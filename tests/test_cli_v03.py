@@ -107,7 +107,7 @@ def test_verify_replay_reports_drift_without_failing(tmp_path, monkeypatch):
     runner.invoke(cli.app, ["export", "--db", str(db), "--bundle", str(bundle), "--key-dir", str(key_dir)])
 
     @asynccontextmanager
-    async def real_http():
+    async def real_http(**_):  # the replay passes its egress guard; the fake client has none
         from scrutator.modules.base import ModuleContext
 
         class Resolver:

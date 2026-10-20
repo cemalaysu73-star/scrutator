@@ -9,6 +9,7 @@ The table below has one row per module, exactly as `scrutator sources` lists the
 | Module | Access | Non-commercial | Replayable | Gives | Terms in short |
 |---|---|---|---|---|---|
 | `asn` | keyless | yes | yes | IP to ASN and network name (RIPEstat) | RIPE NCC terms: non-commercial use, no redistribution of the data without permission, credit RIPE NCC and the original source. Requests identify the application (`sourceapp=scrutator`). Bundles that embed RIPEstat responses inherit this. |
+| `brand` | keyless | no | yes | **Opt-in, `scan --brand` only.** The platform accounts the organisation's home page links to, and whether they, the bare brand name and up to 20 look-alikes of it exist on those platforms (HTTP status of the public profile page, nothing from the page) | Contacts the organisation's own site: robots.txt first (agent `scrutator`; an unreadable robots.txt counts as "disallow"), then the home page if allowed, one request a second, no login. Profile pages are asked only on github.com, gitlab.com, mastodon.social, huggingface.co, codeberg.org and hub.docker.com, and only when the site links to that platform. X, LinkedIn, Facebook, Instagram, TikTok, YouTube, Reddit, Bluesky, PyPI, npm, Medium, Telegram and Twitch are never requested (their terms restrict automated access, or the page does not tell): a link to them is reported as *unverifiable*. Only the profile checks replay; the organisation's site is never replayed. |
 | `certspotter` | keyless | yes | yes | Second Certificate Transparency view: names, issuer, key hash, revocation (`api.certspotter.com`) | The unauthenticated API is for personal or evaluation use; production needs an SSLMate account; the free tier may change at any time. At most 2 pages per scan. |
 | `commoncrawl` | keyless | no | yes | Hostnames seen in the latest crawl (`index.commoncrawl.org`) | Public index; fair use. |
 | `crtsh` | keyless | no | yes | Certificate Transparency names (`crt.sh`) | Public service of Sectigo; no stated limit; often slow or answers 502. |
@@ -83,4 +84,5 @@ shapes. Treat your first real run as the real test.
 Every module that runs sends the service the domain (or, for address sources, the addresses your in-scope names
 resolve to). A service you did not choose never sees it: use `--sources` or `--exclude-sources`. The target itself is
 never contacted by a passive scan, except that your resolver is asked DNS questions about it, which reach the
-target's own name servers when your resolver has no cached answer.
+target's own name servers when your resolver has no cached answer. The opt-in `brand` module is the exception you
+choose: with `scan --brand` it reads robots.txt and the home page of the organisation's site (see the table).

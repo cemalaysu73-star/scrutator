@@ -17,8 +17,11 @@ SCHEMA_VERSION = 1
 # KINDS are the files the risk and attribution results are derived from: the report embeds them and
 # `verify` re-derives from them, so they are hashed together. Playbooks only guide the agent; no
 # result depends on them, so they are loaded and validated like the rest but kept out of that hash.
-KINDS = ("providers", "takeover", "signals")
+KINDS = ("providers", "takeover", "signals", "platforms")
 ALL_KINDS = (*KINDS, "playbooks")
+# kinds added after bundles already existed: a bundle made before a kind existed declares no file of it, and is
+# compared with a trusted copy without that kind (it cannot have used it)
+NEWER_KINDS = frozenset({"platforms"})
 SITUATIONS = ("cname_out", "san_cohabitants", "mail", "delegated", "ip_without_network", "candidates", "spf_includes")
 CATEGORIES = ("dns", "mail", "cdn", "hosting", "ca")
 
@@ -191,6 +194,84 @@ class PlaybookEntry(Entry):
         return values
 
 
+_HANDLE_PUNCTUATION = set("-_.")
+
+
+class PlatformEntry(Entry):
+    """A public platform an organisation may link to from its own site (brand presence, scrutator/brand.py).
+
+    `profile` builds a profile URL from a handle; `link_hosts` and `link_paths` recognise a link to an account; a handle
+    is ASCII letters and digits plus the characters in `handle_chars` (only `-`, `_`, `.`), `handle_min` to `handle_max`
+    long, not starting or ending with a character in `no_edge`, and not one of `reserved` (site pages, not accounts).
+    These are templates and character sets, not regular expressions, so a pack (or a bundle's embedded copy) cannot
+    make matching slow. `presence: status` means the HTTP status of the public profile page tells: `exists` and `absent`
+    list the statuses (absent may be empty: then absence is never concluded). `presence: unverifiable` means the page
+    does not tell, blocks automated requests, or the platform's terms forbid them: such a platform is never requested."""
+
+    platform: str = Field(min_length=1, max_length=80)
+    profile: str = Field(max_length=200)
+    link_hosts: tuple[str, ...] = Field(min_length=1, max_length=8)
+    link_paths: tuple[str, ...] = Field(min_length=1, max_length=6)
+    handle_chars: str = Field(default="", max_length=3)
+    handle_min: int = Field(ge=1, le=64)
+    handle_max: int = Field(ge=1, le=255)
+    no_edge: str = Field(default="", max_length=3)
+    reserved: tuple[str, ...] = Field(default=(), max_length=60)
+    presence: Literal["status", "unverifiable"]
+    exists: tuple[int, ...] = Field(default=(), max_length=5)
+    absent: tuple[int, ...] = Field(default=(), max_length=5)
+
+    @field_validator("profile")
+    @classmethod
+    def _profile(cls, value: str) -> str:
+        if not value.startswith("https://") or value.count("{handle}") != 1 or re.search(r"[\s?#]", value):
+            raise ValueError("profile must be an https URL template with {handle} once and no query")
+        host = value[len("https://"):].split("/", 1)[0]
+        canonical_host(host)
+        if "{handle}" in host or "/" not in value[len("https://"):]:
+            raise ValueError("{handle} must be in the path of the profile URL")
+        return value
+
+    @field_validator("link_hosts")
+    @classmethod
+    def _link_hosts(cls, values: tuple[str, ...]) -> tuple[str, ...]:
+        return tuple(canonical_host(v) for v in values)
+
+    @field_validator("link_paths")
+    @classmethod
+    def _link_paths(cls, values: tuple[str, ...]) -> tuple[str, ...]:
+        for value in values:
+            if not value.startswith("/") or value.count("{handle}") != 1 or not re.fullmatch(r"[a-z0-9/@~_.{}-]+", value):
+                raise ValueError(f"a link path is a template such as /@{{handle}}: {value!r}")
+        return values
+
+    @field_validator("handle_chars", "no_edge")
+    @classmethod
+    def _punctuation(cls, value: str) -> str:
+        if set(value) - _HANDLE_PUNCTUATION:
+            raise ValueError("only -, _ and . may be listed")
+        return value
+
+    @field_validator("exists", "absent")
+    @classmethod
+    def _statuses(cls, values: tuple[int, ...]) -> tuple[int, ...]:
+        if any(not 100 <= v <= 599 for v in values):
+            raise ValueError("not an HTTP status")
+        return values
+
+    @model_validator(mode="after")
+    def _presence_rules(self) -> "PlatformEntry":
+        if self.handle_min > self.handle_max:
+            raise ValueError("handle_min is larger than handle_max")
+        if self.presence == "status" and not self.exists:
+            raise ValueError("presence: status needs at least one status in exists")
+        if self.presence == "unverifiable" and (self.exists or self.absent):
+            raise ValueError("presence: unverifiable takes no statuses")
+        if set(self.exists) & set(self.absent):
+            raise ValueError("a status cannot mean both exists and absent")
+        return self
+
+
 class _Envelope(BaseModel):
     model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
@@ -222,10 +303,15 @@ class SignalsFile(_Envelope):
     entries: list[SignalEntry]
 
 
+class PlatformsFile(_Envelope):
+    kind: Literal["platforms"]
+    entries: list[PlatformEntry]
+
+
 class PlaybooksFile(_Envelope):
     kind: Literal["playbooks"]
     entries: list[PlaybookEntry]
 
 
-FILE_MODELS = {"providers": ProvidersFile, "takeover": TakeoverFile, "signals": SignalsFile, "playbooks": PlaybooksFile}
-ENTRY_MODELS = {"providers": ProviderEntry, "takeover": TakeoverEntry, "signals": SignalEntry, "playbooks": PlaybookEntry}
+FILE_MODELS = {"providers": ProvidersFile, "takeover": TakeoverFile, "signals": SignalsFile, "platforms": PlatformsFile, "playbooks": PlaybooksFile}
+ENTRY_MODELS = {"providers": ProviderEntry, "takeover": TakeoverEntry, "signals": SignalEntry, "platforms": PlatformEntry, "playbooks": PlaybookEntry}

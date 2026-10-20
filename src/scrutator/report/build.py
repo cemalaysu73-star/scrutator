@@ -5,6 +5,7 @@ from typing import Any
 
 from scrutator import __version__
 from scrutator.attribution import attribute
+from scrutator.brand import brand_presence
 from scrutator.exposure import exposure
 from scrutator.findings import findings_from_report, summarise_findings
 from scrutator.names import headline, name_states, summarise_states, summarise_tiers
@@ -165,6 +166,9 @@ def build_report(
     report["dependencies"] = analysis["dependencies"]
     report["summary"]["risks"] = len(analysis["risks"])
     report["exposure"] = exposure(report)
+    brand = brand_presence(report, packs)
+    if brand is not None:  # only scans run with --brand have the section
+        report["brand"] = brand
     report["names"] = name_states(report)
     report["summary"]["names"] = summarise_states(report["names"])
     report["summary"]["tiers"] = summarise_tiers(report["names"])

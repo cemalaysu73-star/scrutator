@@ -11,10 +11,13 @@ from scrutator.bundle.reader import BundleError, read_raw
 from scrutator.exposure import exposure
 from scrutator.findings import findings_from_report, summarise_findings
 from scrutator.names import headline, name_states, summarise_states, summarise_tiers
-from scrutator.packs import KINDS, PackSet, load_packs
+from scrutator.brand import SOURCE as BRAND_SOURCE
+from scrutator.brand import brand_presence
+from scrutator.packs import KINDS, NEWER_KINDS, PackSet, load_packs
 from scrutator.modules.registry import load_builtin_modules
 from scrutator.report.build import promotions
 from scrutator.risk.engine import RULESET_VERSION, analyze
+from scrutator.risk.engine import comparable as ruleset_comparable
 from scrutator.sources import SourcePolicy
 from scrutator.store import GENESIS_HASH, chain_hash
 
@@ -72,6 +75,14 @@ def _packs_problem(report: dict, warnings: list[str]) -> str:
     if declared.effective_sha256 != report["packs"]["effective_sha256"]:
         return "the pack entries do not match the hash the report declares for them"
     trusted = _trusted_packs()
+    absent_kinds = NEWER_KINDS - declared.declared_kinds()
+    if absent_kinds:
+        # a bundle made before a kind existed is compared without it; one whose evidence needed it may not omit it
+        if "platforms" in absent_kinds and any(
+            isinstance(r, dict) and r.get("source") == BRAND_SOURCE for r in (report.get("evidence") or {}).values()
+        ):
+            return "the bundle holds brand-presence evidence but declares no platforms pack"
+        trusted = trusted.without(absent_kinds)
     ours = {(f["name"], f["kind"]): f for f in trusted.files if f["origin"] == "bundled"}
     user_files, uncomparable = False, False
     for item in declared.files:
@@ -92,7 +103,7 @@ def _packs_problem(report: dict, warnings: list[str]) -> str:
     if user_files:
         have, want = declared.effective(), trusted.effective()
         for kind in KINDS:
-            missing = {e["id"] for e in want[kind]} - {e["id"] for e in have[kind]}
+            missing = {e["id"] for e in want.get(kind, [])} - {e["id"] for e in have.get(kind, [])}
             if missing:
                 return f"bundled {kind} entries were removed: {sorted(missing)[:3]}"
         warnings.append("the bundle includes user packs, which cannot be compared with a trusted copy; the signer is vouching for them.")
@@ -126,7 +137,7 @@ def _analysis_problem(manifest: dict, report: dict, warnings: list[str]) -> tupl
             problem = problem or "the report has an attribution but the manifest records none"
         elif recorded_attribution.get("candidates") != len(report["attribution"]["candidates"]) or recorded_attribution.get("ruleset") != report["attribution"].get("ruleset"):
             problem = problem or "the manifest and the report disagree about the attribution"
-    comparable = analysis.get("ruleset") == RULESET_VERSION
+    comparable = ruleset_comparable(analysis.get("ruleset"), report)
     if not comparable:
         warnings.append(
             f"the risks were made by rule set {analysis.get('ruleset')}; this tool implements "
@@ -332,6 +343,15 @@ def _verify(path: str | Path, pinned_fingerprint: str | None, result: VerifyRepo
             add("exposure derivable", same, "" if same else "the address table is not what the cited evidence implies")
     except Exception as exc:  # noqa: BLE001
         add("exposure derivable", False, f"malformed exposure: {type(exc).__name__}: {exc}")
+
+    # brand presence: re-derived from the report's own evidence and the embedded platforms pack. It runs when either the
+    # section or its evidence is present, so dropping the section while keeping the evidence fails too.
+    try:
+        if "brand" in report or any(isinstance(r, dict) and r.get("source") == BRAND_SOURCE for r in report["evidence"].values()):
+            same = brand_presence(report, PackSet.from_dict(report["packs"])) == report.get("brand")
+            add("brand derivable", same, "" if same else "the brand section is not what the cited evidence and the platforms pack imply")
+    except Exception as exc:  # noqa: BLE001
+        add("brand derivable", False, f"malformed brand section: {type(exc).__name__}: {exc}")
 
     # the resolution state and the tier of each name: re-derived from the report's own evidence
     try:

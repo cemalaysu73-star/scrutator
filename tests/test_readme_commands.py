@@ -107,7 +107,12 @@ def test_every_source_with_terms_is_in_the_sources_table():
             continue
         documented += 1
         hosts = set(re.findall(r"https://([a-z0-9.-]+)", inspect.getsource(type(module))))
-        assert hosts, module.name
+        if module.opt_in:
+            # the opt-in modules contact the organisation's own site, and the platform hosts their licence note names
+            hosts |= set(re.findall(r"\b((?:[a-z0-9-]+\.)+(?:com|org|social|co))\b", module.licence_note))
+            assert f"`{module.name}`" in SOURCES_PAGE, module.name
+        else:
+            assert hosts, module.name
         for host in hosts:
             assert host in SOURCES_PAGE, f"{module.name}: {host} is not in the sources table of docs/sources.md"
     assert documented >= 5

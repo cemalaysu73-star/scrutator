@@ -24,6 +24,8 @@ from scrutator.packs.schema import (
     ENTRY_MODELS,
     FILE_MODELS,
     KINDS,
+    NEWER_KINDS,
+    PlatformEntry,
     PlaybookEntry,
     ProviderEntry,
     SignalEntry,
@@ -179,8 +181,9 @@ def validate_dir(directory=None) -> list[str]:
 class PackSet:
     """The merged content of the bundled packs and any user packs, with matching helpers."""
 
-    def __init__(self, files: Sequence[dict], providers=(), takeover=(), signals=(), playbooks=()) -> None:
+    def __init__(self, files: Sequence[dict], providers=(), takeover=(), signals=(), playbooks=(), platforms=()) -> None:
         self.files = tuple(files)
+        self.platforms: tuple[PlatformEntry, ...] = tuple(sorted(platforms, key=lambda e: e.id))
         self.providers: tuple[ProviderEntry, ...] = tuple(sorted(providers, key=lambda e: e.id))
         self.takeover: tuple[TakeoverEntry, ...] = tuple(sorted(takeover, key=lambda e: e.id))
         self.signals: tuple[SignalEntry, ...] = tuple(sorted(signals, key=lambda e: e.id))
@@ -190,11 +193,28 @@ class PackSet:
     # description
 
     def effective(self) -> dict:
-        return {
+        out = {
             "providers": [_dump(e) for e in self.providers],
             "takeover": [_dump(e) for e in self.takeover],
             "signals": [_dump(e) for e in self.signals],
         }
+        # a kind added later is part of the hashed content only when it has entries, so the hash of a pack set made
+        # before it existed (or without it) does not change
+        if self.platforms:
+            out["platforms"] = [_dump(e) for e in self.platforms]
+        return out
+
+    def declared_kinds(self) -> set[str]:
+        """The kinds this set has files for (a set rebuilt from an old report lacks the newer kinds)."""
+        return {str(f.get("kind")) for f in self.files if isinstance(f, dict)}
+
+    def without(self, kinds) -> "PackSet":
+        """The same set with the entries of `kinds` left out (only newer kinds can be left out)."""
+        drop = set(kinds) & NEWER_KINDS
+        return PackSet(
+            [f for f in self.files if f.get("kind") not in drop], self.providers, self.takeover, self.signals, self.playbooks,
+            () if "platforms" in drop else self.platforms,
+        )
 
     @property
     def effective_sha256(self) -> str:
@@ -223,7 +243,7 @@ class PackSet:
                     problems.extend(_errors(f"effective.{kind}[{index}]", exc))
         if problems:
             raise PackError("\n".join(problems[:10]))
-        return cls(data["files"], parsed["providers"], parsed["takeover"], parsed["signals"])
+        return cls(data["files"], parsed["providers"], parsed["takeover"], parsed["signals"], platforms=parsed["platforms"])
 
     # matching
 
@@ -288,4 +308,7 @@ def load_packs(extra_dirs: Sequence[Path] = (), *, bundled=True) -> PackSet:
             infos.append(info.to_dict())
             for entry in entries:
                 merged[info.kind][entry.id] = entry
-    return PackSet(infos, merged["providers"].values(), merged["takeover"].values(), merged["signals"].values(), merged["playbooks"].values())
+    return PackSet(
+        infos, merged["providers"].values(), merged["takeover"].values(), merged["signals"].values(), merged["playbooks"].values(),
+        merged["platforms"].values(),
+    )

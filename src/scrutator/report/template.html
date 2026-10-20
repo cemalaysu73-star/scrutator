@@ -344,6 +344,36 @@ function renderExposure() {
   section("risks", "Exposure of the addresses (Shodan InternetDB and RIPEstat)", el("div", {}, el("p", {className: "muted", textContent: "What Shodan saw open on the addresses the in-scope names resolve to, an earlier scan by Shodan and not a check made now; CVE ids are Shodan's guesses from product versions. Abuse contact and network name are from RIPEstat. Non-commercial data: see the README."}), table));
 }
 
+function renderBrand() {
+  const brand = D.brand;
+  if (!brand) return;
+  const host = el("div", {}, el("p", {className: "muted", textContent: "Run with --brand. The platform accounts the organisation links from its own home page (robots.txt honoured), and whether they and look-alikes of the brand name exist, read only from the HTTP status of the public profile page. Unverifiable means the page does not tell, or the platform is never asked (its terms or a login wall); it never means absent. Ownership of a look-alike is unknown."}));
+  for (const site of brand.domains) {
+    host.append(el("h3", {textContent: `${site.domain} (brand name "${site.brand}")`}));
+    const robots = site.robots.map(r => `${r.url}: ${r.status === null ? "no answer" : "HTTP " + r.status}${r.allows_home ? "" : " (does not allow the home page)"}`);
+    const pages = site.pages.map(p => `${p.url}: ${p.status === null ? "not fetched" : "HTTP " + p.status}, ${p.links} platform link(s)`);
+    host.append(el("p", {textContent: [...robots, ...pages].join(" · ") || "nothing fetched"}));
+    const table = el("table", {}, el("thead", {}, el("tr", {}, ...["Platform", "Handle", "Why asked", "Answer", "Reason", "Evidence"].map(t => el("th", {textContent: t})))));
+    const body = el("tbody");
+    const rows = [
+      ...site.official.map(o => ({...o, kind: "official", how: "linked from the site", ids: o.evidence_ids})),
+      ...site.checks.filter(c => c.kind !== "official").map(c => ({...c, ids: [c.evidence_id]})),
+    ];
+    for (const r of rows) {
+      body.append(el("tr", {},
+        el("td", {textContent: r.platform}),
+        el("td", {textContent: r.handle}),
+        el("td", {textContent: `${r.kind}: ${r.how}`}),
+        el("td", {textContent: r.state}),
+        el("td", {textContent: r.reason}),
+        el("td", {}, evidenceDetails(r.ids))));
+    }
+    table.append(body);
+    host.append(rows.length ? table : el("p", {className: "muted", textContent: "The home page links to no known platform account, so no platform was asked about."}));
+  }
+  section("risks", "Brand presence", host);
+}
+
 function renderFindings() {
   const host = document.getElementById("findings");
   const by = D.summary.findings_by_tier;
@@ -465,6 +495,7 @@ renderRisks();
 renderNames();
 renderDependencies();
 renderExposure();
+renderBrand();
 renderAttribution();
 renderAnalystLeads();
 renderFindings();

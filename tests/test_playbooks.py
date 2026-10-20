@@ -94,7 +94,7 @@ def test_a_user_playbook_is_added_and_one_with_a_bundled_id_replaces_it(tmp_path
 
 
 def test_playbooks_are_not_part_of_what_a_proof_depends_on(tmp_path):
-    bare = PackSet(PACKS.files, PACKS.providers, PACKS.takeover, PACKS.signals)
+    bare = PackSet(PACKS.files, PACKS.providers, PACKS.takeover, PACKS.signals, platforms=PACKS.platforms)
     assert bare.effective_sha256 == PACKS.effective_sha256
     assert "playbooks" not in PACKS.effective() and "playbooks" not in PACKS.to_dict()["effective"]
     extra = write_pack(tmp_path, "mine.yaml", "playbooks", [playbook("mine")])

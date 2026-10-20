@@ -152,6 +152,18 @@ _RULES = [
         "The name servers the registry (RDAP) lists for a domain differ from the NS records the zone itself publishes. A mismatch can mean a half-finished provider migration or a lame delegation.",
         "Make the registry delegation and the zone's NS records identical.",
     ),
+    _rule(
+        "brand-handle-unregistered", "risk", "low",
+        "A brand handle is not registered on a platform the organisation uses",
+        "The organisation's own site links to an account on a platform, and either that account or the bare brand name answers as an account that does not exist on the public profile page. Whoever registers the handle can pose as the organisation; a dead link on the site sends its own visitors there (medium). A suspended or renamed account can answer the same way, so this is low confidence.",
+        "Register (or reclaim) the handle, and fix or remove the link on the site. Check the platform's own account page while signed in before acting.",
+    ),
+    _rule(
+        "brand-lookalike-handle", "risk", "low",
+        "A look-alike of the brand name exists on a platform the organisation uses",
+        "A handle that looks like the brand name (a homoglyph, an added word, a separator or a typo) exists on a platform the organisation's site links to. Who owns it is unknown: it may be the organisation's own, a fan, a reseller or an impersonator.",
+        "Look at the account by hand. If it is not yours and impersonates you, report it through the platform's impersonation process; consider registering the closest look-alikes yourself.",
+    ),
 ]
 
 RULES: dict[str, RuleInfo] = {rule.rule_id: rule for rule in _RULES}

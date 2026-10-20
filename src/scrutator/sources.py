@@ -41,6 +41,7 @@ class SourcePolicy:
     allow: tuple[str, ...] | None = None  # only these sources (None: every source)
     exclude: tuple[str, ...] = ()
     no_noncommercial: bool = False
+    opted_in: tuple[str, ...] = ()  # opt-in modules the user asked for (`--brand`, `scrutator exposure`)
 
     @classmethod
     def parse(
@@ -63,11 +64,18 @@ class SourcePolicy:
         return cls(wanted_allow, wanted_exclude, bool(no_noncommercial))
 
     def to_dict(self) -> dict:
-        return {
+        out = {
             "allow": list(self.allow) if self.allow is not None else None,
             "exclude": list(self.exclude),
             "no_noncommercial": self.no_noncommercial,
         }
+        if self.opted_in:  # absent unless used, so policies recorded before opt-in modules existed keep their shape
+            out["opted_in"] = list(self.opted_in)
+        return out
+
+    def opt(self, *names: str) -> "SourcePolicy":
+        """The same policy with these opt-in modules asked for."""
+        return SourcePolicy(self.allow, self.exclude, self.no_noncommercial, tuple(sorted({*self.opted_in, *names})))
 
     @classmethod
     def from_dict(cls, data: Mapping | None) -> "SourcePolicy":
@@ -78,11 +86,14 @@ class SourcePolicy:
             tuple(str(n) for n in allow) if allow is not None else None,
             tuple(str(n) for n in data.get("exclude") or ()),
             bool(data.get("no_noncommercial")),
+            tuple(str(n) for n in data.get("opted_in") or ()),
         )
 
     def restriction(self, module: Module) -> str | None:
         """Why the policy itself (not a missing key) keeps `module` from running, or None."""
         names = _names(module)
+        if module.opt_in and module.name not in self.opted_in:
+            return f"opt-in: only with {module.opt_in}"
         if self.allow is not None and not names & set(self.allow):
             return "not in --sources"
         if names & set(self.exclude):
@@ -171,7 +182,7 @@ def describe(
                 "enabled": reason is None,
                 "why_disabled": reason,
                 "noncommercial": module.noncommercial,
-                "replayable": not module.needs_key,
+                "replayable": (not module.needs_key) if module.replayable is None else module.replayable,
                 "last_scan": last,
             }
         )

@@ -50,6 +50,8 @@ async def run_scan(
     # the knowledge the risk rules will use is recorded with the scan, so a report made months
     # later (or on another machine) is built from the same data
     store.set_meta(scan_id, "packs", json.dumps(packs.to_dict(), sort_keys=True))
+    if ctx is not None and ctx.packs is None:
+        ctx.packs = packs  # the opt-in modules read their knowledge (platforms) from the scan's own packs
     if ai is not None:
         ai.bind(store, scan_id)
     engine = Engine(

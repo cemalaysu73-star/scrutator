@@ -69,13 +69,19 @@ def found(report):
 # the exit criterion: all planted issues detected ------------------------------------------------
 
 
+# the two brand-presence rules need a website and platform answers: they are planted in the brand lab instead
+# (scrutator/benchlab/brandlab.py, tests/test_brand.py), and this checks that they are
+BRAND_RULES = {rule for rule, _, _ in __import__("scrutator.benchlab.brandlab", fromlist=["x"]).TRUTH_RISKS}
+
+
 def test_the_lab_plants_every_rule_in_the_catalog():
-    assert PLANTED_RULES == set(RULES)
+    assert BRAND_RULES == {"brand-handle-unregistered", "brand-lookalike-handle"}
+    assert PLANTED_RULES | BRAND_RULES == set(RULES)
 
 
 def test_every_planted_issue_is_detected(lab):
     assert PLANTED <= found(lab.report), sorted(PLANTED - found(lab.report))
-    assert {r["rule_id"] for r in lab.report["risks"]} == set(RULES)
+    assert {r["rule_id"] for r in lab.report["risks"]} == set(RULES) - BRAND_RULES
     assert lab.report["summary"]["risks"] == len(lab.report["risks"])
 
 

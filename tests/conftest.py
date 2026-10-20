@@ -10,6 +10,9 @@ def no_rdap_pacing(monkeypatch):
     from scrutator.modules import rdap
 
     monkeypatch.setattr(rdap, "PACE", (100_000, 100_000.0))
+    from scrutator.modules import brand
+
+    monkeypatch.setattr(brand, "PACE", 100_000.0)
 
 
 class FakeResolver:

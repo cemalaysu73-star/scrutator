@@ -13,7 +13,8 @@ sent only when it is
 What this does not cover: a host on the list could itself be compromised, and an RDAP server's address is checked
 once per scan, before its first request, so a name that changes its answer between the check and the connection (DNS rebinding)
 is not caught. The target itself is never on the list, so a redirect can never turn a passive scan into contact
-with the organisation under investigation."""
+with the organisation under investigation. (The opt-in brand and organisation-exposure modules, which do read the
+organisation's own site, use a separate client and guard: scrutator/web.py.)"""
 
 import asyncio
 import ipaddress

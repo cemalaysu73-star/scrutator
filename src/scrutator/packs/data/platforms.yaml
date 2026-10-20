@@ -1,0 +1,339 @@
+schema: 1
+kind: platforms
+version: 2026.10.1
+updated: 2026-10-20
+description: >-
+  Platforms an organisation may link to from its own site: how a profile URL is built and how the HTTP status of the
+  public profile page shows whether a handle exists (no login, nothing read from the page).
+# `verified: true` means the presence behaviour described in `note` was observed live on 2026-10-20 (source: the
+# platform itself). The handle character and length rules are the platforms' published rules as known to the author and
+# were not re-checked: a valid handle outside them is not recognised in a link.
+entries:
+  # --- status-checkable: behaviour observed on 2026-10-20 from one network in the Netherlands, two requests each
+  #     (the platform's own account and a random handle that cannot exist); see .cemal/rounds/r5-opus.md
+  - id: github
+    platform: GitHub
+    profile: "https://github.com/{handle}"
+    link_hosts: [github.com, www.github.com]
+    link_paths: ["/{handle}"]
+    handle_chars: "-"
+    handle_min: 1
+    handle_max: 39
+    no_edge: "-"
+    reserved: [about, apps, collections, contact, customer-stories, enterprise, events, explore, features, join, login, marketplace, new, notifications, orgs, pricing, readme, security, settings, site, sponsors, team, topics, trending]
+    presence: status
+    exists: [200]
+    absent: [404]
+    examples: ["https://github.com/example", "https://www.github.com/example-org/"]
+    source: "https://github.com/"
+    verified: true
+    note: "github.com/github answered 200 and a random handle 404 (2026-10-20). A suspended or renamed account also answers 404."
+  - id: gitlab
+    platform: GitLab
+    profile: "https://gitlab.com/{handle}"
+    link_hosts: [gitlab.com, www.gitlab.com]
+    link_paths: ["/{handle}"]
+    handle_chars: "-_."
+    handle_min: 2
+    handle_max: 255
+    no_edge: "-_."
+    reserved: [explore, help, users, dashboard, groups, projects, search, admin, api]
+    presence: status
+    exists: [200]
+    absent: []
+    examples: ["https://gitlab.com/example"]
+    source: "https://gitlab.com/"
+    verified: true
+    note: "gitlab.com/gitlab-org answered 200; a random handle answered 302 to the sign-in page, as a private one would, so absence is never concluded (only existence)."
+  - id: mastodon-social
+    platform: Mastodon (mastodon.social)
+    profile: "https://mastodon.social/@{handle}"
+    link_hosts: [mastodon.social]
+    link_paths: ["/@{handle}"]
+    handle_chars: "_"
+    handle_min: 1
+    handle_max: 30
+    no_edge: ""
+    reserved: []
+    presence: status
+    exists: [200]
+    absent: [404]
+    examples: ["https://mastodon.social/@example"]
+    source: "https://mastodon.social/"
+    verified: true
+    note: "Only the mastodon.social instance; other instances are other hosts and are not checked. mastodon.social/@Mastodon answered 200 and a random handle 404 (2026-10-20)."
+  - id: huggingface
+    platform: Hugging Face
+    profile: "https://huggingface.co/{handle}"
+    link_hosts: [huggingface.co, www.huggingface.co]
+    link_paths: ["/{handle}"]
+    handle_chars: "-_."
+    handle_min: 2
+    handle_max: 42
+    no_edge: "-_."
+    reserved: [blog, datasets, docs, enterprise, join, learn, login, models, posts, pricing, spaces, tasks]
+    presence: status
+    exists: [200]
+    absent: [404]
+    examples: ["https://huggingface.co/example"]
+    source: "https://huggingface.co/"
+    verified: true
+    note: "huggingface.co/huggingface answered 200 and a random handle 404 (2026-10-20)."
+  - id: codeberg
+    platform: Codeberg
+    profile: "https://codeberg.org/{handle}"
+    link_hosts: [codeberg.org]
+    link_paths: ["/{handle}"]
+    handle_chars: "-_."
+    handle_min: 1
+    handle_max: 40
+    no_edge: "-_."
+    reserved: [explore, user, repo, org, api, assets, about]
+    presence: status
+    exists: [200]
+    absent: [404]
+    examples: ["https://codeberg.org/example"]
+    source: "https://codeberg.org/"
+    verified: true
+    note: "codeberg.org/Codeberg answered 200 and a random handle 404 (2026-10-20)."
+  - id: dockerhub
+    platform: Docker Hub
+    profile: "https://hub.docker.com/u/{handle}"
+    link_hosts: [hub.docker.com]
+    link_paths: ["/u/{handle}", "/r/{handle}"]
+    handle_chars: ""
+    handle_min: 4
+    handle_max: 30
+    no_edge: ""
+    reserved: []
+    presence: status
+    exists: [200]
+    absent: [404]
+    examples: ["https://hub.docker.com/u/example"]
+    source: "https://hub.docker.com/"
+    verified: true
+    note: "hub.docker.com/u/docker answered 200 and a random handle 404 (2026-10-20). A /r/<namespace> link is read as the namespace."
+  # --- not checked: the page does not tell (same status for any handle), blocks automated requests, sits behind a
+  #     consent or login wall, or the platform's terms forbid automated access. A published link is reported as
+  #     "unverifiable"; no request is made.
+  - id: x
+    platform: X (Twitter)
+    profile: "https://x.com/{handle}"
+    link_hosts: [x.com, www.x.com, twitter.com, www.twitter.com, mobile.twitter.com]
+    link_paths: ["/{handle}"]
+    handle_chars: "_"
+    handle_min: 1
+    handle_max: 15
+    no_edge: ""
+    reserved: [home, explore, search, i, intent, share, login, signup, settings, tos, privacy, hashtag]
+    presence: unverifiable
+    exists: []
+    absent: []
+    examples: ["https://twitter.com/example", "https://x.com/example_org"]
+    source: "https://x.com/"
+    verified: false
+    note: "Not requested: X's terms forbid crawling without prior written consent. (A random handle answered 404 once on 2026-10-20; not relied on.)"
+  - id: linkedin
+    platform: LinkedIn
+    profile: "https://www.linkedin.com/company/{handle}"
+    link_hosts: [linkedin.com, www.linkedin.com]
+    link_paths: ["/company/{handle}", "/showcase/{handle}"]
+    handle_chars: "-_"
+    handle_min: 2
+    handle_max: 100
+    no_edge: ""
+    reserved: []
+    presence: unverifiable
+    exists: []
+    absent: []
+    examples: ["https://www.linkedin.com/company/example"]
+    source: "https://www.linkedin.com/"
+    verified: true
+    note: "Not requested: the user agreement forbids automated access, and a random company page answered 999 (bot block) on 2026-10-20. Only company pages are read; links to personal profiles are ignored."
+  - id: facebook
+    platform: Facebook
+    profile: "https://www.facebook.com/{handle}"
+    link_hosts: [facebook.com, www.facebook.com, m.facebook.com]
+    link_paths: ["/{handle}"]
+    handle_chars: "."
+    handle_min: 5
+    handle_max: 50
+    no_edge: "."
+    reserved: [sharer, share, dialog, login, plugins, events, groups, watch, marketplace, gaming, policies, privacy, help, people, profile.php, tr]
+    presence: unverifiable
+    exists: []
+    absent: []
+    examples: ["https://www.facebook.com/example"]
+    source: "https://www.facebook.com/"
+    verified: true
+    note: "Not requested: the terms forbid automated collection, and a random handle answered 200 like a real one on 2026-10-20."
+  - id: instagram
+    platform: Instagram
+    profile: "https://www.instagram.com/{handle}/"
+    link_hosts: [instagram.com, www.instagram.com]
+    link_paths: ["/{handle}"]
+    handle_chars: "_."
+    handle_min: 1
+    handle_max: 30
+    no_edge: "."
+    reserved: [p, reel, reels, explore, accounts, stories, direct, about, legal]
+    presence: unverifiable
+    exists: []
+    absent: []
+    examples: ["https://www.instagram.com/example/"]
+    source: "https://www.instagram.com/"
+    verified: true
+    note: "Not requested: the terms forbid automated collection, and a random handle answered 200 like a real one on 2026-10-20."
+  - id: tiktok
+    platform: TikTok
+    profile: "https://www.tiktok.com/@{handle}"
+    link_hosts: [tiktok.com, www.tiktok.com]
+    link_paths: ["/@{handle}"]
+    handle_chars: "_."
+    handle_min: 2
+    handle_max: 24
+    no_edge: "."
+    reserved: []
+    presence: unverifiable
+    exists: []
+    absent: []
+    examples: ["https://www.tiktok.com/@example"]
+    source: "https://www.tiktok.com/"
+    verified: true
+    note: "Not requested: a random handle answered 200 like a real one on 2026-10-20, and the terms forbid automated collection."
+  - id: youtube
+    platform: YouTube
+    profile: "https://www.youtube.com/@{handle}"
+    link_hosts: [youtube.com, www.youtube.com, m.youtube.com]
+    link_paths: ["/@{handle}", "/c/{handle}", "/user/{handle}"]
+    handle_chars: "-_."
+    handle_min: 3
+    handle_max: 30
+    no_edge: ""
+    reserved: []
+    presence: unverifiable
+    exists: []
+    absent: []
+    examples: ["https://www.youtube.com/@example", "https://www.youtube.com/c/example"]
+    source: "https://www.youtube.com/"
+    verified: true
+    note: "Not requested: from the EU every profile page (real or not) answered 302 to consent.youtube.com on 2026-10-20."
+  - id: reddit
+    platform: Reddit
+    profile: "https://www.reddit.com/r/{handle}/"
+    link_hosts: [reddit.com, www.reddit.com, old.reddit.com]
+    link_paths: ["/r/{handle}", "/user/{handle}", "/u/{handle}"]
+    handle_chars: "_-"
+    handle_min: 3
+    handle_max: 21
+    no_edge: ""
+    reserved: []
+    presence: unverifiable
+    exists: []
+    absent: []
+    examples: ["https://www.reddit.com/r/example/"]
+    source: "https://www.reddit.com/"
+    verified: true
+    note: "Not requested: a random user page answered 200 like a real one on 2026-10-20; the data API needs registration."
+  - id: bluesky
+    platform: Bluesky
+    profile: "https://bsky.app/profile/{handle}"
+    link_hosts: [bsky.app]
+    link_paths: ["/profile/{handle}"]
+    handle_chars: "-."
+    handle_min: 3
+    handle_max: 253
+    no_edge: "-."
+    reserved: []
+    presence: unverifiable
+    exists: []
+    absent: []
+    examples: ["https://bsky.app/profile/example.com"]
+    source: "https://bsky.app/"
+    verified: true
+    note: "Not requested: the profile page is a script application that answered 200 with the same page for a real and a random handle on 2026-10-20."
+  - id: pypi
+    platform: PyPI
+    profile: "https://pypi.org/user/{handle}/"
+    link_hosts: [pypi.org]
+    link_paths: ["/user/{handle}", "/org/{handle}"]
+    handle_chars: "-_."
+    handle_min: 1
+    handle_max: 50
+    no_edge: "-_."
+    reserved: []
+    presence: unverifiable
+    exists: []
+    absent: []
+    examples: ["https://pypi.org/user/example/", "https://pypi.org/org/example/"]
+    source: "https://pypi.org/"
+    verified: true
+    note: "Not requested: a random user page answered 200 on 2026-10-20 (the status does not tell)."
+  - id: npm
+    platform: npm
+    profile: "https://www.npmjs.com/~{handle}"
+    link_hosts: [npmjs.com, www.npmjs.com]
+    link_paths: ["/~{handle}", "/org/{handle}"]
+    handle_chars: "-_."
+    handle_min: 1
+    handle_max: 214
+    no_edge: "-_."
+    reserved: []
+    presence: unverifiable
+    exists: []
+    absent: []
+    examples: ["https://www.npmjs.com/~example", "https://www.npmjs.com/org/example"]
+    source: "https://www.npmjs.com/"
+    verified: true
+    note: "Not requested: every profile page answered 403 (bot protection) on 2026-10-20."
+  - id: medium
+    platform: Medium
+    profile: "https://medium.com/@{handle}"
+    link_hosts: [medium.com]
+    link_paths: ["/@{handle}"]
+    handle_chars: "_."
+    handle_min: 1
+    handle_max: 30
+    no_edge: ""
+    reserved: []
+    presence: unverifiable
+    exists: []
+    absent: []
+    examples: ["https://medium.com/@example"]
+    source: "https://medium.com/"
+    verified: true
+    note: "Not requested: every profile page answered 403 (bot protection) on 2026-10-20."
+  - id: telegram
+    platform: Telegram
+    profile: "https://t.me/{handle}"
+    link_hosts: [t.me, telegram.me]
+    link_paths: ["/{handle}"]
+    handle_chars: "_"
+    handle_min: 5
+    handle_max: 32
+    no_edge: "_"
+    reserved: [joinchat, share, addstickers, proxy, socks, iv]
+    presence: unverifiable
+    exists: []
+    absent: []
+    examples: ["https://t.me/example_org"]
+    source: "https://t.me/"
+    verified: true
+    note: "Not requested: a random handle answered 200 like a real one on 2026-10-20."
+  - id: twitch
+    platform: Twitch
+    profile: "https://www.twitch.tv/{handle}"
+    link_hosts: [twitch.tv, www.twitch.tv]
+    link_paths: ["/{handle}"]
+    handle_chars: "_"
+    handle_min: 4
+    handle_max: 25
+    no_edge: "_"
+    reserved: [directory, downloads, jobs, p, settings, subscriptions, videos, search]
+    presence: unverifiable
+    exists: []
+    absent: []
+    examples: ["https://www.twitch.tv/example"]
+    source: "https://www.twitch.tv/"
+    verified: true
+    note: "Not requested: a random handle answered 200 like a real one on 2026-10-20."

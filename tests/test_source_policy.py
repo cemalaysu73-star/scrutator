@@ -42,8 +42,10 @@ def test_the_sources_the_readme_marks_non_commercial_are_flagged_on_the_modules(
 
 def test_by_default_everything_without_a_key_may_run(builtin):
     chosen, disabled = SourcePolicy().select(builtin, env={})
-    assert names(chosen) == names([m for m in builtin if not m.needs_key])
-    assert all("key" in reason for reason in disabled.values())  # only keyed sources are off, and they say why
+    assert names(chosen) == names([m for m in builtin if not m.needs_key and not m.opt_in])
+    # only keyed sources and the opt-in modules (brand presence, organisation exposure) are off, and they say why
+    assert all("key" in reason or reason.startswith("opt-in") for reason in disabled.values())
+    assert {n for n, reason in disabled.items() if reason.startswith("opt-in")} == {"brand"}
 
 
 def test_no_noncommercial_drops_exactly_the_flagged_sources(builtin):

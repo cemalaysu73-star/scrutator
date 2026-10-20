@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import ClassVar, Protocol
+from typing import Any, ClassVar, Protocol
 
 import httpx
 
@@ -61,6 +61,10 @@ class ModuleContext:
     # memory shared by the lookups of one scan (the context lives as long as the scan): a module may keep
     # what it learned here so as not to ask a service the same thing twice
     cache: dict = field(default_factory=dict)
+    # Only for the opt-in modules that contact the organisation's own site or public profile pages (brand presence,
+    # organisation exposure): a client guarded by scrutator.web.WebGuard, and the knowledge packs of the scan.
+    web: httpx.AsyncClient | None = None
+    packs: Any = None
 
 
 class Module(ABC):
@@ -93,6 +97,11 @@ class Module(ABC):
     # The source this module belongs to when it differs from the module's own name (two modules talking to
     # one service, a probe that is part of DNS): `--sources` and `--exclude-sources` accept either name.
     source: ClassVar[str | None] = None
+    # An opt-in module never runs in an ordinary scan: only when the user asks for it with the named flag or command
+    # (brand presence: `--brand`; organisation exposure: `scrutator exposure`). The policy records the opt-in.
+    opt_in: ClassVar[str | None] = None
+    # False when a recorded request cannot be re-issued by `verify --replay` (None: replayable unless keyed).
+    replayable: ClassVar[bool | None] = None
 
     @abstractmethod
     async def run(self, entity: Entity, ctx: ModuleContext) -> list[Observation | Fact]: ...
