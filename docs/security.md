@@ -111,6 +111,11 @@ roughly twice those of a plain run; memory is the peak of Python allocations, no
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
 | 5,000 (5,000, the default) | 5.0 s | 7.9 s | 3.2 s | 11.1 s | 10.1 s | 79 MB | 7.8 MB | |
 | 20,000 (60,000) | 16.5 s | 30.5 s | 12.2 s | 42.3 s | 36.3 s | 311 MB | 31 MB | 5.2 MB |
+| 50,000 (60,000), 2026-10-21 | 969 s | 99 s | 40 s | 134 s | 103 s (passes) | 1,210 MB | 128 MB (HTML 107 MB) | 29.6 MB |
+
+At 50,000 names the collection phase dominates (16 minutes with tracing on); the bundle
+verifies, inside the reader's limits. The memory column is the largest phase peak. A scan of that width is far
+outside the default cap; the HTML report at that size is too large for a browser to be pleasant.
 
 Time and memory grow linearly with the number of names (a cProfile of the report builder at 5,000 names shows no
 quadratic step). The limits that bound a hostile or huge input:

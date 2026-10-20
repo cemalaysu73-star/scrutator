@@ -4,9 +4,10 @@ Built from the git history (`git log`), newest first. Dates are commit dates. Ve
 tagged or published; the numbers are the ones in `pyproject.toml` at the time. Nothing here has been released on
 PyPI.
 
-## Unreleased (round R4, toward 1.0)
+## 1.0.0rc1 (2026-10-21, a release candidate; not published)
 
-Security and robustness audit, then the v1.0 pieces.
+Rounds R4 (security and robustness audit, the v1.0 pieces) and R5 (two opt-in modules). The v1.0 gate, the benchmark
+and what still needs the maintainer: [docs/benchmarks/v1.0-candidate.md](docs/benchmarks/v1.0-candidate.md).
 
 - **Fixed (audit findings, each with a failing test first)**
   - The Shodan key of the keyed source travels in a URL, and `httpx` logs request URLs: the key reached the MCP
@@ -47,6 +48,20 @@ Security and robustness audit, then the v1.0 pieces.
     and runs it on Linux, macOS and Windows, a `bench` job, Python 3.13 in the matrix, and a Dockerfile (written, not
     yet built: CI builds it).
   - Launch drafts (`docs/launch/`, not published), example reports (`docs/examples/`), good first issues.
+  - `tools/sbom.py` (CycloneDX 1.5 SBOM of an installed environment; CI uploads one with each wheel), RESPONSIBLE_USE.md.
+- **Added in round R5 (opt-in modules)**
+  - Brand presence, `scan --brand` (off by default): the platform accounts an organisation's home page links to
+    (robots.txt honoured), whether they, the bare brand name and up to 20 look-alikes exist on those platforms (HTTP
+    status of the public profile page only), as a report section and two low-confidence risks. Platforms are data
+    (knowledge-pack kind `platforms`); those whose terms restrict automated access are never asked.
+  - Organisation exposure, `scrutator exposure` (a preview: needs `SCRUTATOR_PREVIEW_EXPOSURE=1` and an engagement
+    file): aggregate social-engineering exposure from what the organisation itself publishes, minimised at collection,
+    per-person detail only with a logged `--detail`. Not legally reviewed yet.
+  - `scrutator bench` sections `brand` and `org_exposure` (bench schema 2).
+- **Changed**
+  - Risk rule set 3 (brand rules); bundles of rule set 2 are still re-derived when they hold no brand evidence, and
+    bundles made before the `platforms` pack kind still verify.
+  - `api.github.com` is a source host (used only by organisation exposure, for organisations its engagement file names).
 
 ## 0.7.0 (2026-10-20)
 
