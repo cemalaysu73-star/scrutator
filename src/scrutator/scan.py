@@ -11,6 +11,7 @@ from scrutator.modules.base import Module, ModuleContext
 from scrutator.modules.registry import load_builtin_modules
 from scrutator.packs import PackSet, load_packs
 from scrutator.scope import ScopePolicy
+from scrutator.sources import SourcePolicy
 from scrutator.store import Store
 
 
@@ -32,6 +33,7 @@ async def run_scan(
     deadline_s: float | None = None,
     deadline: Deadline | None = None,
     breaker_threshold: int = DEFAULT_BREAKER_THRESHOLD,
+    source_policy: SourcePolicy | None = None,
 ) -> tuple[int, AgentStats]:
     """Run a scan. With a deadline (seconds, or a `Deadline` shared with the caller) the scan
     always returns in time: lookups still running when it passes are cancelled, nothing new
@@ -54,6 +56,13 @@ async def run_scan(
         store, scope, ctx, allow_active=allow_active, deadline=deadline, breaker_threshold=breaker_threshold
     )
     chosen = load_builtin_modules() if modules is None else modules
+    # which sources may run is the user's decision (and which have a key): recorded first, in the audit log too,
+    # so a bundle can be checked against it
+    policy = source_policy or SourcePolicy()
+    record = policy.record(chosen)
+    chosen, _ = policy.select(chosen)
+    store.set_meta(scan_id, "source_policy", json.dumps(record, sort_keys=True))
+    store.append_audit(scan_id, {"event": "source_policy", **record})
 
     async def collect() -> AgentStats:
         warm = getattr(ctx.resolver, "warm_up", None) if ctx is not None else None

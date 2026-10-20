@@ -29,6 +29,7 @@ class CertSpotter(Module):
     priority = 0
     apex_only = True
     rate_group = "certspotter"
+    noncommercial = True  # the README's source terms: free for non-commercial (or evaluation) use only
     licence_note = (
         "CertSpotter's free, unauthenticated API is for personal or evaluation use; production use needs an "
         "SSLMate account. SSLMate may restrict the free tier at any time."

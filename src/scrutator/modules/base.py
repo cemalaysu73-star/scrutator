@@ -85,6 +85,12 @@ class Module(ABC):
     breaker: ClassVar[bool] = True
     # A line for module listings and bundles: what the source's terms allow.
     licence_note: ClassVar[str | None] = None
+    # True when the source's free tier is for non-commercial (or evaluation) use only, as the README says.
+    # `--no-noncommercial` turns these off.
+    noncommercial: ClassVar[bool] = False
+    # The source this module belongs to when it differs from the module's own name (two modules talking to
+    # one service, a probe that is part of DNS): `--sources` and `--exclude-sources` accept either name.
+    source: ClassVar[str | None] = None
 
     @abstractmethod
     async def run(self, entity: Entity, ctx: ModuleContext) -> list[Observation | Fact]: ...

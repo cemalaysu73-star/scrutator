@@ -23,6 +23,7 @@ class SubdomainCenter(Module):
     timeout = 45.0
     priority = 0
     apex_only = True
+    noncommercial = True  # the README's source terms: free for non-commercial (or evaluation) use only
     licence_note = (
         "Subdomain Center's terms grant a limited licence for personal, non-commercial use; the free anonymous "
         "tier returns up to 500 names in random order. Its data includes names that do not resolve."

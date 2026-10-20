@@ -28,6 +28,9 @@ def _org(value: str | None) -> Entity | None:
         return None
 
 
+PACE = (8, 1.0)  # (burst, per second) towards rdap.org; tests lift it
+
+
 def _range(data: dict) -> tuple | None:
     """(first, last) address of the network an RDAP answer describes, or None."""
     try:
@@ -73,7 +76,7 @@ class Rdap(Module):
         networks: list = ctx.cache.setdefault("rdap-networks", [])
         url = f"https://rdap.org/{kind}/{entity.value}"
         # rdap.org refuses a burst of more than about ten requests (HTTP 429, retry after ~10 s): eight at once, then one a second
-        await ctx.cache.setdefault("rdap-pace", Pacer(burst=8, per_second=1.0)).take()
+        await ctx.cache.setdefault("rdap-pace", Pacer(*PACE)).take()
         resp = await ctx.http.get(url)
         if resp.status_code == 404:
             return []

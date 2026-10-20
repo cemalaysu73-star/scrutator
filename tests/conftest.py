@@ -4,6 +4,14 @@ import pytest
 from scrutator.modules.base import ModuleContext
 
 
+@pytest.fixture(autouse=True)
+def no_rdap_pacing(monkeypatch):
+    """rdap.org is paced to a request a second; the tests' mocked services need no manners."""
+    from scrutator.modules import rdap
+
+    monkeypatch.setattr(rdap, "PACE", (100_000, 100_000.0))
+
+
 class FakeResolver:
     def __init__(self, records=None):
         self.records = records or {}

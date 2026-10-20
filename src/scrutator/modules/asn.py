@@ -12,6 +12,8 @@ class Asn(Module):
     priority = 20
     concurrency = 8  # RIPEstat allows 8 at a time per client, shared with the ripestat module
     rate_group = "ripestat"
+    source = "ripestat"  # the same service as the ripestat module: one name in --sources covers both
+    noncommercial = True  # the README's source terms: free for non-commercial (or evaluation) use only
     licence_note = (
         "RIPEstat's terms allow non-commercial use only, forbid redistributing its data without permission and "
         "ask you to credit RIPE NCC and the original source. Bundles that embed RIPEstat responses inherit this."

@@ -78,6 +78,7 @@ def create_bundle(
             for name, data in files.items()
         },
         "analysis": analysis_record(report),
+        **({"source_policy": report["source_policy"]} if report.get("source_policy") else {}),
         "public_key": base64.b64encode(public_raw).decode(),
         "key_fingerprint": fingerprint(public_raw),
     }

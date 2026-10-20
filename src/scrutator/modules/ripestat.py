@@ -22,6 +22,7 @@ class RipeStat(Module):
     timeout = 45.0
     priority = 28
     rate_group = "ripestat"
+    noncommercial = True  # the README's source terms: free for non-commercial (or evaluation) use only
     licence_note = (
         "RIPEstat's terms allow non-commercial use only, forbid redistributing its data without permission and "
         "ask you to credit RIPE NCC and the original source. Bundles that embed RIPEstat responses inherit this."

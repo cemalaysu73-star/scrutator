@@ -142,6 +142,7 @@ def build_report(
         "evidence": evidence,
         "sources": source_health(store, scan_id),
         "coverage": coverage(store, scan_id),
+        "source_policy": _meta_json(store, scan_id, "source_policy"),
         "summary_statements": [
             {"text": s["text"], "evidence_ids": s["evidence_ids"], "confidence": s["confidence"]}
             for s in store.statements(scan_id, status="verified")

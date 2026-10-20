@@ -84,6 +84,32 @@ Sources that list names (crt.sh, CertSpotter, Subdomain Center, HackerTarget, ur
 Crawl) are asked once per scan, about the apex. Replay (`scrutator verify --replay`) contacts only the hosts
 in this table and the RIR RDAP servers `rdap.org` redirects to.
 
+### Choosing sources
+
+Which sources a scan may use is your decision, not the tool's:
+
+```bash
+scrutator scan example.com --sources crtsh,dns,rdap          # only these
+scrutator scan example.com --exclude-sources wayback,commoncrawl
+scrutator scan example.com --no-noncommercial                # for work the free tiers' terms do not cover
+```
+
+A name is a module (`asn`) or the source it belongs to (`ripestat` covers the `asn` and `ripestat` modules, `dns`
+covers the resolver and the wildcard probe). An unknown name is an error that lists the valid ones, so a typo
+cannot quietly leave a source on. `--exclude-sources` wins over `--sources`.
+
+`--no-noncommercial` turns off every source in the table above whose free tier is for non-commercial (or
+evaluation) use only: InternetDB, RIPEstat (the `asn` and `ripestat` modules), CertSpotter and Subdomain Center.
+Nothing else changes: the other sources and the deterministic analysis run as before, and the report says what
+was not asked, so a smaller result is never mistaken for a cleaner one.
+
+The policy is recorded three times: in the report (`source_policy`: the options, the sources enabled, and each
+disabled source with its reason), in the signed manifest, and as the first record of the hash-chained audit log.
+`scrutator verify` checks that the three agree and that no lookup in the audit log and no evidence record comes
+from a source the policy forbids (check `source policy honoured`); it re-derives what `--no-noncommercial`
+forbids from its own list of sources, so a bundle cannot narrow the list it records. Bundles made before v0.7 have
+no policy and are not checked.
+
 ### Scope
 
 By default the scope is the seed domain and its subdomains. For anything else, write a

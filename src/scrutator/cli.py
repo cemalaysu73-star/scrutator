@@ -41,7 +41,9 @@ from scrutator.report import build_report, render_html, render_json
 from scrutator.report.sarif import to_sarif
 from scrutator.risk.model import Severity, severity_at_least
 from scrutator.scan import run_scan
+from scrutator.modules.registry import load_builtin_modules
 from scrutator.scope import ScopePolicy
+from scrutator.sources import SourceError, SourcePolicy
 from scrutator.store import Store
 from scrutator.verify.narrative import summarise
 from scrutator.watch import make_webhook_notifier, parse_interval, validate_webhook, watch_loop
@@ -123,6 +125,13 @@ def _load_packs(directories: list[Path]):
         raise _fail(f"cannot load packs:\n{exc}") from exc
 
 
+def _source_policy(sources: Optional[str], exclude_sources: Optional[str], no_noncommercial: bool) -> SourcePolicy:
+    try:
+        return SourcePolicy.parse(sources, exclude_sources, no_noncommercial, load_builtin_modules())
+    except SourceError as exc:
+        raise _fail(str(exc)) from exc
+
+
 def _signing_key(key_dir: Optional[Path]):
     path = private_key_path(key_dir)
     if not path.exists():
@@ -156,8 +165,12 @@ def scan(
     playbooks: bool = typer.Option(True, "--playbooks/--no-playbooks", help="Offer the planner the knowledge packs' playbooks that fit the situation."),
     deadline_s: float = typer.Option(DEFAULT_DEADLINE_S, "--deadline", min=0, help="Seconds the whole scan may take (0: no limit). At the deadline running lookups are cancelled, results so far are kept and the report says what is missing."),
     breaker: int = typer.Option(DEFAULT_BREAKER_THRESHOLD, "--breaker", min=0, help="Consecutive failures or timeouts after which a source is marked down for the rest of the scan (0: never)."),
+    sources: Optional[str] = typer.Option(None, "--sources", help="Use only these sources (comma-separated; see `scrutator sources`).", rich_help_panel="Source policy"),
+    exclude_sources: Optional[str] = typer.Option(None, "--exclude-sources", help="Do not use these sources (comma-separated).", rich_help_panel="Source policy"),
+    noncommercial: bool = typer.Option(True, "--noncommercial/--no-noncommercial", help="--no-noncommercial: leave out sources whose free tier is for non-commercial use only (InternetDB, RIPEstat, CertSpotter, Subdomain Center).", rich_help_panel="Source policy"),
 ) -> None:
     """Run a passive scan and write evidence-backed reports."""
+    policy = _source_policy(sources, exclude_sources, not noncommercial)
     wanted = {f.strip() for f in formats.split(",") if f.strip()}
     if not wanted or not wanted <= _FORMATS:
         raise _fail(f"--format must be a comma-separated subset of {sorted(_FORMATS)}")
@@ -199,7 +212,7 @@ def scan(
                 seed_entity, scope, store, ctx, ai=runtime,
                 max_steps=max_steps or config.max_steps, max_entities=max_entities, packs=packs,
                 attribution=attribute, max_candidates=max_candidates, playbooks=playbooks,
-                deadline=deadline, breaker_threshold=breaker,
+                deadline=deadline, breaker_threshold=breaker, source_policy=policy,
             )
             verdict = await within(summarise(runtime, store, scan_id)) if runtime is not None and summary else None
             leads = await within(run_leads(runtime, store, scan_id)) if runtime is not None and attribute else None
@@ -244,6 +257,9 @@ def scan(
     typer.echo(_findings_line(counts["findings_by_tier"], counts["findings"]))
     if counts.get("names"):
         typer.echo(_names_line(counts["names"]))
+    off = _sources_off_line(report.get("source_policy"))
+    if off:
+        typer.echo(off)
     typer.echo(_risk_line(report["risks"]) + " Run `scrutator risk` for the list.")
     if attribute:
         typer.echo(_candidate_line(report["attribution"]) + " Run `scrutator candidates` for the list.")
@@ -427,8 +443,12 @@ def watch(
     max_runs: int = typer.Option(0, "--max-runs", help="Stop after N scans (0 = run until interrupted)."),
     max_steps: int = typer.Option(1000, "--max-steps", help="Cap on module runs per scan."),
     deadline_s: float = typer.Option(DEFAULT_DEADLINE_S, "--deadline", min=0, help="Seconds each scan may take (0: no limit)."),
+    sources: Optional[str] = typer.Option(None, "--sources", help="Use only these sources (comma-separated)."),
+    exclude_sources: Optional[str] = typer.Option(None, "--exclude-sources", help="Do not use these sources (comma-separated).", rich_help_panel="Source policy"),
+    noncommercial: bool = typer.Option(True, "--noncommercial/--no-noncommercial", help="--no-noncommercial: leave out sources whose free tier is for non-commercial use only.", rich_help_panel="Source policy"),
 ) -> None:
     """Re-scan on a schedule and report what changed (deterministic scans, no AI)."""
+    policy = _source_policy(sources, exclude_sources, not noncommercial)
     try:
         interval = parse_interval(every)
         if webhook is not None:
@@ -453,7 +473,7 @@ def watch(
         async with open_context() as ctx:
             scan_id, _ = await run_scan(
                 seed_entity, scope, store, ctx, max_steps=max_steps,
-                deadline=Deadline(deadline_s) if deadline_s > 0 else None,
+                deadline=Deadline(deadline_s) if deadline_s > 0 else None, source_policy=policy,
             )
         return scan_id
 
@@ -481,6 +501,17 @@ def _names_line(names: dict | None) -> str:
         f"Names: {names['live']} live, {names['stale']} stale, {names['wildcard']} wildcard-covered, "
         f"{names['unresolved']} unresolved."
     )
+
+
+def _sources_off_line(policy: dict | None) -> str:
+    """The sources the policy turned off, with the reason. Sources that are only waiting for a key are left to
+    `scrutator sources`: they were never on."""
+    if not policy:
+        return ""
+    off = {name: why for name, why in policy["disabled"].items() if not why.startswith("needs a key")}
+    if not off:
+        return ""
+    return "Sources off: " + "; ".join(f"{name} ({why})" for name, why in off.items()) + "."
 
 
 def _findings_line(by_tier: dict[str, int], total: int) -> str:

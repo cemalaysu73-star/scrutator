@@ -23,6 +23,7 @@ class Wildcard(Module):
     concurrency = 4
     priority = 5
     apex_only = True
+    source = "dns"  # the probe is a DNS lookup: allowing dns allows it
 
     async def run(self, entity: Entity, ctx: ModuleContext) -> list[Fact]:
         probe = f"{PROBE_PREFIX}{secrets.token_hex(6)}.{entity.value}"

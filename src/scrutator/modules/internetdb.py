@@ -32,6 +32,7 @@ class InternetDb(Module):
     timeout = 30.0
     priority = 25
     rate_group = "internetdb"
+    noncommercial = True  # the README's source terms: free for non-commercial (or evaluation) use only
     licence_note = (
         "Shodan InternetDB is free for non-commercial use only; a revenue-generating use needs a Shodan "
         "enterprise licence. Bundles that embed its data inherit this."

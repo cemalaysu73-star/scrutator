@@ -12,8 +12,10 @@ from scrutator.exposure import exposure
 from scrutator.findings import findings_from_report, summarise_findings
 from scrutator.names import headline, name_states, summarise_states, summarise_tiers
 from scrutator.packs import KINDS, PackSet, load_packs
+from scrutator.modules.registry import load_builtin_modules
 from scrutator.report.build import promotions
 from scrutator.risk.engine import RULESET_VERSION, analyze
+from scrutator.sources import SourcePolicy
 from scrutator.store import GENESIS_HASH, chain_hash
 
 _DATA_FILES = {"report.json", "evidence.jsonl", "audit.jsonl"}
@@ -133,6 +135,33 @@ def _analysis_problem(manifest: dict, report: dict, warnings: list[str]) -> tupl
     return problem, comparable
 
 
+def _policy_problem(manifest: dict, report: dict, audit_records: list[dict], evidence_rows: list[dict]) -> str:
+    """Does the bundle respect the source policy it records? The policy is in the report, the signed manifest and
+    the first record of the signed audit log; the three must agree, and no lookup of a source the policy forbids
+    may appear in the audit log or the evidence. What is forbidden is re-derived from the recorded flags with this
+    tool's own module list (the recorded `disabled` list is trusted only to widen it, never to narrow it).
+    A bundle with no policy anywhere predates v0.7 and is not checked."""
+    recorded = [r for r in audit_records if r.get("event") == "source_policy"]
+    in_report, in_manifest = report.get("source_policy"), manifest.get("source_policy")
+    if not recorded and not in_report and not in_manifest:
+        return ""
+    if len(recorded) != 1 or audit_records.index(recorded[0]) != 0:
+        return "the signed audit log does not open with exactly one source policy record"
+    logged = {k: v for k, v in recorded[0].items() if k != "event"}
+    if in_report != logged:
+        return "the report's source policy is not the one in the signed audit log"
+    if in_manifest != logged:
+        return "the manifest's source policy is not the one in the signed audit log"
+    policy = SourcePolicy.from_dict(logged)
+    forbidden = policy.restricted(load_builtin_modules()) | set(logged.get("disabled", {}))
+    ran = sorted({r["module"] for r in audit_records if r.get("module") in forbidden})
+    # evidence of the DNS resolver and of the wildcard probe both carry the source name "dns"
+    produced = sorted({row["source"] for row in evidence_rows if row.get("source") in forbidden - {"dns"}})
+    if ran or produced:
+        return "the scan used sources its own policy forbids: " + ", ".join(sorted({*ran, *produced}))
+    return ""
+
+
 def verify_bundle(path: str | Path, *, pinned_fingerprint: str | None = None) -> VerifyReport:
     """Check every layer of a bundle independently. A failure in one layer does not hide
     the others, so the output says exactly what was altered."""
@@ -209,9 +238,11 @@ def verify_bundle(path: str | Path, *, pinned_fingerprint: str | None = None) ->
 
     # evidence content addressing
     evidence_ids: set[str] = set()
+    evidence_rows: list[dict] = []
     try:
         bad_ids = []
         for row in _jsonl(raw.files["evidence.jsonl"]):
+            evidence_rows.append(row)
             expected_id = _sha256(f"{row['source']}\n{row['request']}\n{row['payload']}".encode())
             if row["id"] != expected_id:
                 bad_ids.append(str(row["id"])[:12])
@@ -317,6 +348,14 @@ def verify_bundle(path: str | Path, *, pinned_fingerprint: str | None = None) ->
             add("headline derivable", not problems, "" if not problems else "not what the evidence implies: " + ", ".join(problems))
     except Exception as exc:  # noqa: BLE001
         add("headline derivable", False, f"malformed summary: {type(exc).__name__}: {exc}")
+
+    # the source policy: recorded three times, and the lookups and evidence must not contradict it
+    try:
+        problem = _policy_problem(manifest, report, audit_records, evidence_rows)
+        if report.get("source_policy") or manifest.get("source_policy") or any(r.get("event") == "source_policy" for r in audit_records):
+            add("source policy honoured", not problem, problem)
+    except Exception as exc:  # noqa: BLE001
+        add("source policy honoured", False, f"malformed source policy: {type(exc).__name__}: {exc}")
 
     # attribution: re-derived from the report's own evidence, like the risks
     try:
