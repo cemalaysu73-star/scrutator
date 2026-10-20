@@ -44,7 +44,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     defaults:
       run:
@@ -66,3 +66,19 @@ jobs:
         run: |
           EXE="$BIN/scrutator"; [ -f "$BIN/scrutator.exe" ] && EXE="$BIN/scrutator.exe"
           cd "$RUNNER_TEMP" && "$BIN/python" -I "$GITHUB_WORKSPACE/tools/wheel_smoke.py" --scrutator "$EXE" --work "$RUNNER_TEMP/smoke"
+      - name: SBOM of the installed environment (CycloneDX 1.5)
+        run: cd "$RUNNER_TEMP" && "$BIN/python" -I "$GITHUB_WORKSPACE/tools/sbom.py" --extra mcp --out "$RUNNER_TEMP/sbom.cdx.json"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheel-and-sbom-${{ matrix.os }}
+          path: |
+            ${{ runner.temp }}/wheel/*.whl
+            ${{ runner.temp }}/sbom.cdx.json
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t scrutator:ci .
+      - run: docker run --rm scrutator:ci --version
+      - run: docker run --rm scrutator:ci bench --out /tmp/bench
