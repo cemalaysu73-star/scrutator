@@ -5,7 +5,10 @@ server is built, so everything else works without it. A tool that raises is repo
 as an error result; nothing is printed to stdout, which the protocol uses for its messages.
 """
 
+import logging
+
 from scrutator import __version__
+from scrutator.keys import install_log_redaction
 from scrutator.mcp_tools import ToolError, ToolSet
 
 INSTRUCTIONS = (
@@ -21,6 +24,7 @@ INSTRUCTIONS = (
 
 def build_server(tools: ToolSet):
     """An MCPServer exposing `tools`. Raises ImportError when the SDK is not installed."""
+    install_log_redaction()
     from mcp.server import MCPServer
     from mcp.server.mcpserver.exceptions import ToolError as ClientVisibleError
     from mcp.types import ToolAnnotations
@@ -31,6 +35,10 @@ def build_server(tools: ToolSet):
         return ClientVisibleError(str(exc))
 
     server = MCPServer("scrutator", instructions=INSTRUCTIONS, version=__version__)
+    # The SDK has just pointed the root logger at stderr (INFO), which a client keeps in its log files. Request URLs
+    # name the target and, for Shodan, carry the key: keep them out (keys are also redacted by scrutator.keys).
+    for name in ("httpx", "httpcore"):
+        logging.getLogger(name).setLevel(logging.WARNING)
     reading = ToolAnnotations(readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
 
     @server.tool(name="list_candidates", annotations=reading, description="List the names outside the scope that may belong to the organisation, strongest first, with band and score. Read-only.")
