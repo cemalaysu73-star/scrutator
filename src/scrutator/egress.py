@@ -11,7 +11,7 @@ sent only when it is
   the request. Only RDAP servers may redirect off the list; a redirect anywhere else from any other source is refused.
 
 What this does not cover: a host on the list could itself be compromised, and an RDAP server's address is checked
-once, before the request, so a name that changes its answer between the check and the connection (DNS rebinding)
+once per scan, before its first request, so a name that changes its answer between the check and the connection (DNS rebinding)
 is not caught. The target itself is never on the list, so a redirect can never turn a passive scan into contact
 with the organisation under investigation."""
 
@@ -73,6 +73,7 @@ class EgressGuard:
         self.hosts = hosts
         self._resolve = resolve or _system_resolve
         self._redirect_targets: set[str] = set()  # hosts an allowed redirect pointed at
+        self._public: set[str] = set()  # referral hosts that resolved to public addresses only: checked once per guard
         self._redirectors: set[str] = set(REDIRECTORS)
 
     @staticmethod
@@ -96,7 +97,7 @@ class EgressGuard:
         if not problem and host not in self.hosts:
             if host not in self._redirect_targets:
                 problem = f"{host} is not a source host"
-            else:
+            elif host not in self._public:
                 try:
                     addresses = await self._resolve(host)
                 except OSError as exc:
@@ -104,6 +105,8 @@ class EgressGuard:
                 bad = [a for a in addresses if not ipaddress.ip_address(a.split("%")[0]).is_global]
                 if not addresses or bad:
                     problem = f"{host} resolves to a non-public address ({(bad or ['nothing'])[0]})"
+                else:
+                    self._public.add(host)  # a failure is never remembered; a pass is, for the life of this guard
         if problem:
             raise EgressDenied(f"egress refused: {problem}", request=request)
 

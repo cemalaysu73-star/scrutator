@@ -209,3 +209,31 @@ async def test_a_webhook_redirect_is_not_followed():
             local = router.route(host="127.0.0.1").mock(return_value=httpx.Response(200))
             await notify("example.com", 2, 1, Diff(added_entities=[{"id": "domain:a.example.com", "value": "a.example.com"}]))
     assert local.call_count == 0
+
+
+async def test_a_referral_host_is_checked_once_not_before_every_request():
+    """Twenty RDAP lookups of one scan are referred to the same few registry hosts; resolving each host before each
+    request cost a scan two to three seconds on Windows (R4 timing: 29.5 s against 31.9 s on owasp.org)."""
+    asked = []
+
+    async def counting_resolve(host):
+        asked.append(host)
+        return await fake_resolve(host)
+
+    egress = EgressGuard(resolve=counting_resolve)
+    async with open_context(egress=egress) as ctx:
+        with respx.mock(assert_all_called=False) as router:
+            router.get(url__regex=r"https://rdap\.org/.*").mock(
+                return_value=httpx.Response(302, headers={"Location": "https://rdap.arin.net/registry/ip/1"}))
+            router.get(url__regex=r"https://rdap\.arin\.net/.*").mock(return_value=httpx.Response(200, json={}))
+            for n in range(5):
+                assert (await ctx.http.get(f"https://rdap.org/ip/192.0.2.{n}")).status_code == 200
+    assert asked == ["rdap.arin.net"]
+
+
+async def test_a_cached_host_is_still_refused_when_it_was_not_public():
+    egress = EgressGuard(resolve=fake_resolve)
+    egress._redirect_targets.add("internal.example.net")
+    for _ in range(2):
+        with pytest.raises(EgressDenied, match="non-public"):
+            await egress.on_request(httpx.Request("GET", "https://internal.example.net/x"))
