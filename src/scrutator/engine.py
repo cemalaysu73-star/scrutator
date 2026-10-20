@@ -3,6 +3,7 @@ import asyncio
 import httpx
 
 from scrutator.deadline import Deadline
+from scrutator.keys import redact
 from scrutator.model import Entity, EntityType, ScopeState
 from scrutator.modules.base import Fact, Mode, Module, ModuleContext, SourceUnavailable
 from scrutator.modules.registry import select_modules
@@ -142,7 +143,8 @@ class Engine:
                     self.deadline_losses += 1
                     self._audit(scan_id, "cancelled", module, entity, reason="deadline")
                     return []
-                detail = str(exc) or (
+                # an error message may quote a URL, and a URL may carry a key: nothing is written unredacted
+                detail = redact(str(exc)) or (
                     f"no answer within {limit:g} s" if isinstance(exc, asyncio.TimeoutError) else "no detail given"
                 )
                 self._audit(scan_id, "error", module, entity, error=f"{type(exc).__name__}: {detail}")

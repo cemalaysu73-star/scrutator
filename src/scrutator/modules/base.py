@@ -67,6 +67,8 @@ class Module(ABC):
     name: ClassVar[str]
     accepts: ClassVar[frozenset[EntityType]]
     mode: ClassVar[Mode] = Mode.PASSIVE
+    # The environment variable that holds this source's API key (never a command-line option; see scrutator.keys).
+    # A module with one is off until the variable is set.
     needs_key: ClassVar[str | None] = None
     concurrency: ClassVar[int] = 2
     timeout: ClassVar[float] = 60.0

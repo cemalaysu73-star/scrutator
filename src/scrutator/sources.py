@@ -114,6 +114,17 @@ class SourcePolicy:
                 chosen.append(module)
         return chosen, disabled
 
+    def missing_keys(self, modules: Iterable[Module], env: Mapping[str, str] | None = None) -> list[str]:
+        """Messages for sources the user asked for by name (`--sources`) that cannot run for lack of a key."""
+        if self.allow is None:
+            return []
+        source = os.environ if env is None else env
+        return [
+            f"{m.name} needs the environment variable {m.needs_key}, which is not set (keys are never read from the command line)"
+            for m in modules
+            if m.needs_key and not source.get(m.needs_key) and _names(m) & set(self.allow) and not self.restriction(m)
+        ]
+
     def restricted(self, modules: Iterable[Module]) -> set[str]:
         """Names of the modules this policy forbids, whatever keys are set (what `verify` re-derives)."""
         return {m.name for m in modules if self.restriction(m)}
@@ -122,3 +133,46 @@ class SourcePolicy:
         """What goes into the report, the manifest and the audit log: the policy and its effect."""
         chosen, disabled = self.select(modules, env)
         return {**self.to_dict(), "enabled": sorted(m.name for m in chosen), "disabled": dict(sorted(disabled.items()))}
+
+
+def describe(
+    modules: Iterable[Module],
+    policy: SourcePolicy,
+    health: Mapping[str, Mapping] | None,
+    scan_label: str | None,
+    env: Mapping[str, str] | None = None,
+) -> list[dict]:
+    """One row per source for `scrutator sources`: how it is reached (keyless, or the variable that holds its
+    key), whether this policy lets it run and why not, its non-commercial flag, and what the last scan saw
+    of it. `health` is the report's per-source health of that scan (None: there is no scan yet)."""
+    rows = []
+    for module in sorted(modules, key=lambda m: m.name):
+        reason = policy.reason_disabled(module, env)
+        seen = (health or {}).get(module.name)
+        if health is None:
+            last = "no scan yet"
+        elif seen is None:
+            last = f"not run in {scan_label}"
+        elif seen.get("down"):
+            last = f"down in {scan_label}: marked down by the breaker after repeated failures"
+        elif seen.get("error") and not seen.get("ok"):
+            last = f"failing in {scan_label}: {(seen.get('errors') or ['error'])[0]}"
+        elif seen.get("error"):
+            last = f"answered in {scan_label} ({seen['ok']} ok, {seen['error']} failed)"
+        elif seen.get("ok"):
+            last = f"answered in {scan_label} ({seen['ok']} ok)"
+        else:
+            last = f"not run in {scan_label}"
+        rows.append(
+            {
+                "source": module.name,
+                "family": module.source or module.name,
+                "kind": f"keyed ({module.needs_key})" if module.needs_key else "keyless",
+                "enabled": reason is None,
+                "why_disabled": reason,
+                "noncommercial": module.noncommercial,
+                "replayable": not module.needs_key,
+                "last_scan": last,
+            }
+        )
+    return rows

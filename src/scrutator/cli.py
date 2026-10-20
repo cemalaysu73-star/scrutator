@@ -44,6 +44,7 @@ from scrutator.scan import run_scan
 from scrutator.modules.registry import load_builtin_modules
 from scrutator.scope import ScopePolicy
 from scrutator.sources import SourceError, SourcePolicy
+from scrutator.sources import describe as describe_sources
 from scrutator.store import Store
 from scrutator.verify.narrative import summarise
 from scrutator.watch import make_webhook_notifier, parse_interval, validate_webhook, watch_loop
@@ -126,10 +127,15 @@ def _load_packs(directories: list[Path]):
 
 
 def _source_policy(sources: Optional[str], exclude_sources: Optional[str], no_noncommercial: bool) -> SourcePolicy:
+    modules = load_builtin_modules()
     try:
-        return SourcePolicy.parse(sources, exclude_sources, no_noncommercial, load_builtin_modules())
+        policy = SourcePolicy.parse(sources, exclude_sources, no_noncommercial, modules)
     except SourceError as exc:
         raise _fail(str(exc)) from exc
+    problems = policy.missing_keys(modules)
+    if problems:
+        raise _fail("; ".join(problems))
+    return policy
 
 
 def _signing_key(key_dir: Optional[Path]):
@@ -305,6 +311,47 @@ def scan(
     typer.echo(f"Wrote {', '.join(written)} to {out}")
     if bundle_path is not None:
         typer.echo(f"Proof bundle: {bundle_path} (signing key {manifest['key_fingerprint']})")
+
+
+@app.command(name="sources")
+def list_sources(
+    db: Path = typer.Option(Path("scrutator-out/scrutator.db"), "--db", help="Database whose latest scan shows each source's last observed health."),
+    sources: Optional[str] = typer.Option(None, "--sources", help="Preview the effect of this allow list."),
+    exclude_sources: Optional[str] = typer.Option(None, "--exclude-sources", help="Preview the effect of this exclude list."),
+    noncommercial: bool = typer.Option(True, "--noncommercial/--no-noncommercial", help="--no-noncommercial: preview leaving out non-commercial sources."),
+    as_json: bool = typer.Option(False, "--json", help="Machine-readable output."),
+) -> None:
+    """List every source: keyless or keyed, on or off and why, non-commercial or not, and how it fared last time."""
+    from scrutator.report.build import source_health
+
+    modules = load_builtin_modules()
+    try:
+        policy = SourcePolicy.parse(sources, exclude_sources, not noncommercial, modules)
+    except SourceError as exc:
+        raise _fail(str(exc)) from exc
+    health, label = None, None
+    if db.exists():
+        store = Store(db)
+        try:
+            scans = store.scans()
+            if scans:
+                health, label = source_health(store, scans[-1]["id"]), f"scan #{scans[-1]['id']}"
+        finally:
+            store.close()
+    rows = describe_sources(modules, policy, health, label)
+    if as_json:
+        typer.echo(json.dumps(rows, indent=2, sort_keys=True))
+        return
+    typer.echo(f"{'Source':<16}{'Access':<38}{'State':<10}{'Non-comm.':<10}Last scan")
+    for row in rows:
+        state = "on" if row["enabled"] else "off"
+        typer.echo(f"{row['source']:<16}{row['kind']:<38}{state:<10}{'yes' if row['noncommercial'] else 'no':<10}{row['last_scan']}")
+        if row["why_disabled"]:
+            typer.echo(f"{'':<16}off: {row['why_disabled']}")
+    typer.echo(
+        "Keys come only from the environment variables named above, never from the command line; keyed sources "
+        "are implemented against the documented APIs and not live-verified, and are not replayable."
+    )
 
 
 @app.command()

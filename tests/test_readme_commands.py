@@ -13,7 +13,7 @@ README = (Path(__file__).parent.parent / "README.md").read_text(encoding="utf-8"
 runner = CliRunner()
 COMMANDS = {
     "scan", "keygen", "export", "verify", "diff", "watch", "risk", "ai", "doctor", "packs", "list", "validate", "manifest",
-    "candidates", "attribution", "promote", "mcp",
+    "candidates", "attribution", "promote", "mcp", "sources",
 }
 
 

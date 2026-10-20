@@ -86,7 +86,7 @@ async def test_leads_that_cite_what_was_not_listed_are_dropped_before_anyone_rea
             {"kind": "lead", "claim": "uses evidence that was never shown", "entity_refs": [partner], "evidence_refs": ["E999"]},
             {"kind": "lead", "claim": "is about an entity that was never shown", "entity_refs": ["N99"], "evidence_refs": evidence[:1]},
             {"kind": "premortem", "claim": "is a pre-mortem about something that is not a candidate", "entity_refs": [entities["domain:example.com"]] if "domain:example.com" in entities else ["N99"], "evidence_refs": evidence[:1]},
-            {"kind": "lead", "claim": "suggests an unregistered module", "entity_refs": [partner], "evidence_refs": evidence[:1], "check": {"module": "shodan", "entity_ref": partner}},
+            {"kind": "lead", "claim": "suggests an unregistered module", "entity_refs": [partner], "evidence_refs": evidence[:1], "check": {"module": "nonexistent-scanner", "entity_ref": partner}},
             {"kind": "lead", "claim": "suggests a check on an unlisted entity", "entity_refs": [partner], "evidence_refs": evidence[:1], "check": {"module": "dns", "entity_ref": "N99"}},
             {"kind": "lead", "claim": "is fine", "entity_refs": [partner], "evidence_refs": evidence[:1]},
         ]

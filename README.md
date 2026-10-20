@@ -110,6 +110,46 @@ from a source the policy forbids (check `source policy honoured`); it re-derives
 forbids from its own list of sources, so a bundle cannot narrow the list it records. Bundles made before v0.7 have
 no policy and are not checked.
 
+### Keyed sources (optional, off by default)
+
+Three sources need an API key you hold yourself. They are **implemented against each service's documented API and
+not live-verified**: no key was available to the author and no account was created to get one, so their tests use
+fake answers in the documented shapes. Treat your first real run as the real test.
+
+| Source | Variable | Host | What it adds |
+|---|---|---|---|
+| `virustotal` | `SCRUTATOR_VIRUSTOTAL_KEY` | `www.virustotal.com` | Subdomains VirusTotal holds (`/api/v3/domains/{domain}/subdomains`, up to 5 pages of 40) |
+| `securitytrails` | `SCRUTATOR_SECURITYTRAILS_KEY` | `api.securitytrails.com` | Subdomains (`/v1/domain/{domain}/subdomains`) |
+| `shodan` | `SCRUTATOR_SHODAN_KEY` | `api.shodan.io` | Shodan's DNS data for the domain (`/dns/domain/{domain}`, up to 2 pages, one query credit each); not the keyless InternetDB |
+
+Censys is not offered: its search API is being replaced by a new platform API, so there is no stable documented
+shape to implement against yet.
+
+The rules, each covered by a test:
+
+- A key comes **only from its environment variable**. There is no command-line option, config-file field or prompt
+  for a key, so it cannot reach shell history or a process list. A source without its variable is off, and the
+  report says so with the variable's name (never a value). Asking for one by name (`--sources shodan`) without its
+  variable is an error.
+- The key is read when a lookup runs and sent as the service requires (a header; Shodan insists on a query
+  parameter). It is **never stored**: the evidence records the request without it, and the report, HTML, signed
+  bundle, audit log and database contain no key. Error messages go through a redaction that replaces any
+  configured key, also percent-encoded, with `[redacted]`.
+- Keyed sources are scope-gated and passive like the others, and their names are claims until DNS or a certificate
+  agrees. Their hosts are not on the replay allowlist (a replay would need your key), so `verify --replay` skips
+  their evidence.
+- Terms depend on the plan your key belongs to; you hold the key, so you hold the licence. They are not marked
+  non-commercial, so check your plan before using them in commercial work.
+
+`scrutator sources` lists every source: keyless or keyed (with its variable), on or off and why, whether its free
+tier is non-commercial, and how it fared in the latest scan of the database (answered, failing, or marked down by
+the circuit breaker). It also previews a policy:
+
+```bash
+scrutator sources
+scrutator sources --no-noncommercial --json
+```
+
 ### Scope
 
 By default the scope is the seed domain and its subdomains. For anything else, write a
