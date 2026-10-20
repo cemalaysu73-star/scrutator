@@ -1,0 +1,197 @@
+Scrutator demo (offline: a planted fixture zone, no network)
+working folder: demo-out\offline
+
+== Step 1: scan the fixture zone
+   the scan runs in this process against a planted zone: a fake resolver and recorded answers of the public sources
+   (the command line scans the real network; the key, export, verify and tamper steps below are the real command line)
+   names: 17 verified, 1 claimed (4 stale, 0 wildcard-covered)
+   55 entities, 73 findings, 83 evidence records, 23 risks (the zone has 22 planted issues; `scrutator bench` checks every one is among them)
+   wrote demo-out\offline\report.html and report.json
+
+== Step 2: follow a claim to its evidence
+   the most severe risk: [high] CNAME to a claimable service that no longer exists
+      about domain:shop.example.com, domain:demo.pages.example.org
+      shop.example.com is an alias (CNAME) of demo.pages.example.org, and the address lookup for shop.example.com returned NXDOMAIN, so the target does not exist. demo.pages.example.org matches the takeover fingerprint lab-pages (Example Pages, rated vulnerable, shown by NXDOMAIN).
+   it cites 2 evidence record(s); the first is id c4d48be7276d6db6... (sha256 of source, request, payload):
+      source   dns
+      request  DNS A shop.example.com
+      payload  'NXDOMAIN'
+   open report.html and click the risk to see the same record in the browser
+
+== Step 3: a model invents claims; the verifier has to stop them
+   a scripted writer proposes 18 statements about a tiny scan; 12 of them are made up
+   (an invented host, address, port, CVE id, date; a planted instruction in a TXT record obeyed; a negation; ...)
+   the verifier is a mechanical stand-in verifier (not a language model); before it, a deterministic check drops statements naming anything the facts do not
+   published: 6 statements, of which 0 made up
+   rejected, with the reason:
+      x 192.0.2.50 is vulnerable to CVE-2021-44228.
+          ungrounded: names cve-2021-44228, which none of the cited facts contains
+      x backup.example.com exposes an open database at 203.0.113.66.
+          ungrounded: names backup.example.com, which none of the cited facts contains
+      x dev.example.com has port 3389 open.
+          ungrounded: names 3389, which none of the cited facts contains
+      x dev.example.com resolves to 192.0.2.10.
+          ungrounded: puts dev.example.com together with 192.0.2.10, which no cited fact does
+      x example.com is in maintenance mode.
+          ungrounded: repeats "in maintenance mode", text of a raw record that no cited fact contains
+      x example.com stops receiving mail on 2031-01-01.
+          ungrounded: names 2031-01-01, which none of the cited facts contains
+      x staging.example.com resolves to 192.0.2.10.
+          ungrounded: names staging.example.com, which none of the cited facts contains
+      x www.example.com does not resolve.
+          ungrounded: denies something (not, no, never, without, missing) that none of the cited facts denies
+      x www.example.com is compromised.
+          ungrounded: says "compromised", which none of the cited facts says
+      x www.example.com resolves to 192.0.2.99.
+          ungrounded: names 192.0.2.99, which none of the cited facts contains
+      x www.example.com runs an outdated web server.
+          ungrounded: says "outdated", which none of the cited facts says
+      x www.example.com serves a legacy application.
+          not in the cited facts: serves
+
+== Step 4: export a signed proof bundle
+$ scrutator keygen --key-dir keys
+Wrote demo-out\offline\keys\signing.key (keep it secret) and demo-out\offline\keys\signing.pub (share it).
+The private key is not encrypted. `scrutator keygen --passphrase` (or `scrutator protect-key` later) seals it with a passphrase.
+Key fingerprint: d99bc241533215128bd9a6912445473855efd743008c1a46c200f9e42ae9df02
+Give readers the fingerprint or signing.pub through a channel they trust; they pin it with `scrutator verify --pin`.
+[exit status 0]
+$ scrutator export 1 --db scrutator.db --bundle proof.scrutator --key-dir keys
+Wrote demo-out\offline\proof.scrutator for scan #1 of example.com (signing key d99bc241533215128bd9a6912445473855efd743008c1a46c200f9e42ae9df02).
+Warning: the signing key demo-out\offline\keys\signing.key is not encrypted; anyone who can read the file can sign as you. Protect it with `scrutator protect-key`.
+[exit status 0]
+   proof.scrutator: 41 KiB (report, every raw evidence record, hash-chained audit log, signed manifest)
+
+== Step 5: verify it, pinning the signer's key
+$ scrutator verify proof.scrutator --pin signing.pub
+PASS  readable bundle
+PASS  manifest parses
+PASS  file hashes
+PASS  signature valid
+PASS  signing key pinned
+PASS  audit chain
+PASS  evidence hashes
+PASS  report references
+PASS  findings derivable
+PASS  scan identity
+PASS  analysis recorded
+PASS  packs intact
+PASS  risks derivable
+PASS  exposure derivable
+PASS  name states derivable
+PASS  headline derivable
+PASS  source policy honoured
+PASS  attribution derivable
+PASS  promotions recorded
+Signing key: d99bc241533215128bd9a6912445473855efd743008c1a46c200f9e42ae9df02
+Warning: the bundle includes user packs, which cannot be compared with a trusted copy; the signer is vouching for them.
+Verification passed.
+[exit status 0]
+   -> exit status 0
+
+== Step 6: tamper with it
+   A. flip one bit in the middle of report.json inside the bundle
+$ scrutator verify flipped.scrutator --pin signing.pub
+PASS  readable bundle
+PASS  manifest parses
+FAIL  file hashes  (report.json does not match the manifest)
+PASS  signature valid
+PASS  signing key pinned
+PASS  audit chain
+PASS  evidence hashes
+PASS  report references
+FAIL  findings derivable  (the findings are not what the cited evidence implies)
+PASS  scan identity
+PASS  analysis recorded
+PASS  packs intact
+PASS  risks derivable
+PASS  exposure derivable
+PASS  name states derivable
+PASS  headline derivable
+PASS  source policy honoured
+PASS  attribution derivable
+PASS  promotions recorded
+Signing key: d99bc241533215128bd9a6912445473855efd743008c1a46c200f9e42ae9df02
+Warning: the bundle includes user packs, which cannot be compared with a trusted copy; the signer is vouching for them.
+Verification FAILED: do not rely on this bundle.
+[exit status 1]
+   -> exit status 1: verification FAILED, as it must
+
+   B. a forger deletes a risk from the report, rebuilds every file hash and re-signs with their own key
+$ scrutator verify forged.scrutator   (no --pin)
+PASS  readable bundle
+PASS  manifest parses
+PASS  file hashes
+PASS  signature valid
+PASS  audit chain
+PASS  evidence hashes
+PASS  report references
+PASS  findings derivable
+PASS  scan identity
+FAIL  analysis recorded  (the manifest and the report disagree about the number of risks)
+PASS  packs intact
+FAIL  risks derivable  (the risks are not what the cited evidence and the packs imply)
+PASS  exposure derivable
+PASS  name states derivable
+PASS  headline derivable
+PASS  source policy honoured
+PASS  attribution derivable
+PASS  promotions recorded
+Signing key: f929c80739a1db59ae7ea59c8a3d7bb7f7146bce1aebadcc3f58ab520c558fba
+Warning: signing key is not pinned: a valid signature only proves the bundle matches the key inside it, and anyone can sign a forged bundle with their own key. Pin the signer with --pin.
+Warning: the bundle includes user packs, which cannot be compared with a trusted copy; the signer is vouching for them.
+Verification FAILED: do not rely on this bundle.
+[exit status 1]
+   -> exit status 1: caught even without a pin, because verify recomputes the risks from the evidence
+
+   C. a different, internally consistent bundle (another scan, signed by another key) offered in its place
+$ scrutator verify substitute.scrutator   (no --pin)
+PASS  readable bundle
+PASS  manifest parses
+PASS  file hashes
+PASS  signature valid
+PASS  audit chain
+PASS  evidence hashes
+PASS  report references
+PASS  findings derivable
+PASS  scan identity
+PASS  analysis recorded
+PASS  packs intact
+PASS  risks derivable
+PASS  exposure derivable
+PASS  name states derivable
+PASS  headline derivable
+PASS  source policy honoured
+PASS  attribution derivable
+PASS  promotions recorded
+Signing key: f929c80739a1db59ae7ea59c8a3d7bb7f7146bce1aebadcc3f58ab520c558fba
+Warning: signing key is not pinned: a valid signature only proves the bundle matches the key inside it, and anyone can sign a forged bundle with their own key. Pin the signer with --pin.
+Verification passed.
+[exit status 0]
+   -> exit status 0: every check passes; a reader who does not pin the key is only warned
+$ scrutator verify substitute.scrutator --pin signing.pub
+PASS  readable bundle
+PASS  manifest parses
+PASS  file hashes
+PASS  signature valid
+FAIL  signing key pinned  (signed by f929c80739a1db59ae7ea59c8a3d7bb7f7146bce1aebadcc3f58ab520c558fba, not d99bc241533215128bd9a6912445473855efd743008c1a46c200f9e42ae9df02)
+PASS  audit chain
+PASS  evidence hashes
+PASS  report references
+PASS  findings derivable
+PASS  scan identity
+PASS  analysis recorded
+PASS  packs intact
+PASS  risks derivable
+PASS  exposure derivable
+PASS  name states derivable
+PASS  headline derivable
+PASS  source policy honoured
+PASS  attribution derivable
+PASS  promotions recorded
+Signing key: f929c80739a1db59ae7ea59c8a3d7bb7f7146bce1aebadcc3f58ab520c558fba
+Verification FAILED: do not rely on this bundle.
+[exit status 1]
+   -> exit status 1: the pinned key is what catches it
+
+Done in 31 s. Open demo-out\offline\report.html in a browser; the bundle is demo-out\offline\proof.scrutator.
