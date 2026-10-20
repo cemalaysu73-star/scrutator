@@ -46,6 +46,7 @@ from scrutator.scope import ScopePolicy
 from scrutator.sources import SourceError, SourcePolicy
 from scrutator.sources import describe as describe_sources
 from scrutator.store import Store
+from scrutator.textsafe import terminal_safe
 from scrutator.verify.narrative import summarise
 from scrutator.watch import make_webhook_notifier, parse_interval, validate_webhook, watch_loop
 
@@ -57,6 +58,12 @@ app.add_typer(packs_app, name="packs")
 
 _FORMATS = {"json", "html"}
 _sleep = asyncio.sleep
+
+
+def _echo(message: object = "", **kwargs) -> None:
+    """Everything this tool prints may quote data from sources or from a bundle someone handed you: control and
+    bidirectional-override characters are shown as escapes, never sent to the terminal."""
+    typer.echo(terminal_safe(str(message)), **kwargs)
 
 
 @app.callback()
@@ -79,7 +86,7 @@ def _default_scope(seed: Entity) -> ScopePolicy:
 
 
 def _fail(message: str) -> typer.Exit:
-    typer.echo(f"error: {message}", err=True)
+    _echo(f"error: {message}", err=True)
     return typer.Exit(2)
 
 
@@ -110,11 +117,11 @@ def _consent(config: AIConfig, mode: AIMode, yes_cloud: bool) -> None:
     hosts = cloud_hosts(config, mode)
     if not hosts or yes_cloud:
         return
-    typer.echo(
+    _echo(
         "Cloud AI is configured. These endpoints would receive graph summaries and evidence "
         "excerpts about the target: " + ", ".join(sorted(hosts))
     )
-    typer.echo("Nothing is sent in local mode. --redact pseudonymises domains, IPs and organisation names.")
+    _echo("Nothing is sent in local mode. --redact pseudonymises domains, IPs and organisation names.")
     if not typer.confirm("Send this data?", default=False):
         raise _fail("cloud AI declined")
 
@@ -255,62 +262,62 @@ def scan(
     store.close()
 
     counts = report["summary"]
-    typer.echo(f"Scan #{scan_id} of {seed_entity.value}: {counts['headline']}.")
-    typer.echo(
+    _echo(f"Scan #{scan_id} of {seed_entity.value}: {counts['headline']}.")
+    _echo(
         f"{counts['entities']} entities, {counts['edges']} relations, {counts['findings']} findings "
         f"({stats.modules_run} module runs, {stats.rounds} rounds)."
     )
-    typer.echo(_findings_line(counts["findings_by_tier"], counts["findings"]))
+    _echo(_findings_line(counts["findings_by_tier"], counts["findings"]))
     if counts.get("names"):
-        typer.echo(_names_line(counts["names"]))
+        _echo(_names_line(counts["names"]))
     off = _sources_off_line(report.get("source_policy"))
     if off:
-        typer.echo(off)
-    typer.echo(_risk_line(report["risks"]) + " Run `scrutator risk` for the list.")
+        _echo(off)
+    _echo(_risk_line(report["risks"]) + " Run `scrutator risk` for the list.")
     if attribute:
-        typer.echo(_candidate_line(report["attribution"]) + " Run `scrutator candidates` for the list.")
+        _echo(_candidate_line(report["attribution"]) + " Run `scrutator candidates` for the list.")
     if interrupted:
-        typer.echo("Interrupted: the report covers what was collected so far (partial).")
+        _echo("Interrupted: the report covers what was collected so far (partial).")
     if stats.deadline_hit:
-        typer.echo(
+        _echo(
             f"Deadline of {deadline_s:g} s reached: the report is partial. Lookups still running were "
             "cancelled and the rest did not start; Source coverage lists what is missing."
         )
     if report["coverage"]["sources_down"]:
-        typer.echo(
+        _echo(
             "Sources marked down after repeated failures (no more calls this scan): "
             + ", ".join(report["coverage"]["sources_down"]) + "."
         )
     if stats.steps_exhausted:
-        typer.echo("Step budget reached: some lookups were not run. Raise --max-steps to cover them.")
+        _echo("Step budget reached: some lookups were not run. Raise --max-steps to cover them.")
     failed = sum(h["error"] for h in report["sources"].values())
     if failed:
-        typer.echo(f"{failed} source run(s) failed after retries; see Source coverage in the report.")
+        _echo(f"{failed} source run(s) failed after retries; see Source coverage in the report.")
     if runtime is None:
-        typer.echo("AI: off (no local model found, or --ai off). Deterministic mode.")
+        _echo("AI: off (no local model found, or --ai off). Deterministic mode.")
     else:
         roles = ", ".join(
             f"{role} {p['provider']}/{p['model']} ({'local' if p['local'] else 'cloud'})"
             for role, p in runtime.describe()["providers"].items()
         )
-        typer.echo(f"AI: {used.value}: {roles}")
+        _echo(f"AI: {used.value}: {roles}")
         if verdict is not None:
-            typer.echo(
+            _echo(
                 f"Summary: {len(verdict.verified)} statement(s) verified, {len(verdict.rejected)} rejected"
                 + (f" ({verdict.skipped_reason})" if verdict.skipped_reason else "")
                 + "."
             )
             if verdict.same_model:
-                typer.echo("Warning: writer and verifier use the same model; use a different one for independence.")
+                _echo("Warning: writer and verifier use the same model; use a different one for independence.")
         if leads is not None:
-            typer.echo(
+            _echo(
                 f"Leads: {len(leads.verified)} verified, {len(leads.rejected)} rejected, {leads.dropped} dropped"
                 + (f" ({leads.skipped_reason})" if leads.skipped_reason else "")
                 + "."
             )
-    typer.echo(f"Wrote {', '.join(written)} to {out}")
+    _echo(f"Wrote {', '.join(written)} to {out}")
     if bundle_path is not None:
-        typer.echo(f"Proof bundle: {bundle_path} (signing key {manifest['key_fingerprint']})")
+        _echo(f"Proof bundle: {bundle_path} (signing key {manifest['key_fingerprint']})")
 
 
 @app.command(name="sources")
@@ -340,15 +347,15 @@ def list_sources(
             store.close()
     rows = describe_sources(modules, policy, health, label)
     if as_json:
-        typer.echo(json.dumps(rows, indent=2, sort_keys=True))
+        _echo(json.dumps(rows, indent=2, sort_keys=True))
         return
-    typer.echo(f"{'Source':<16}{'Access':<38}{'State':<10}{'Non-comm.':<10}Last scan")
+    _echo(f"{'Source':<16}{'Access':<38}{'State':<10}{'Non-comm.':<10}Last scan")
     for row in rows:
         state = "on" if row["enabled"] else "off"
-        typer.echo(f"{row['source']:<16}{row['kind']:<38}{state:<10}{'yes' if row['noncommercial'] else 'no':<10}{row['last_scan']}")
+        _echo(f"{row['source']:<16}{row['kind']:<38}{state:<10}{'yes' if row['noncommercial'] else 'no':<10}{row['last_scan']}")
         if row["why_disabled"]:
-            typer.echo(f"{'':<16}off: {row['why_disabled']}")
-    typer.echo(
+            _echo(f"{'':<16}off: {row['why_disabled']}")
+    _echo(
         "Keys come only from the environment variables named above, never from the command line; keyed sources "
         "are implemented against the documented APIs and not live-verified, and are not replayable."
     )
@@ -364,9 +371,9 @@ def keygen(
         fp = generate_keypair(target)
     except FileExistsError as exc:
         raise _fail(str(exc)) from exc
-    typer.echo(f"Wrote {private_key_path(target)} (keep it secret) and {public_key_path(target)} (share it).")
-    typer.echo(f"Key fingerprint: {fp}")
-    typer.echo("Give readers the fingerprint or signing.pub through a channel they trust; they pin it with `scrutator verify --pin`.")
+    _echo(f"Wrote {private_key_path(target)} (keep it secret) and {public_key_path(target)} (share it).")
+    _echo(f"Key fingerprint: {fp}")
+    _echo("Give readers the fingerprint or signing.pub through a channel they trust; they pin it with `scrutator verify --pin`.")
 
 
 @app.command()
@@ -391,7 +398,7 @@ def export(
         raise _fail(str(exc)) from exc
     finally:
         store.close()
-    typer.echo(f"Wrote {bundle} for scan #{chosen} of {manifest['scan']['seed']} (signing key {manifest['key_fingerprint']}).")
+    _echo(f"Wrote {bundle} for scan #{chosen} of {manifest['scan']['seed']} (signing key {manifest['key_fingerprint']}).")
 
 
 def _pinned(pin: Optional[str]) -> Optional[str]:
@@ -415,15 +422,15 @@ def verify(
     """Check a proof bundle: hashes, signature, audit chain, evidence and findings."""
     report = verify_bundle(bundle, pinned_fingerprint=_pinned(pin))
     for check in report.checks:
-        typer.echo(f"{'PASS' if check.ok else 'FAIL'}  {check.name}" + (f"  ({check.detail})" if check.detail else ""))
+        _echo(f"{'PASS' if check.ok else 'FAIL'}  {check.name}" + (f"  ({check.detail})" if check.detail else ""))
     if report.key_fingerprint:
-        typer.echo(f"Signing key: {report.key_fingerprint}")
+        _echo(f"Signing key: {report.key_fingerprint}")
     for warning in report.warnings:
-        typer.echo(f"Warning: {warning}")
+        _echo(f"Warning: {warning}")
     if not report.ok:
-        typer.echo("Verification FAILED: do not rely on this bundle.")
+        _echo("Verification FAILED: do not rely on this bundle.")
         raise typer.Exit(1)
-    typer.echo("Verification passed.")
+    _echo("Verification passed.")
     if not replay:
         return
 
@@ -435,13 +442,13 @@ def verify(
 
     results = asyncio.run(go())
     tally = {s: sum(1 for r in results if r.status == s) for s in ("unchanged", "changed", "unavailable", "skipped")}
-    typer.echo(
+    _echo(
         f"replay: {tally['unchanged']} unchanged, {tally['changed']} changed, "
         f"{tally['unavailable']} unavailable, {tally['skipped']} skipped"
     )
     for r in [r for r in results if r.status != "unchanged"][:20]:
-        typer.echo(f"  {r.status:<11} {r.source}: {r.request[:90]}" + (f" ({r.detail})" if r.detail else ""))
-    typer.echo("Changed and unavailable records are drift, not forgery: sources change and go down.")
+        _echo(f"  {r.status:<11} {r.source}: {r.request[:90]}" + (f" ({r.detail})" if r.detail else ""))
+    _echo("Changed and unavailable records are drift, not forgery: sources change and go down.")
 
 
 def _load_report(ref: str, db: Path, packs=None) -> tuple[dict, str]:
@@ -476,7 +483,7 @@ def diff(
     old_report, old_label = _load_report(old, db)
     new_report, new_label = _load_report(new, db)
     result = diff_reports(old_report, new_report)
-    typer.echo(json.dumps(result.to_dict(), indent=2, sort_keys=True) if as_json else render_diff(result, old_label, new_label))
+    _echo(json.dumps(result.to_dict(), indent=2, sort_keys=True) if as_json else render_diff(result, old_label, new_label))
 
 
 @app.command()
@@ -508,11 +515,11 @@ def watch(
     store = Store(db or out / "scrutator.db")
 
     def report_run(scan_id: int, previous: Optional[int], result) -> None:
-        typer.echo(f"Run {scan_id}: scan #{scan_id} of {seed_entity.value} finished.")
+        _echo(f"Run {scan_id}: scan #{scan_id} of {seed_entity.value} finished.")
         if result is None:
-            typer.echo("  first scan for this seed; nothing to compare yet")
+            _echo("  first scan for this seed; nothing to compare yet")
             return
-        typer.echo(render_diff(result, f"scan {previous}", f"scan {scan_id}"))
+        _echo(render_diff(result, f"scan {previous}", f"scan {scan_id}"))
         if not result.empty:
             (out / f"diff-{scan_id}.json").write_text(json.dumps(result.to_dict(), indent=2, sort_keys=True), encoding="utf-8")
 
@@ -535,7 +542,7 @@ def watch(
     try:
         asyncio.run(go())
     except KeyboardInterrupt:
-        typer.echo("Stopped.")
+        _echo("Stopped.")
     finally:
         store.close()
 
@@ -614,26 +621,26 @@ def risk(
     if sarif is not None:
         sarif.write_text(json.dumps(to_sarif({**report, "risks": risks}), indent=2, sort_keys=True), encoding="utf-8")
     if as_json:
-        typer.echo(json.dumps({"risks": risks, "dependencies": report["dependencies"]}, indent=2, sort_keys=True))
+        _echo(json.dumps({"risks": risks, "dependencies": report["dependencies"]}, indent=2, sort_keys=True))
     else:
-        typer.echo(f"{label} of {report['scan']['seed']}. {_risk_line(risks)}")
+        _echo(f"{label} of {report['scan']['seed']}. {_risk_line(risks)}")
         if report.get("summary", {}).get("names"):
-            typer.echo(_names_line(report["summary"]["names"]))
+            _echo(_names_line(report["summary"]["names"]))
         for item in risks:
-            typer.echo(f"[{item['severity'].upper():<6}] {item['rule_id']}  {', '.join(item['entity_ids'][:3])}")
-            typer.echo(f"         {item['title']}. {item['explanation']}")
-            typer.echo(f"         evidence: {len(item['evidence_ids'])} record(s), fingerprint {item['fingerprint']}")
-            typer.echo(f"         fix: {item['remediation']}")
+            _echo(f"[{item['severity'].upper():<6}] {item['rule_id']}  {', '.join(item['entity_ids'][:3])}")
+            _echo(f"         {item['title']}. {item['explanation']}")
+            _echo(f"         evidence: {len(item['evidence_ids'])} record(s), fingerprint {item['fingerprint']}")
+            _echo(f"         fix: {item['remediation']}")
         if report["dependencies"]:
-            typer.echo("Provider dependencies:")
+            _echo("Provider dependencies:")
             for dep in report["dependencies"]:
-                typer.echo(f"  {dep['category']:<8} {dep['provider']}  ({len(dep['hostnames'])} name(s) via {', '.join(dep['via'])})")
+                _echo(f"  {dep['category']:<8} {dep['provider']}  ({len(dep['hostnames'])} name(s) via {', '.join(dep['via'])})")
     if sarif is not None:
-        typer.echo(f"Wrote {sarif}")
+        _echo(f"Wrote {sarif}")
     if fail_on is not None:
         blocking = [r for r in risks if severity_at_least(r["severity"], fail_on)]
         if blocking:
-            typer.echo(f"{len(blocking)} risk(s) at or above {fail_on}.", err=True)
+            _echo(f"{len(blocking)} risk(s) at or above {fail_on}.", err=True)
             raise typer.Exit(1)
 
 
@@ -685,14 +692,14 @@ def candidates_cmd(
     promoted = {p["entity"] for p in report.get("promotions", [])}
     items = [c for c in report["attribution"]["candidates"] if band_rank(c["band"]) >= floor]
     if as_json:
-        typer.echo(json.dumps({"scan": report["scan"], "candidates": items, "promotions": report.get("promotions", [])}, indent=2, sort_keys=True))
+        _echo(json.dumps({"scan": report["scan"], "candidates": items, "promotions": report.get("promotions", [])}, indent=2, sort_keys=True))
         return
-    typer.echo(f"{label} of {report['scan']['seed']}. {_candidate_line(report['attribution'])}")
+    _echo(f"{label} of {report['scan']['seed']}. {_candidate_line(report['attribution'])}")
     for item in items:
         mark = ", promoted" if item["entity_id"] in promoted else ""
-        typer.echo(f"[{item['band'].upper():<9}] {item['score']:.2f}  {item['entity_id']}  ({item['state']}{mark}; {len(item['signals'])} signal(s), {len(item['evidence_ids'])} evidence record(s))")
+        _echo(f"[{item['band'].upper():<9}] {item['score']:.2f}  {item['entity_id']}  ({item['state']}{mark}; {len(item['signals'])} signal(s), {len(item['evidence_ids'])} evidence record(s))")
     if any(item["state"] == "candidate" for item in items):
-        typer.echo("Explain one with `scrutator attribution --entity NAME`; accept one into scope with `scrutator promote NAME --scope FILE`.")
+        _echo("Explain one with `scrutator attribution --entity NAME`; accept one into scope with `scrutator promote NAME --scope FILE`.")
 
 
 @app.command("attribution")
@@ -716,21 +723,21 @@ def attribution_cmd(
         items = [c for c in items if band_rank(c["band"]) >= floor]
     leads = report.get("leads", {"verified": [], "rejected": []})
     if as_json:
-        typer.echo(json.dumps({"attribution": {**report["attribution"], "candidates": items}, "leads": leads}, indent=2, sort_keys=True))
+        _echo(json.dumps({"attribution": {**report["attribution"], "candidates": items}, "leads": leads}, indent=2, sort_keys=True))
         return
-    typer.echo(f"{label} of {report['scan']['seed']}. {_candidate_line(report['attribution'])}")
+    _echo(f"{label} of {report['scan']['seed']}. {_candidate_line(report['attribution'])}")
     for item in items:
-        typer.echo(f"\n[{item['band'].upper()}] {item['entity_id']}  score {item['score']:.2f}  ({item['state']})")
+        _echo(f"\n[{item['band'].upper()}] {item['entity_id']}  score {item['score']:.2f}  ({item['state']})")
         for signal in item["signals"]:
-            typer.echo(f"  {'+' if signal['weight'] > 0 else '-'} {signal['kind']} {signal['weight']:.2f}: {signal['detail']} ({len(signal['evidence_ids'])} evidence record(s))")
+            _echo(f"  {'+' if signal['weight'] > 0 else '-'} {signal['kind']} {signal['weight']:.2f}: {signal['detail']} ({len(signal['evidence_ids'])} evidence record(s))")
             if signal["note"]:
-                typer.echo(f"      {signal['note']}")
+                _echo(f"      {signal['note']}")
         for note in item["premortem"]:
-            typer.echo(f"  ? {note['text']}")
+            _echo(f"  ? {note['text']}")
     if leads["verified"]:
-        typer.echo("\nAnalyst leads (AI, verified against the evidence they cite):")
+        _echo("\nAnalyst leads (AI, verified against the evidence they cite):")
         for lead in leads["verified"]:
-            typer.echo(f"  [{lead['kind']}] {lead['claim']}" + (f"  (suggested check, not run: {lead['check']})" if lead["check"] else ""))
+            _echo(f"  [{lead['kind']}] {lead['claim']}" + (f"  (suggested check, not run: {lead['check']})" if lead["check"] else ""))
 
 
 @app.command("promote")
@@ -753,7 +760,7 @@ def promote_cmd(
         item = next((c for c in report["attribution"]["candidates"] if c["entity_id"] == entity_id), None)
         if item is None or item["state"] != "candidate":
             raise _fail(f"{entity_id} is not a candidate of scan #{chosen}: only candidates can be promoted")
-        typer.echo(
+        _echo(
             f"{entity_id} is {item['band']} (score {item['score']:.2f}) on {len(item['evidence_ids'])} evidence record(s). "
             f"Promoting it adds {item['value']} and every name under it to {scope_file}."
         )
@@ -765,8 +772,8 @@ def promote_cmd(
             raise _fail(str(exc)) from exc
     finally:
         store.close()
-    typer.echo(f"Promoted {entity_id} at {record['at']}; recorded in the audit log of scan #{chosen}.")
-    typer.echo(f"{scope_file} now lists it (the previous file is kept as {scope_file.name}.bak). Scan again to investigate it fully.")
+    _echo(f"Promoted {entity_id} at {record['at']}; recorded in the audit log of scan #{chosen}.")
+    _echo(f"{scope_file} now lists it (the previous file is kept as {scope_file.name}.bak). Scan again to investigate it fully.")
 
 
 @app.command("mcp")
@@ -799,11 +806,11 @@ def packs_list(
 ) -> None:
     """List the pack files in use and how many entries they hold."""
     packs = _load_packs(packs_dirs)
-    typer.echo(f"{'file':<16}{'kind':<11}{'version':<12}{'origin':<9}{'entries':<8}sha256")
+    _echo(f"{'file':<16}{'kind':<11}{'version':<12}{'origin':<9}{'entries':<8}sha256")
     for item in packs.files:
-        typer.echo(f"{item['name']:<16}{item['kind']:<11}{item['version']:<12}{item['origin']:<9}{item['entries']:<8}{item['content_sha256'][:12]}")
+        _echo(f"{item['name']:<16}{item['kind']:<11}{item['version']:<12}{item['origin']:<9}{item['entries']:<8}{item['content_sha256'][:12]}")
     verified = sum(1 for e in packs.providers if e.verified)
-    typer.echo(
+    _echo(
         f"{len(packs.providers)} provider entries ({verified} verified), {len(packs.takeover)} takeover fingerprints, "
         f"{len(packs.signals)} signal frequencies. Merged content sha256 {packs.effective_sha256[:12]}."
     )
@@ -818,10 +825,10 @@ def packs_validate(
     where = directory if directory is not None else "the bundled packs"
     if problems:
         for line in problems:
-            typer.echo(f"error: {line}", err=True)
-        typer.echo(f"{where}: {len(problems)} problem(s).", err=True)
+            _echo(f"error: {line}", err=True)
+        _echo(f"{where}: {len(problems)} problem(s).", err=True)
         raise typer.Exit(1)
-    typer.echo(f"{where}: valid.")
+    _echo(f"{where}: valid.")
 
 
 @packs_app.command("manifest")
@@ -833,7 +840,7 @@ def packs_manifest(
         raise _fail(f"{directory} is not a directory")
     manifest = build_manifest(directory)
     (directory / "manifest.json").write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    typer.echo(f"Wrote {directory / 'manifest.json'} ({len(manifest['files'])} file(s)).")
+    _echo(f"Wrote {directory / 'manifest.json'} ({len(manifest['files'])} file(s)).")
 
 
 @ai_app.command("doctor")
@@ -863,7 +870,7 @@ def doctor(
     except AIError as exc:
         raise _fail(str(exc)) from exc
     if report is None:
-        typer.echo("no AI runtime available: start Ollama or another local server, or configure [ai.*] roles.")
+        _echo("no AI runtime available: start Ollama or another local server, or configure [ai.*] roles.")
         raise typer.Exit(1)
-    typer.echo(render_doctor(report))
+    _echo(render_doctor(report))
     raise typer.Exit(0 if report.passed else 1)

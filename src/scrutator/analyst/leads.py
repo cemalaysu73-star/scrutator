@@ -27,6 +27,7 @@ from scrutator.modules.registry import load_builtin_modules
 from scrutator.report import build_report
 from scrutator.store import Store
 from scrutator.verify.entail import judge_entailment
+from scrutator.verify.grounding import ungrounded
 
 MAX_LEADS = 8
 MAX_CANDIDATES = 12
@@ -120,6 +121,19 @@ def _context(report: dict) -> tuple[str, dict[str, str], dict[str, str], set[str
     return text, entity_refs, evidence_refs, {c["entity_id"] for c in candidates}, {c["entity_id"]: c for c in candidates}
 
 
+def _facts(report: dict, entity_ids: list[str], by_entity: dict[str, dict]) -> list[str]:
+    """What deterministic code says about the entities a lead cites: their names, the attribution's explanation and
+    signals, and the risks about them. Raw payloads are not facts here: they are where injected text would be."""
+    facts = [entity_id.split(":", 1)[-1] for entity_id in entity_ids]
+    for entity_id in entity_ids:
+        candidate = by_entity.get(entity_id)
+        if candidate is not None:
+            facts.append(f"{candidate['entity_id']}: {candidate['explanation']}")
+            facts += [f"{candidate['entity_id']}: {s['detail']}" for s in candidate["signals"]]
+    facts += [f"{', '.join(r['entity_ids'])}: {r['title']}. {r['explanation']}" for r in report["risks"] if set(r["entity_ids"]) & set(entity_ids)]
+    return facts
+
+
 def _problem(lead: Lead, entity_refs: dict[str, str], evidence_refs: dict[str, str], candidates: set[str], modules: set[str]) -> str:
     """Why a lead is discarded before anyone reads it, or an empty string."""
     unknown = [r for r in lead.entity_refs if r not in entity_refs] + [r for r in lead.evidence_refs if r not in evidence_refs]
@@ -169,6 +183,10 @@ async def run_leads(ai: AIRuntime | None, store: Store, scan_id: int) -> LeadRes
         excerpts += [_excerpt(report["evidence"][i]) for i in evidence_ids]
         check = f"{lead.check.module} on {entity_refs[lead.check.entity_ref]}" if lead.check else ""
         item = {"kind": lead.kind, "claim": lead.claim, "entity_ids": entity_ids, "evidence_ids": evidence_ids, "check": check}
+        problem = ungrounded(lead.claim, _facts(report, entity_ids, by_entity))
+        if problem:
+            result.rejected.append({**item, "reason": f"ungrounded: {problem}"})
+            continue
         try:
             verdict = await judge_entailment(ai, lead.claim, excerpts)
         except AIError as exc:

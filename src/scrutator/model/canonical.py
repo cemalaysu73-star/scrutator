@@ -4,6 +4,7 @@ import ipaddress
 import re
 
 from scrutator.model.types import EntityType
+from scrutator.textsafe import strip_unsafe
 
 _LABEL = re.compile(r"^[a-z0-9_]([a-z0-9_-]{0,61}[a-z0-9_])?$")
 _ASN = re.compile(r"^(?:as)?(\d{1,10})$", re.IGNORECASE)
@@ -33,7 +34,9 @@ def canonicalize(etype: EntityType, value: str) -> str:
             raise ValueError(f"invalid ASN: {value!r}")
         return f"AS{int(match.group(1))}"
     if etype is EntityType.ORG:
-        org = " ".join(value.split())
+        # an organisation name comes from a registry or a source answer: control and bidirectional-override
+        # characters are dropped so a name can neither steer a terminal nor read differently from what it is
+        org = " ".join(strip_unsafe(value).split())
         if not org:
             raise ValueError("empty organisation name")
         return org

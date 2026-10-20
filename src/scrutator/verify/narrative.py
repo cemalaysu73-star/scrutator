@@ -11,6 +11,7 @@ from scrutator.report.build import build_report
 from scrutator.risk.engine import findings_from_risks
 from scrutator.store import Store
 from scrutator.verify.entail import judge_entailment
+from scrutator.verify.grounding import ungrounded
 
 _ORDER = {Confidence.LOW: 0, Confidence.MEDIUM: 1, Confidence.HIGH: 2}
 _RANK = {Confidence.HIGH: 0, Confidence.MEDIUM: 1, Confidence.LOW: 2}
@@ -107,6 +108,11 @@ async def summarise(ai: AIRuntime | None, store: Store, scan_id: int) -> Summary
             result.rejected.append(
                 RejectedStatement(statement.text, tuple(statement.finding_refs), f"cites unknown finding {unknown[0]}")
             )
+            continue
+        # deterministic floor first: a statement may only name what its cited facts name (verify/grounding.py)
+        problem = ungrounded(statement.text, [f.claim for f in cited])
+        if problem:
+            result.rejected.append(RejectedStatement(statement.text, tuple(statement.finding_refs), f"ungrounded: {problem}"))
             continue
         evidence_ids: list[str] = []
         excerpts: list[str] = []

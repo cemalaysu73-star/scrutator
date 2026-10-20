@@ -164,9 +164,20 @@ def _policy_problem(manifest: dict, report: dict, audit_records: list[dict], evi
 
 def verify_bundle(path: str | Path, *, pinned_fingerprint: str | None = None) -> VerifyReport:
     """Check every layer of a bundle independently. A failure in one layer does not hide
-    the others, so the output says exactly what was altered."""
-    result = VerifyReport()
+    the others, so the output says exactly what was altered.
 
+    A bundle is untrusted input. Whatever it contains (JSON nested deeper than the parser allows, values of the
+    wrong type anywhere, text that is not UTF-8), the answer is a failed check with a reason, never a traceback:
+    anything a layer did not anticipate fails the bundle."""
+    result = VerifyReport()
+    try:
+        _verify(path, pinned_fingerprint, result)
+    except Exception as exc:  # noqa: BLE001 - fail closed on whatever a hostile bundle breaks
+        result.checks.append(Check("well-formed bundle", False, f"malformed bundle: {type(exc).__name__}: {str(exc)[:200]}"))
+    return result
+
+
+def _verify(path: str | Path, pinned_fingerprint: str | None, result: VerifyReport) -> None:
     def add(name: str, ok: bool, detail: str = "") -> None:
         result.checks.append(Check(name, ok, detail))
 
@@ -174,7 +185,7 @@ def verify_bundle(path: str | Path, *, pinned_fingerprint: str | None = None) ->
         raw = read_raw(path)
     except BundleError as exc:
         add("readable bundle", False, str(exc))
-        return result
+        return
     add("readable bundle", True)
 
     try:
@@ -182,9 +193,9 @@ def verify_bundle(path: str | Path, *, pinned_fingerprint: str | None = None) ->
         if not isinstance(manifest, dict):
             raise ValueError("manifest is not an object")
         add("manifest parses", True)
-    except ValueError as exc:
+    except (ValueError, RecursionError) as exc:
         add("manifest parses", False, str(exc))
-        return result
+        return
 
     problems = []
     declared = manifest.get("files")
@@ -233,7 +244,7 @@ def verify_bundle(path: str | Path, *, pinned_fingerprint: str | None = None) ->
             audit_records.append(json.loads(row["record"]))
             previous, expected = row["hash"], expected + 1
         add("audit chain", not bad, bad)
-    except (ValueError, KeyError, TypeError) as exc:
+    except (ValueError, KeyError, TypeError, AttributeError, RecursionError) as exc:
         add("audit chain", False, f"malformed audit log: {exc}")
 
     # evidence content addressing
@@ -248,7 +259,7 @@ def verify_bundle(path: str | Path, *, pinned_fingerprint: str | None = None) ->
                 bad_ids.append(str(row["id"])[:12])
             evidence_ids.add(row["id"])
         add("evidence hashes", not bad_ids, f"altered records: {', '.join(bad_ids[:5])}" if bad_ids else "")
-    except (ValueError, KeyError, TypeError) as exc:
+    except (ValueError, KeyError, TypeError, AttributeError, RecursionError) as exc:
         add("evidence hashes", False, f"malformed evidence: {exc}")
 
     # the report and what it cites
@@ -295,9 +306,9 @@ def verify_bundle(path: str | Path, *, pinned_fingerprint: str | None = None) ->
         add("findings derivable", derivable, why)
         same_scan = report["scan"]["seed"] == manifest["scan"]["seed"]
         add("scan identity", same_scan, "" if same_scan else "the report is for a different scan than the manifest")
-    except (ValueError, KeyError, TypeError) as exc:
+    except (ValueError, KeyError, TypeError, AttributeError, RecursionError) as exc:
         add("report references", False, f"malformed report: {exc}")
-        return result
+        return
 
     # the risk analysis: recorded in the manifest, built on trusted packs, re-derivable from the report
     try:
@@ -381,4 +392,4 @@ def verify_bundle(path: str | Path, *, pinned_fingerprint: str | None = None) ->
             add("promotions recorded", not problem, problem)
     except Exception as exc:  # noqa: BLE001
         add("attribution derivable", False, f"malformed attribution: {type(exc).__name__}: {exc}")
-    return result
+    return
