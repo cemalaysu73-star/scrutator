@@ -195,13 +195,24 @@ def _inside(name: str, subject: set[str]) -> bool:
     return any(name == root or name.endswith("." + root) for root in subject)
 
 
+# How much a replay will do. A bundle is untrusted input and its evidence decides the requests: without a bound, a
+# bundle of a million records would make the verifier send a million lookups. A large honest scan (the default
+# entity cap of 5000 names) holds a few thousand records; these limits leave room for several times that.
+MAX_RECORDS = 20_000  # replayable records attempted per replay
+MAX_HTTP_REQUESTS = 2_000  # distinct HTTP requests per replay
+
+
 async def replay_evidence(
-    records: list[dict], http: httpx.AsyncClient, resolver: Resolver, *, concurrency: int = 4, subject: set[str] | None = None
+    records: list[dict], http: httpx.AsyncClient, resolver: Resolver, *, concurrency: int = 4, subject: set[str] | None = None,
+    max_records: int = MAX_RECORDS, max_http: int = MAX_HTTP_REQUESTS,
 ) -> list[ReplayResult]:
     """Re-issue each replayable request and say whether the source still supports the
     recorded evidence. Drift is information, not failure: sources change and go down.
-    With `subject` (see subject_names), DNS lookups of names outside it are skipped."""
+    With `subject` (see subject_names), DNS lookups of names outside it are skipped. At most `max_records` records
+    are attempted and `max_http` distinct HTTP requests sent; the rest are reported as skipped (replay limit)."""
     semaphore = asyncio.Semaphore(concurrency)
+    attempted = 0
+    urls: set[str] = set()
     fetches: dict[str, asyncio.Future] = {}  # url -> (status, text): each distinct request is sent once
 
     async def fetch(url: str) -> tuple[int, str]:
@@ -218,11 +229,19 @@ async def replay_evidence(
         def result(status: str, detail: str = "") -> ReplayResult:
             return ReplayResult(rec["id"], rec["source"], rec["request"], status, detail)
 
+        nonlocal attempted
         parsed = parse_request(rec["request"])
         if parsed is None:
             return result("skipped", "request is not replayable")
         if parsed[0] == "dns" and subject is not None and not _inside(parsed[2], subject):
             return result("skipped", "name is outside the bundle's scope and entities")
+        if attempted >= max_records:
+            return result("skipped", f"replay limit: only the first {max_records} records are replayed")
+        if parsed[0] == "http" and parsed[1] not in urls:
+            if len(urls) >= max_http:
+                return result("skipped", f"replay limit: only {max_http} distinct requests are sent")
+            urls.add(parsed[1])
+        attempted += 1  # no await between the checks and the count: the decision is made in record order
         try:
             if parsed[0] == "http":
                 status, text = await fetch(parsed[1])

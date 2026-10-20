@@ -32,7 +32,7 @@ from scrutator.bundle.keys import (
     public_key_path,
 )
 from scrutator.bundle.reader import read_raw
-from scrutator.bundle.replay import replay_evidence, subject_names
+from scrutator.bundle.replay import MAX_RECORDS, replay_evidence, subject_names
 from scrutator.bundle.verify import verify_bundle
 from scrutator.bundle.writer import BundleTooLarge, create_bundle
 from scrutator.context import ai_client, open_context
@@ -486,6 +486,7 @@ def verify(
     bundle: Path = typer.Argument(..., help="A .scrutator proof bundle."),
     pin: Optional[str] = typer.Option(None, "--pin", help="Signer fingerprint (64 hex) or a signing.pub file to require."),
     replay: bool = typer.Option(False, "--replay", help="Re-issue the recorded requests and report drift."),
+    replay_limit: int = typer.Option(MAX_RECORDS, "--replay-limit", min=1, help="With --replay: replay at most this many records (a bundle is untrusted input; the rest are reported as skipped)."),
 ) -> None:
     """Check a proof bundle: hashes, signature, audit chain, evidence and findings."""
     report = verify_bundle(bundle, pinned_fingerprint=_pinned(pin))
@@ -511,7 +512,7 @@ def verify(
 
     async def go():
         async with open_context() as ctx:
-            return await replay_evidence(records, ctx.http, ctx.resolver, subject=subject)
+            return await replay_evidence(records, ctx.http, ctx.resolver, subject=subject, max_records=replay_limit)
 
     results = asyncio.run(go())
     tally = {s: sum(1 for r in results if r.status == s) for s in ("unchanged", "changed", "unavailable", "skipped")}
