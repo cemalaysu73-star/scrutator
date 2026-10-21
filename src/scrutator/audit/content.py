@@ -16,7 +16,7 @@ from scrutator.risk.engine import RULESET_VERSION
 
 FORMAT = "scrutator-audit/1"
 MAX_INVENTORY = 200
-MAX_CITED = 400
+MAX_CITED = 150  # the appendix lists the records the findings cite first; the bundle and the annex hold all
 _SEV_RANK = {"high": 3, "medium": 2, "low": 1, "info": 0}
 _CONF_RANK = {"high": 2, "medium": 1, "low": 0}
 

@@ -46,7 +46,7 @@ p{margin:0 0 10px}
 .toc a{color:var(--ink);text-decoration:none}
 table{width:100%%;border-collapse:collapse;font-size:13px;margin:8px 0 14px}
 th,td{text-align:left;vertical-align:top;padding:7px 8px;border-bottom:1px solid var(--line);overflow-wrap:anywhere}
-th{background:var(--soft);font-weight:600;color:var(--ink2)}
+th{background:var(--soft);font-weight:600;color:var(--ink2);white-space:nowrap;overflow-wrap:normal}
 thead{display:table-header-group}
 tr{break-inside:avoid}
 .mono,code,pre{font-family:ui-monospace,"Cascadia Mono",Consolas,"Liberation Mono",monospace;font-size:12px}

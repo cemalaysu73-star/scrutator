@@ -63,7 +63,7 @@ def print_pdf(html_path: Path, pdf_path: Path, *, browser: str | None = None, ti
         command = [
             browser, "--headless=new", "--disable-gpu", "--no-first-run", "--no-default-browser-check", "--disable-extensions",
             "--disable-background-networking", "--disable-sync", "--no-pdf-header-footer", f"--user-data-dir={profile}",
-            f"--print-to-pdf={pdf_path}", html_path.resolve().as_uri(),
+            f"--print-to-pdf={pdf_path.resolve()}", html_path.resolve().as_uri(),
         ]
         try:
             subprocess.run(command, capture_output=True, timeout=timeout, check=False)

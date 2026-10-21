@@ -385,11 +385,11 @@ def test_a_faithful_rewording_is_kept_and_audit_check_rechecks_it(tmp_path):
 
 
 @pytest.mark.skipif(find_browser() is None, reason="no Chromium-based browser installed")
-def test_the_pdf_is_printed_with_an_installed_browser(tmp_path):
-    out = tmp_path / "audit"
-    result = run("audit", "--from-bundle", LAB, "--self", "--yes", "--out", out)
+def test_the_pdf_is_printed_with_an_installed_browser(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)  # a relative --out (the live run that found this: the browser resolves paths elsewhere)
+    result = run("audit", "--from-bundle", LAB, "--self", "--yes", "--out", "audit")
     assert result.exit_code == 0, result.output
-    assert (out / "audit.pdf").read_bytes()[:5] == b"%PDF-"
+    assert (tmp_path / "audit" / "audit.pdf").read_bytes()[:5] == b"%PDF-"
 
 
 def test_without_a_browser_the_audit_says_how_to_print(tmp_path, monkeypatch):
