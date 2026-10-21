@@ -11,6 +11,7 @@
 | [MCP](mcp.md) | drive Scrutator from Claude Desktop or any MCP client |
 | [Client audits](audit.md) | `scrutator audit`: a branded, print-ready deliverable from a signed scan, the authorisation letter, and how the client checks it offline |
 | [Bug-bounty mode](bounty.md) | import a programme scope (deny by default), watch it for new assets and takeover candidates, get report drafts |
+| [Running monitoring for clients](hosting.md) | `watch` as a retainer: alerts, weekly digest, e-mail; a Windows scheduled task, a systemd timer, Docker Compose |
 | [Writing a knowledge pack](knowledge-packs.md) | add a provider, a takeover fingerprint or a playbook |
 | [Writing a module](writing-a-module.md) | add a data source |
 | [Security model and known limits](security.md) | the guarantees, how they are tested, what is not guaranteed |

@@ -723,37 +723,102 @@ def watch(
     seed: str = typer.Argument(..., help="Domain or IP address to watch."),
     every: str = typer.Option("24h", "--every", help="Interval: 30s, 15m, 6h, 1d."),
     scope_file: Optional[Path] = typer.Option(None, "--scope", help="YAML scope file."),
-    out: Path = typer.Option(Path("scrutator-watch"), "--out", help="Output directory."),
+    out: Path = typer.Option(Path("scrutator-watch"), "--out", help="Output directory (one per client: it holds the baseline, alerts and digests)."),
     db: Optional[Path] = typer.Option(None, "--db", help="SQLite database (default: <out>/scrutator.db)."),
-    webhook: Optional[str] = typer.Option(None, "--webhook", help="POST a JSON summary of changes (https only, or localhost)."),
+    webhook: Optional[str] = typer.Option(None, "--webhook", help="POST a JSON summary of changes and the new alerts (https only, or localhost)."),
     max_runs: int = typer.Option(0, "--max-runs", help="Stop after N scans (0 = run until interrupted)."),
     max_steps: int = typer.Option(1000, "--max-steps", help="Cap on module runs per scan."),
     deadline_s: float = typer.Option(DEFAULT_DEADLINE_S, "--deadline", min=0, help="Seconds each scan may take (0: no limit)."),
     sources: Optional[str] = typer.Option(None, "--sources", help="Use only these sources (comma-separated)."),
     exclude_sources: Optional[str] = typer.Option(None, "--exclude-sources", help="Do not use these sources (comma-separated).", rich_help_panel="Source policy"),
     noncommercial: bool = typer.Option(True, "--noncommercial/--no-noncommercial", help="--no-noncommercial: leave out sources whose free tier is for non-commercial use only.", rich_help_panel="Source policy"),
+    client: Optional[str] = typer.Option(None, "--client", help="Client name for alerts and digests (default: the seed).", rich_help_panel="Alerts"),
+    min_severity: str = typer.Option("low", "--min-severity", help="Announce alerts at or above: info, low, medium or high (all are kept in the state and the digest data).", rich_help_panel="Alerts"),
+    email_to: list[str] = typer.Option([], "--email-to", help="Also e-mail each run's alerts here (repeatable). Server and credentials only from SCRUTATOR_SMTP_HOST/PORT/USER/PASSWORD/FROM, never from the command line.", rich_help_panel="Alerts"),
+    lang: str = typer.Option("en", "--lang", help="Language of the 'why this matters' line and the digest: en or tr.", rich_help_panel="Alerts"),
+    ai: str = typer.Option("off", "--ai", help="off (default), or local, cloud, hybrid: a model rewords each English 'why this matters' line; kept only when the deterministic floor and the verifier pass it.", rich_help_panel="Alerts"),
+    model: Optional[str] = typer.Option(None, "--model", help="Model name for every AI role.", rich_help_panel="Alerts"),
+    yes_cloud: bool = typer.Option(False, "--yes-cloud", help="Consent to cloud AI without a prompt.", rich_help_panel="Alerts"),
+    config_path: Optional[Path] = typer.Option(None, "--config", help="AI config file.", rich_help_panel="Alerts"),
 ) -> None:
-    """Re-scan on a schedule and report what changed (deterministic scans, no AI)."""
+    """Re-scan on a schedule and report what changed. On top of the full diff, each run turns what is new into
+    severity-ranked alerts (new names, findings, takeover candidates, certificates, open services), announced once,
+    each citing its evidence; a weekly digest (digest-<year>-W<week>.md) collects them for the client."""
+    from scrutator.monitor import SEVERITIES, SmtpConfig, at_least, current_keys, dedupe, diff_snapshots, explain, load_state, render_digest, save_state, send_email, snapshot, write_digest
+
     policy = _source_policy(sources, exclude_sources, not noncommercial)
+    if min_severity not in SEVERITIES:
+        raise _fail(f"--min-severity must be one of {list(SEVERITIES)}")
+    if lang not in ("en", "tr"):
+        raise _fail("--lang must be en or tr")
+    mode = _mode(ai)
     try:
         interval = parse_interval(every)
         if webhook is not None:
             validate_webhook(webhook)
         seed_entity = _parse_seed(seed)
         scope = ScopePolicy.from_file(scope_file) if scope_file else _default_scope(seed_entity)
+        smtp = SmtpConfig.from_env() if email_to else None
+        for address in email_to:
+            if "@" not in address or any(c in address for c in "\r\n,;<>"):
+                raise ValueError(f"not an e-mail address: {address!r}")
     except (OSError, ValueError) as exc:
         raise _fail(str(exc)) from exc
+    label = client or seed_entity.value
     out.mkdir(parents=True, exist_ok=True)
     store = Store(db or out / "scrutator.db")
+    try:
+        state = load_state(out)
+    except ValueError as exc:
+        raise _fail(str(exc)) from exc
+    runtime_holder: dict = {}
+    latest: dict = {"alerts": []}
+
+    def in_scope(host: str) -> bool:
+        try:
+            return scope.decide_entity(Entity(type=EntityType.DOMAIN, value=host)).allowed
+        except ValueError:
+            return False
 
     def report_run(scan_id: int, previous: Optional[int], result) -> None:
         _echo(f"Run {scan_id}: scan #{scan_id} of {seed_entity.value} finished.")
         if result is None:
             _echo("  first scan for this seed; nothing to compare yet")
-            return
-        _echo(render_diff(result, f"scan {previous}", f"scan {scan_id}"))
-        if not result.empty:
-            (out / f"diff-{scan_id}.json").write_text(json.dumps(result.to_dict(), indent=2, sort_keys=True), encoding="utf-8")
+        else:
+            _echo(render_diff(result, f"scan {previous}", f"scan {scan_id}"))
+            if not result.empty:
+                (out / f"diff-{scan_id}.json").write_text(json.dumps(result.to_dict(), indent=2, sort_keys=True), encoding="utf-8")
+        shown = latest["alerts"]
+        if shown:
+            _echo(f"Alerts for {label} ({len(shown)}, at or above {min_severity}):")
+            for alert in shown:
+                _echo(f"  [{alert['severity'].upper():<6}] {alert['title']}")
+                _echo(f"           why it matters{' (AI, verified)' if alert['why_source'] == 'ai-verified' else ''}: {alert['why']}")
+                _echo(f"           evidence: {', '.join(i[:12] for i in alert['evidence_ids'][:4])}")
+
+    async def alerts_for(scan_id: int) -> None:
+        report = build_report(store, scan_id)
+        snap = snapshot(report, in_scope)
+        found = diff_snapshots(state["snapshot"], snap, lang=lang)
+        fresh, remembered = dedupe(found, set(state["alerted"]), current_keys(snap))
+        announced = at_least(fresh, min_severity)
+        if runtime_holder.get("ai") is not None and lang == "en":
+            await explain(runtime_holder["ai"], announced, {i: r["payload"] for i, r in report["evidence"].items()})
+        stamp = datetime_now()
+        rows = [{**a.to_dict(), "at": stamp, "scan_id": scan_id} for a in fresh]
+        state.update(snapshot=snap, alerted=sorted(remembered))
+        state["history"] = (state.get("history") or [])[-5000:] + rows
+        state["runs"] = (state.get("runs") or [])[-500:] + [{"at": stamp, "scan_id": scan_id, "alerts": len(fresh)}]
+        save_state(out, state)
+        write_digest(out, label, [r for r in state["history"] if r["severity"] in SEVERITIES[SEVERITIES.index(min_severity):]], lang=lang)
+        latest["alerts"] = [r for r in rows if r["key"] in {a.key for a in announced}]
+        for row, alert in zip([r for r in rows if r["key"] in {a.key for a in announced}], announced):
+            row["why"], row["why_source"] = alert.why, alert.why_source
+        if latest["alerts"] and smtp is not None:
+            body = render_digest(label, latest["alerts"], period=f"scan #{scan_id}, {stamp}", lang=lang)
+            counts = ", ".join(f"{sum(1 for a in latest['alerts'] if a['severity'] == s)} {s}" for s in reversed(SEVERITIES) if any(a["severity"] == s for a in latest["alerts"]))
+            problem = send_email(smtp, list(email_to), f"[Scrutator] {label}: {len(latest['alerts'])} new alert(s) ({counts})", body)
+            _echo(problem or f"E-mailed {len(latest['alerts'])} alert(s) to {', '.join(email_to)}.")
 
     async def run_once() -> int:
         async with open_context() as ctx:
@@ -761,11 +826,21 @@ def watch(
                 seed_entity, scope, store, ctx, max_steps=max_steps,
                 deadline=Deadline(deadline_s) if deadline_s > 0 else None, source_policy=policy,
             )
+        await alerts_for(scan_id)
         return scan_id
 
     async def go():
-        async with make_webhook_client() as client:
-            notify = make_webhook_notifier(webhook, client) if webhook else None
+        async with make_webhook_client() as http_client:
+            notify = make_webhook_notifier(webhook, http_client, extra=lambda: {"client": label, "alerts": latest["alerts"]}) if webhook else None
+            if mode is not AIMode.OFF:
+                config = _config(config_path)
+                _consent(config, mode, yes_cloud)
+                async with ai_client() as ai_http:
+                    runtime_holder["ai"], _used = await build_runtime(config, cli_mode=mode, model=model, consent_cloud=True, redact=None,
+                                                                      client=ai_http, apex_domains=[seed_entity.value])
+                    await watch_loop(run_once=run_once, store=store, seed=seed_entity.value, interval=interval,
+                                     max_runs=max_runs, notify=notify, sleep=lambda seconds: _sleep(seconds), on_run=report_run)
+                    return
             await watch_loop(
                 run_once=run_once, store=store, seed=seed_entity.value, interval=interval,
                 max_runs=max_runs, notify=notify, sleep=lambda seconds: _sleep(seconds), on_run=report_run,

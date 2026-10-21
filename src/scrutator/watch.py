@@ -42,7 +42,8 @@ def make_webhook_client() -> httpx.AsyncClient:
     return httpx.AsyncClient(follow_redirects=False, timeout=15.0)
 
 
-def make_webhook_notifier(url: str, client: httpx.AsyncClient) -> Notifier:
+def make_webhook_notifier(url: str, client: httpx.AsyncClient, *, extra=None) -> Notifier:
+    """`extra` returns more fields for the payload (the monitor's alerts: titles, details and evidence ids, never raw evidence)."""
     validate_webhook(url)
 
     async def notify(seed: str, scan_id: int, previous: int | None, diff: Diff) -> None:
@@ -55,6 +56,7 @@ def make_webhook_notifier(url: str, client: httpx.AsyncClient) -> Notifier:
             "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "counts": {k: len(v) for k, v in changes.items() if isinstance(v, list)},
             "changes": {k: v for k, v in changes.items() if isinstance(v, list)},
+            **(extra() if extra is not None else {}),
         }
         try:
             await client.post(url, json=payload, timeout=15.0)

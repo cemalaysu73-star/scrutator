@@ -639,7 +639,11 @@ scrutator watch example.com --every 6h --webhook https://hooks.example.test/x
 
 `watch` re-scans on a schedule, prints what changed, writes `diff-<n>.json`, and posts a summary
 (counts and changes, no raw evidence) to the webhook. Webhooks must be HTTPS (plain HTTP only for
-localhost). Watch scans are deterministic; they do not use AI.
+localhost). Watch scans are deterministic. On top of the diff, each run turns what is new into severity-ranked
+alerts, announced once per client folder (`--out`), each with its evidence ids and a "why this matters" line (reworded
+by a model only with `--ai`, and only when verified), a weekly digest (`digest-<year>-W<week>.md`), `--min-severity`,
+and `--email-to` with the SMTP server and credentials from `SCRUTATOR_SMTP_*` variables only. Running it as a
+scheduled task, a systemd timer or a Docker Compose service: [docs/hosting.md](docs/hosting.md).
 
 ## AI
 
