@@ -398,3 +398,13 @@ def test_without_a_browser_the_audit_says_how_to_print(tmp_path, monkeypatch):
     result = run("audit", "--from-bundle", LAB, "--self", "--yes", "--out", out)
     assert result.exit_code == 0, result.output
     assert "No PDF" in result.output and "print it to PDF" in result.output and not (out / "audit.pdf").exists()
+
+
+@pytest.mark.parametrize("folder", ["audit", "audit/tr"])
+def test_the_shipped_sample_audit_passes_audit_check_pinned(folder):
+    from scrutator.bundle.keys import fingerprint, load_public_raw
+
+    base = Path(__file__).resolve().parent.parent / "docs" / "examples" / folder
+    pin = fingerprint(load_public_raw(base / "signing.pub"))
+    checks = check_audit(base / "audit.html", base / "proof.scrutator", pin=pin)
+    assert all(c.ok for c in checks), [c for c in checks if not c.ok]

@@ -19,7 +19,7 @@ scrutator bench --json                       # the JSON on stdout
 scrutator bench --verifier-model qwen3:8b    # also: a model on this machine as the verifier in the Hallucination Test
 ```
 
-Nine sections, each a set of metrics with thresholds. The labs are fixtures: fake DNS, recorded answers of the public
+Twelve sections, each a set of metrics with thresholds. The labs are fixtures: fake DNS, recorded answers of the public
 sources, reserved names (`example.com`, `*.test`, documentation address ranges). The labs and the scoring live in
 `src/scrutator/benchlab/`; the same labs back the test suite.
 
@@ -35,8 +35,12 @@ sources, reserved names (`example.com`, `*.test`, documentation address ranges).
 | `org_exposure` | `scrutator exposure` on a planted organisation that publishes six role mailboxes and five people's work addresses in its security.txt, pages, DMARC, SOA, RDAP and commits, plus names, phone numbers, a street address, a private address and a handle that must never come out; eight refusal cases | refused = 8 of 8 (no file, expired, a public mail provider, a domain outside the engagement, a name, an e-mail address, a phone number, a handle as the seed); the aggregate right (5 of 5); personal data in the report, HTML, bundle and database = 0; detail in its own file and in the audit log; requests and DNS names outside the engagement = 0; the engagement recorded before the first lookup; the bundle re-derives the aggregate; a changed aggregate is caught |
 | `recall_speed` | (R6) an archived payload that mentions three in-scope hosts and one partner host; a planted zone of five names served by a one-shot AXFR responder on 127.0.0.1, and one that refuses; a zone with a wildcard address for the live name list | mentioned in-scope hosts found (3 of 3); mentioned hosts outside the scope = 0; zone-transfer names found (5 of 5); the refusal recorded as evidence; names printed live that the report does not call live, or live names not printed = 0 |
 
-Output: a table, `bench.md`, and `bench.json` with `"schema": "scrutator-bench/3"` (2 added the sections `brand`
-and `org_exposure`, 3 added `recall_speed`):
+| `audit` | (R7) the client audit made from the risk lab's signed scan, in English and Turkish; branding written as an attacker would; three tamper cases (an edited number in the page, a high finding dropped and the page re-rendered, a flipped byte in the bundle) | claims about the client without evidence in the bundle = 0; every `audit-check` check passes; hostile branding inert; tampering caught 3 of 3; both languages render and check; every risk of the scan is in the audit |
+| `bounty` | (R7) 22 hostile scope entries (`*`, `*.com.tr`, `javascript:`, user-info URLs, private ranges, hidden characters, ...), 5 odd but safe ones, an oversized file, a membership table, a three-step history with new in-scope and out-of-scope assets | hostile refused 22 of 22; safe normalised 5 of 5; oversized refused; membership errors = 0; alerts on the baseline = 0; new assets detected 4 of 4; out-of-scope announced = 0; repeats = 0 |
+| `monitor` | (R7) a seven-step history (a finding appears, stays, resolves, stays away, comes back; a name goes) and a mixed set of alerts | dedupe errors = 0; announcements = 4; severity order; the min-severity filter; the digest cites the evidence |
+
+Output: a table, `bench.md`, and `bench.json` with `"schema": "scrutator-bench/4"` (2 added the sections `brand`
+and `org_exposure`, 3 added `recall_speed`, 4 added `audit`, `bounty` and `monitor`):
 
 ```
 {"schema", "tool", "created_at", "seconds", "signing_key", "pass",

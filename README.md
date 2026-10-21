@@ -98,6 +98,39 @@ Read these before you rely on it. They are also in [docs/security.md](docs/secur
   and ethics review its design requires, and runs only when you set `SCRUTATOR_PREVIEW_EXPOSURE=1`.
 - **Not released.** Not on PyPI, no signed releases, no private beta yet. v1.0 is a candidate, not a release.
 
+## For consultants and bug-bounty hunters
+
+**Consultants, vCISOs and MSPs** who sell an external exposure review (for an ISO/IEC 27001, NIS2, KVKK/GDPR or
+cyber-insurance file): `scrutator audit` turns a passive scan into a branded, print-ready deliverable in English or
+Turkish, with the authorisation it rests on, a plain-language executive summary, prioritised findings with remediation,
+an informational ISO 27001 / NIS2 / CIS / OWASP mapping, the asset inventory, what was **not** tested, and an evidence
+appendix. Your client's auditor checks it offline, without trusting you, in three commands. It refuses to run without
+a signed authorisation (`scrutator audit-letter` writes a template) or `--self` for your own domains.
+
+```bash
+scrutator audit-letter --lang tr --client "Ornek A.S." --domains ornek.com.tr --out authorisation
+scrutator audit ornek.com.tr --engagement authorisation/engagement.yaml --branding audit.yaml --out audit-ornek
+scrutator audit-check audit-ornek/audit.html audit-ornek/proof.scrutator      # what the client runs
+```
+
+![An audit: the executive summary and the findings in priority order, from a live passive run on example.com](docs/screenshots/audit-summary.jpg)
+
+A real sample, made from the planted lab fixture (example.com names only, a fictional client, a placeholder auditor):
+[docs/examples/audit/audit.html](docs/examples/audit/audit.html) and its [PDF](docs/examples/audit/audit.pdf), the
+[Turkish version](docs/examples/audit/tr/audit.html), the bundle and the signer's key next to them. Measured on this
+machine: a passive scan plus the audit took 21 to 44 s on the benchmark targets
+([unit economics](docs/business/unit-economics.md)). Docs: [client audits](docs/audit.md),
+[monitoring for clients](docs/hosting.md), [business pack](docs/business/README.md).
+
+**Bug-bounty hunters**: `scrutator bounty import` turns a programme's scope (HackerOne CSV, Bugcrowd JSON, a pasted
+list) into a deny-by-default scope file and refuses what it cannot represent safely (`*`, `*.com`, odd schemes,
+user-info URLs, private ranges, hidden characters); `scrutator bounty watch` announces, once, new in-scope verified
+names, takeover candidates, certificates and open services, each with the evidence ids, and writes a ready-to-paste
+report draft for every takeover candidate. Passive only: it never probes or claims anything. [docs/bounty.md](docs/bounty.md)
+
+What it is not: not a vulnerability scanner or a pentest, not faster and not wider than the established recon tools.
+What it is: the one where every claim can be checked.
+
 ## Install
 
 ```bash
@@ -117,7 +150,7 @@ CI does the same on Linux and Windows.
 ## Documentation
 
 [Quickstart](docs/quickstart.md) · [Concepts](docs/concepts.md) · [Reading a report](docs/reading-a-report.md) ·
-[Proof bundles](docs/proof-bundles.md) · [Sources and terms](docs/sources.md) · [AI modes and privacy](docs/ai-and-privacy.md) ·
+[Proof bundles](docs/proof-bundles.md) · [Client audits](docs/audit.md) · [Bug bounty](docs/bounty.md) · [Monitoring](docs/hosting.md) · [Sources and terms](docs/sources.md) · [AI modes and privacy](docs/ai-and-privacy.md) ·
 [MCP](docs/mcp.md) · [Knowledge packs](docs/knowledge-packs.md) · [Writing a module](docs/writing-a-module.md) ·
 [Security model](docs/security.md) · [Benchmark](docs/benchmarks.md) · [Demo](demo/README.md) ·
 [CHANGELOG](CHANGELOG.md) · [SECURITY](SECURITY.md) · [CONTRIBUTING](CONTRIBUTING.md)

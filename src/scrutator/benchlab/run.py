@@ -1,6 +1,6 @@
 """`scrutator bench`: OSINT-Bench v0, offline, one command.
 
-Nine sections, each a set of metrics with thresholds:
+Twelve sections, each a set of metrics with thresholds:
 
 - risk_rules: the planted risk lab (every rule planted at least once) and a clean zone (no risk expected).
 - attribution: the planted attribution lab, precision and recall by band.
@@ -16,8 +16,12 @@ Nine sections, each a set of metrics with thresholds:
   refusals, aggregate, personal data in outputs, detail logged, scope, the signed engagement.
 - recall_speed (R6): mined mentions, the opt-in zone transfer against a local AXFR responder, and the live name list
   agreeing with the report (benchlab/r6lab.py).
+- audit, bounty, monitor (R7): the client audit made from the risk lab's signed scan (every claim cites evidence in the
+  bundle, audit-check passes, hostile branding is inert, tampering is caught, English and Turkish both render and
+  check); hostile bounty scope entries refused and new-asset detection on a fixture history; monitor dedupe,
+  severity order and filter (benchlab/r7lab.py).
 
-The JSON written has a stable shape (`schema: "scrutator-bench/3"`); the exit status is 1 if any threshold fails.
+The JSON written has a stable shape (`schema: "scrutator-bench/4"`); the exit status is 1 if any threshold fails.
 Nothing here touches the network, except `--verifier-model`, which asks a model server on this machine (loopback
 only)."""
 
@@ -54,7 +58,7 @@ from scrutator.scan import run_scan
 from scrutator.scope import ScopePolicy
 from scrutator.store import Store
 
-SCHEMA = "scrutator-bench/3"  # 2: sections brand and org_exposure (R5); 3: recall_speed (R6)
+SCHEMA = "scrutator-bench/4"  # 2: sections brand and org_exposure (R5); 3: recall_speed (R6); 4: audit, bounty, monitor (R7)
 SEED = Entity(type=EntityType.DOMAIN, value="example.com")
 KEYLESS = {m.name for m in load_builtin_modules() if not m.needs_key}
 
@@ -634,6 +638,19 @@ async def recall_speed() -> dict:
     return _section(metrics, notes, started)
 
 
+def _r7_sections(out: Path, state: dict, key) -> dict:
+    """R7: the audit deliverable (from the risk lab's scan), bounty scope import and detection, monitor dedupe."""
+    from scrutator.benchlab import r7lab
+
+    sections = {}
+    for name, run in (("audit", lambda: r7lab.audit_metrics(out, state["lab"][0], state["lab"][1], key)),
+                      ("bounty", r7lab.bounty_metrics), ("monitor", r7lab.monitor_metrics)):
+        started = time.perf_counter()
+        metrics, notes = run()
+        sections[name] = _section(metrics, notes, started)
+    return sections
+
+
 async def _sections(out: Path, state: dict, key, model, ollama_url) -> dict:
     return {
         "risk_rules": await risk_rules(out, state),
@@ -645,6 +662,7 @@ async def _sections(out: Path, state: dict, key, model, ollama_url) -> dict:
         "brand": await brand(out, state, key),
         "org_exposure": await org_exposure_section(out, state, key),
         "recall_speed": await recall_speed(),
+        **_r7_sections(out, state, key),
     }
 
 

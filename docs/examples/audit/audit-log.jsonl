@@ -1,0 +1,1 @@
+{"ai": false, "at": "2026-10-21T03:29:47+00:00", "authorisation_sha256": "02ccc7d8a905c94f0fa87b4c32c06634801ff45b2d0071f6ec58a2cf814706a1", "bundle_sha256": "8cfcdc95a0128a9a7bb8d3e107a84d8a2928f2ceeb552e7f70a1e0c73a40c9aa", "event": "audit", "lang": "en", "mode": "client", "pdf": true, "recorded": "report-time", "timing": {"audit_s": 1.7, "total_s": 2.0}}

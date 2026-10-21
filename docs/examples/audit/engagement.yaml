@@ -1,0 +1,7 @@
+organisation: "Example Corp (fictional sample)"
+domains: [example.com, example.net]
+authorised_by: {name: "Sample Signatory (fictional)", role: "CISO (fictional)"}
+start: 2026-10-01
+end: 2026-12-31
+purpose: "Sample report made from the planted lab fixture; not a real engagement"
+reference: "SAMPLE-001"

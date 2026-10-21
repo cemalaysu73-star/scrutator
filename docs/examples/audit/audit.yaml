@@ -1,0 +1,4 @@
+auditor: "Sample Auditor (placeholder)"
+contact: "audits@example.org"
+colours: {primary: "#1f3a5f", accent: "#2f6f4f"}
+language: en

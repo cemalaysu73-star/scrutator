@@ -4,6 +4,42 @@ Built from the git history (`git log`), newest first. Dates are commit dates. Ve
 tagged or published; the numbers are the ones in `pyproject.toml` at the time. Nothing here has been released on
 PyPI.
 
+## 1.0.0rc3 (2026-10-21, a release candidate; not published)
+
+Round R7: make it sellable by someone who sells it. The one edge kept in front: every claim carries signed, independently
+verifiable evidence. Speed and source count are not claimed.
+
+- **Client audits** (`scrutator audit`, `audit-check`, `audit-letter`; docs/audit.md)
+  - A passive scan, or an existing signed bundle, becomes a client deliverable: one self-contained HTML file with an A4
+    print style sheet and no running script, a PDF through an installed Chromium-based browser (nothing downloaded),
+    the interactive report as the technical annex, the signed bundle. Cover, authorisation, executive summary in English
+    or Turkish, findings in priority order with remediation and an effort estimate, asset inventory, what was not
+    tested, methodology, glossary, evidence appendix with the three offline verification commands.
+  - Refuses to run without `--engagement` (client) or `--self`; a new scan writes the authorisation to the signed audit
+    log before its first lookup. `audit-letter` writes a fill-in letter (template, not legal advice) and the engagement
+    file; unfilled placeholders are refused.
+  - `audit-check` re-derives the whole document from the bundle and catches an edited page, a dropped finding re-rendered
+    with consistent data, another bundle and a tampered one. Branding (`audit.yaml`) is treated as hostile input.
+  - Optional AI rewording of the English executive sentences, kept only when the deterministic floor and the verifier
+    pass it (`scrutator.verify.polish`).
+- **Compliance mapping pack**: every risk rule mapped to ISO/IEC 27001:2022 Annex A, NIS2 Art. 21(2), CIS Controls v8.1,
+  OWASP and KVKK references, informational only; references read at an authoritative public page are verified, every
+  ISO one is not (`scrutator risk --compliance`).
+- **Bug-bounty mode** (`scrutator bounty import`, `bounty watch`; docs/bounty.md): HackerOne CSV, Bugcrowd / bounty-targets
+  JSON and plain lists into a deny-by-default scope (hostile entries refused); scheduled passive scans that announce
+  new in-scope names, takeover candidates, certificates and open services once, with a report draft per candidate.
+- **Monitoring** (`watch`): severity-ranked alerts announced once per client folder, a "why this matters" line, a weekly
+  digest, `--min-severity`, e-mail with SMTP credentials from the environment only; docs/hosting.md (scheduled task,
+  systemd timer, Docker Compose).
+- **Fixed (R6 debt)**: crt.sh's database is the one TCP endpoint and is checked by the egress policy before connecting;
+  sources that only list names can no longer use up the entity cap or the step budget before DNS resolves the names a
+  certificate or DNS vouches for (a test with 20,000 junk names); the cap is reported per source; the report's summary
+  strip never leaves an empty cell or a lone stat (checked at 360, 768 and 1280 px).
+- **Bench**: `scrutator-bench/4` with sections `audit`, `bounty`, `monitor`.
+- **Business pack** (docs/business/): offers, competitor prices read from their own pages with URL and date, measured
+  machine time per audit, three labelled revenue scenarios, a 30-day go-to-market in Turkish and English, a legal and
+  risk checklist, open-core licensing options.
+
 ## 1.0.0rc2 (2026-10-21, a release candidate; not published)
 
 Round R6: speed you feel, recall that does not depend on a lucky quota day, and a report worth showing.

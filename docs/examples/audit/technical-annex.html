@@ -1,0 +1,1022 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Scrutator report</title>
+<style>
+:root{
+  color-scheme: light dark;
+  --paper:#f4f1ea; --surface:#fbfaf6; --sunk:#ece7dc; --ink:#1c1b18; --ink-2:#514d46; --ink-3:#635d52;
+  --line:#ddd6c8; --line-2:#cbc3b2; --field:#fffefb;
+  --proof:#2f6b43; --proof-ink:#1f4f30; --proof-wash:#e3ecdf;
+  --claim:#8a6d1f; --claim-wash:#f0e8d2;
+  --sev-info:#6b6559; --sev-low:#8a6d1f; --sev-medium:#b4531a; --sev-high:#a62a21;
+  --sev-info-wash:#eceadf; --sev-low-wash:#f0e8d2; --sev-medium-wash:#f3e0d0; --sev-high-wash:#f2d9d4;
+  --accent:#395c86; --bad:#a62a21;
+  --radius:7px; --gap:clamp(16px,2.2vw,28px);
+  --mono:ui-monospace,"SF Mono","Cascadia Mono","JetBrains Mono",Menlo,Consolas,monospace;
+  --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --shadow:0 1px 1px rgba(28,27,24,.04),0 6px 20px -8px rgba(28,27,24,.18);
+  --shadow-lift:0 2px 4px rgba(28,27,24,.06),0 22px 48px -16px rgba(28,27,24,.34);
+}
+:root:not([data-theme="light"]){@media (prefers-color-scheme:dark){
+  --paper:#15140f; --surface:#1b1a15; --sunk:#100f0b; --ink:#ece7da; --ink-2:#b8b19d; --ink-3:#978f7c;
+  --line:#2c2a22; --line-2:#3a382e; --field:#201e18;
+  --proof:#7bc08b; --proof-ink:#9fd4ab; --proof-wash:#1c2a1f;
+  --claim:#d8b65a; --claim-wash:#2a2415;
+  --sev-info:#a39b88; --sev-low:#d8b65a; --sev-medium:#e8975a; --sev-high:#ef8178;
+  --sev-info-wash:#242218; --sev-low-wash:#2a2415; --sev-medium-wash:#2c1f16; --sev-high-wash:#2d1a17;
+  --accent:#8fb3df; --bad:#ef8178;
+  --shadow:0 1px 1px rgba(0,0,0,.3),0 8px 24px -10px rgba(0,0,0,.6);
+  --shadow-lift:0 2px 6px rgba(0,0,0,.4),0 26px 52px -16px rgba(0,0,0,.72);
+}}
+:root[data-theme="dark"]{
+  --paper:#15140f; --surface:#1b1a15; --sunk:#100f0b; --ink:#ece7da; --ink-2:#b8b19d; --ink-3:#978f7c;
+  --line:#2c2a22; --line-2:#3a382e; --field:#201e18;
+  --proof:#7bc08b; --proof-ink:#9fd4ab; --proof-wash:#1c2a1f;
+  --claim:#d8b65a; --claim-wash:#2a2415;
+  --sev-info:#a39b88; --sev-low:#d8b65a; --sev-medium:#e8975a; --sev-high:#ef8178;
+  --sev-info-wash:#242218; --sev-low-wash:#2a2415; --sev-medium-wash:#2c1f16; --sev-high-wash:#2d1a17;
+  --accent:#8fb3df; --bad:#ef8178;
+  --shadow:0 1px 1px rgba(0,0,0,.3),0 8px 24px -10px rgba(0,0,0,.6);
+  --shadow-lift:0 2px 6px rgba(0,0,0,.4),0 26px 52px -16px rgba(0,0,0,.72);
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--paper);color:var(--ink);font:400 16px/1.58 var(--sans);
+  font-feature-settings:"ss01","cv05";-webkit-font-smoothing:antialiased;letter-spacing:-.003em}
+.wrap{max-width:1180px;margin:0 auto;padding:0 clamp(16px,4vw,48px)}
+a{color:var(--accent)}
+h1,h2,h3{letter-spacing:-.02em;font-weight:600;margin:0}
+h2{font-size:clamp(19px,2.1vw,23px);margin:calc(var(--gap)*1.3) 0 2px}
+h3{font-size:16px;margin:22px 0 2px;font-weight:600}
+.num{font-variant-numeric:tabular-nums}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums;letter-spacing:0}
+.muted{color:var(--ink-2)}
+.faint{color:var(--ink-3)}
+.lede{color:var(--ink-2);max-width:72ch;margin:4px 0 0;font-size:15px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* masthead */
+.mast{border-bottom:1px solid var(--line);background:linear-gradient(var(--surface),var(--paper));position:relative}
+.mast .wrap{padding-top:clamp(22px,4vw,40px);padding-bottom:4px}
+.brandline{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.brandline h1{font-size:clamp(23px,3vw,31px)}
+.brandline .glyph{font-family:var(--mono);color:var(--proof);font-weight:600;font-size:15px;
+  border:1px solid var(--line-2);border-radius:5px;padding:1px 7px;letter-spacing:.02em}
+#meta{font-family:var(--mono);font-size:12.5px;color:var(--ink-3);margin-top:7px;word-break:break-word;letter-spacing:0}
+.toprow{display:flex;justify-content:space-between;align-items:flex-start;gap:16px}
+.theme-btn{flex:none;font:inherit;font-size:13px;color:var(--ink-2);background:var(--field);border:1px solid var(--line-2);
+  border-radius:6px;padding:6px 12px;cursor:pointer;display:inline-flex;gap:7px;align-items:center;transition:border-color .15s,color .15s}
+.theme-btn:hover{color:var(--ink);border-color:var(--ink-3)}
+.theme-btn:focus-visible,a:focus-visible,button:focus-visible,summary:focus-visible,select:focus-visible,input:focus-visible,[tabindex]:focus-visible{
+  outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+
+/* verdict strip */
+/* Flex, not an auto-fit grid: every row is filled edge to edge, so no empty grey cell is ever left at the end of a
+   row; the cell count (data-n, 3 to 8) picks a row length that leaves no stat alone on the last row. */
+.verdict{display:flex;flex-wrap:wrap;gap:1px;background:var(--line);
+  border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;margin:var(--gap) 0 2px;box-shadow:var(--shadow)}
+.vcell{background:var(--surface);padding:13px 16px 12px;flex:1 1 0;min-width:0}
+@media (max-width:960px){
+  .vcell{flex-basis:calc(33.34% - 1px)}
+  .verdict[data-n="4"] .vcell{flex-basis:calc(50% - 1px)}
+  .verdict[data-n="7"] .vcell,.verdict[data-n="8"] .vcell{flex-basis:calc(25% - 1px)}
+}
+@media (max-width:560px){
+  .vcell,.verdict[data-n] .vcell{flex-basis:calc(50% - 1px)}
+  /* an odd count: the first stat (the verified names) takes the whole first row as the headline */
+  .verdict[data-n="3"] .vcell:first-child,.verdict[data-n="5"] .vcell:first-child,.verdict[data-n="7"] .vcell:first-child{flex-basis:100%}
+}
+.vcell .n{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:clamp(22px,3vw,27px);font-weight:600;line-height:1.05;display:block}
+.vcell .k{font-size:12px;color:var(--ink-2);margin-top:3px;letter-spacing:.01em}
+.vcell.lead{background:var(--proof-wash)} .vcell.lead .n{color:var(--proof-ink)}
+.vcell.warn .n{color:var(--claim)}
+.vcell.sev-high .n{color:var(--sev-high)} .vcell.sev-medium .n{color:var(--sev-medium)}
+
+/* nav */
+nav.toc{position:sticky;top:0;z-index:30;background:var(--surface);
+  border-bottom:1px solid var(--line);margin-top:var(--gap)}
+nav.toc .wrap{display:flex;gap:4px;overflow-x:auto;padding-top:7px;padding-bottom:7px;scrollbar-width:none}
+nav.toc .wrap::-webkit-scrollbar{display:none}
+nav.toc a{flex:none;font-size:13px;color:var(--ink);text-decoration:none;padding:5px 11px;border-radius:999px;
+  white-space:nowrap;transition:background .15s,color .15s}
+nav.toc a:hover{color:var(--ink);background:var(--sunk)}
+nav.toc a .c{font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--ink-3);margin-left:5px;font-size:12px}
+
+section{padding:6px 0 10px;scroll-margin-top:52px}
+.sec-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+
+/* panels & tables */
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);
+  margin-top:14px;overflow:hidden}
+.panel-pad{padding:clamp(14px,2vw,20px)}
+.controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center;padding:12px clamp(14px,2vw,20px);
+  border-bottom:1px solid var(--line);background:var(--sunk)}
+.controls .grow{flex:1 1 200px}
+label.ctl{font-size:12px;color:var(--ink-2);display:flex;flex-direction:column;gap:3px}
+select,input[type=search]{font:inherit;font-size:14px;background:var(--field);color:var(--ink);
+  border:1px solid var(--line-2);border-radius:6px;padding:7px 10px;width:100%}
+input[type=search]::placeholder{color:var(--ink-3)}
+.tablewrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{text-align:left;padding:10px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+thead th{position:sticky;top:0;background:var(--surface);font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;
+  color:var(--ink-2);font-weight:600;white-space:nowrap;z-index:1}
+th.sortable{cursor:pointer;user-select:none}
+th.sortable:hover{color:var(--ink)}
+th.sortable .arrow{opacity:.5;font-size:10px}
+tbody tr{transition:background .12s}
+tbody tr.clickable{cursor:pointer}
+tbody tr.clickable:hover{background:var(--sunk)}
+tbody tr:last-child td{border-bottom:0}
+td.mono,.cell-name{font-family:var(--mono);font-variant-numeric:tabular-nums;letter-spacing:0;overflow-wrap:anywhere;word-break:normal}
+.cell-name{font-size:13px}
+#names td:first-child,#entities td:first-child{min-width:150px}
+@media (max-width:760px){.names-by{display:none}}
+td.right{text-align:right}
+.empty{padding:26px clamp(14px,2vw,20px);color:var(--ink-2);font-size:14.5px}
+.count-hint{font-family:var(--mono);color:var(--ink-3);font-size:12.5px}
+
+/* chips */
+.chip{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;line-height:1;
+  padding:3px 8px;border-radius:999px;border:1px solid var(--line-2);white-space:nowrap;letter-spacing:.01em}
+.chip .dot{width:7px;height:7px;border-radius:50%;background:currentColor;flex:none}
+.chip.verified{color:var(--proof-ink);background:var(--proof-wash);border-color:transparent}
+.chip.claimed{color:var(--claim);background:var(--claim-wash);border-color:transparent}
+.chip.stale{color:var(--sev-medium);background:var(--sev-medium-wash);border-color:transparent}
+.chip.wildcard{color:var(--sev-info);background:var(--sev-info-wash);border-color:transparent}
+.chip.state{color:var(--ink-2);background:var(--sunk);font-weight:500}
+.chip.band-confirmed{color:var(--proof-ink);background:var(--proof-wash);border-color:transparent}
+.chip.band-probable{color:var(--accent);background:var(--sunk);border-color:transparent}
+.chip.band-possible{color:var(--claim);background:var(--claim-wash);border-color:transparent}
+.chip.band-unlikely{color:var(--ink-3);background:var(--sunk);border-color:transparent}
+.chip.tag{color:var(--ink-3);background:var(--sunk);font-weight:500}
+.sev-badge{display:inline-flex;align-items:center;gap:6px;font-weight:600;font-size:12px}
+.sev-badge .bar{width:3px;height:14px;border-radius:2px;background:currentColor}
+.sev-high{color:var(--sev-high)} .sev-medium{color:var(--sev-medium)} .sev-low{color:var(--sev-low)} .sev-info{color:var(--sev-info)}
+
+/* receipt mark (the hash, drawn) */
+.receipt{display:inline-flex;align-items:center;gap:8px}
+.mark{display:inline-block;height:18px;width:40px;vertical-align:middle;color:var(--proof)}
+.mark.hollow{color:var(--ink-3);opacity:.6}
+.markbtn{font:inherit;cursor:pointer;background:none;border:1px solid var(--line);border-radius:6px;padding:3px 7px;
+  display:inline-flex;align-items:center;gap:7px;color:var(--ink-2);transition:border-color .15s,background .15s}
+.markbtn:hover{border-color:var(--ink-3);background:var(--sunk)}
+.markbtn .short{font-family:var(--mono);font-size:11.5px;letter-spacing:0}
+
+/* evidence — inline disclosure (the reliable trace) */
+details.ev{border:1px solid var(--line);border-radius:6px;margin:6px 0;background:var(--field);overflow:hidden}
+details.ev>summary{list-style:none;cursor:pointer;padding:8px 11px;display:flex;align-items:center;gap:10px;font-size:13px}
+details.ev>summary::-webkit-details-marker{display:none}
+details.ev>summary:hover{background:var(--sunk)}
+details.ev .src{font-weight:600;color:var(--ink);flex:none}
+details.ev .req{font-family:var(--mono);font-size:12px;color:var(--ink-2);word-break:break-all;letter-spacing:0}
+.ev-body{padding:4px 11px 11px;border-top:1px solid var(--line)}
+.ev-meta{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;margin:8px 0;font-size:12px;color:var(--ink-3)}
+.ev-id{font-family:var(--mono);font-size:11.5px;color:var(--ink-2);letter-spacing:0}
+.copybtn{font:inherit;font-size:11.5px;cursor:pointer;background:var(--sunk);border:1px solid var(--line-2);
+  border-radius:5px;padding:2px 8px;color:var(--ink-2)}
+.copybtn:hover{color:var(--ink);border-color:var(--ink-3)}
+.verify-hint{font-family:var(--mono);font-size:11.5px;color:var(--ink-3);letter-spacing:0;
+  background:var(--sunk);border-radius:5px;padding:4px 8px;word-break:break-all}
+pre{background:var(--sunk);border:1px solid var(--line);border-radius:6px;padding:10px 12px;overflow:auto;
+  max-height:260px;white-space:pre-wrap;word-break:break-word;font-family:var(--mono);font-size:12px;line-height:1.5;margin:4px 0 0;letter-spacing:0}
+pre mark{background:var(--proof-wash);color:var(--proof-ink);padding:0 2px;border-radius:2px}
+ul.signals,ul.plain{margin:4px 0 0;padding-left:0;list-style:none}
+ul.signals li,ul.plain li{padding:6px 0;border-top:1px solid var(--line)}
+ul.signals li:first-child,ul.plain li:first-child{border-top:0}
+
+/* tier groups */
+.tier-group{border-top:1px solid var(--line)}
+.tier-group>summary{list-style:none;cursor:pointer;padding:12px 2px;font-weight:600;font-size:14.5px;
+  display:flex;align-items:center;gap:10px}
+.tier-group>summary::-webkit-details-marker{display:none}
+.tier-group>summary::before{content:"";width:0;height:0;border-left:6px solid var(--ink-3);
+  border-top:4px solid transparent;border-bottom:4px solid transparent;transition:transform .18s ease}
+.tier-group[open]>summary::before{transform:rotate(90deg)}
+.tier-note{margin:0 0 8px;color:var(--ink-2);font-size:13.5px;max-width:74ch}
+
+/* graph */
+.graphwrap{position:relative}
+svg#graph{display:block;width:100%;height:clamp(360px,52vh,560px);background:
+  radial-gradient(circle at 30% 20%,color-mix(in srgb,var(--surface) 70%,var(--paper)),var(--paper));
+  color:var(--ink)}
+.legend{display:flex;gap:14px;flex-wrap:wrap;padding:11px clamp(14px,2vw,20px);border-top:1px solid var(--line);
+  font-size:12.5px;color:var(--ink-2)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{width:10px;height:10px;border-radius:50%;display:inline-block}
+
+/* proof panel */
+.proof{background:var(--proof-wash);border:1px solid color-mix(in srgb,var(--proof) 40%,var(--line));
+  border-radius:var(--radius);padding:clamp(16px,2.2vw,24px);margin-top:14px}
+.proof h2{margin-top:0}
+.proof .seal{color:var(--proof-ink);display:inline-flex;gap:9px;align-items:center;font-weight:600;font-size:15px}
+.proof ol{margin:12px 0 0;padding-left:20px;max-width:76ch}
+.proof ol li{margin:7px 0;color:var(--ink-2)}
+.proof code{font-family:var(--mono);font-size:12.5px;background:var(--field);border:1px solid var(--line);
+  border-radius:5px;padding:2px 6px;color:var(--ink);letter-spacing:0;word-break:break-all}
+
+/* drawer */
+.drawer-scrim{position:fixed;inset:0;background:rgba(20,18,12,.44);opacity:0;pointer-events:none;
+  transition:opacity .2s ease;z-index:40}
+.drawer-scrim.open{opacity:1;pointer-events:auto}
+aside.drawer{position:fixed;top:0;right:0;height:100%;width:min(560px,94vw);background:var(--surface);
+  border-left:1px solid var(--line-2);box-shadow:var(--shadow-lift);z-index:50;display:flex;flex-direction:column;
+  transform:translateX(100%);transition:transform .24s cubic-bezier(.22,1,.36,1)}
+aside.drawer.open{transform:none}
+.drawer-head{padding:18px 20px 14px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.drawer-head h3{font-size:16px}
+.drawer-head .sub{font-size:12.5px;color:var(--ink-2);margin-top:3px}
+.drawer-close{font:inherit;font-size:20px;line-height:1;background:none;border:0;color:var(--ink-2);cursor:pointer;padding:2px 6px}
+.drawer-close:hover{color:var(--ink)}
+.drawer-body{overflow-y:auto;padding:14px 20px 40px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+@media (max-width:640px){
+  th,td{padding:9px 11px}
+  h2{margin-top:calc(var(--gap)*1.1)}
+}
+@media print{
+  nav.toc,.theme-btn,.controls,.drawer-scrim,aside.drawer,.markbtn{display:none!important}
+  body{background:#fff;color:#000;font-size:11pt}
+  .panel,.proof,.verdict{box-shadow:none;break-inside:avoid}
+  details.ev,.tier-group{break-inside:avoid}
+  details[open] .tier-group{display:block}
+  a{color:#000;text-decoration:underline}
+  svg#graph{height:300px}
+}
+</style>
+</head>
+<body>
+<div class="drawer-scrim" id="drawer-scrim"></div>
+<aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-labelledby="drawer-title" aria-hidden="true" tabindex="-1">
+  <div class="drawer-head">
+    <div><h3 id="drawer-title">Evidence</h3><div class="sub" id="drawer-sub"></div></div>
+    <button class="drawer-close" id="drawer-close" aria-label="Close evidence">&times;</button>
+  </div>
+  <div class="drawer-body" id="drawer-body"></div>
+</aside>
+
+<header class="mast">
+  <div class="wrap">
+    <div class="toprow">
+      <div>
+        <div class="brandline"><span class="glyph">[ ]</span><h1>Scrutator report</h1></div>
+        <div id="meta"></div>
+      </div>
+      <button class="theme-btn" id="theme" type="button" aria-label="Switch colour theme"><span id="theme-icon">◑</span><span id="theme-label">Theme</span></button>
+    </div>
+    <div id="headline"></div>
+    <div class="verdict" id="cards"></div>
+  </div>
+</header>
+
+<nav class="toc" aria-label="Report sections"><div class="wrap" id="toc"></div></nav>
+
+<main class="wrap">
+  <section id="sec-names" tabindex="-1"><div id="names"></div></section>
+  <section id="sec-risks" tabindex="-1"><div id="risks"></div></section>
+  <section id="sec-attribution" tabindex="-1"><div id="attribution"></div></section>
+  <section id="sec-findings" tabindex="-1"><h2>Findings</h2><div class="lede" id="findings-lede"></div><div id="findings"></div></section>
+  <section id="sec-graph" tabindex="-1"><h2>Infrastructure</h2><div class="lede">Entities and the relations between them, laid out by scope. Hover a node for its value; the graph collapses the largest scans by scope so it stays legible.</div><div class="panel"><div class="graphwrap"><svg id="graph" role="img" aria-label="Entity and relation graph"></svg></div><div class="legend" id="graph-legend"></div></div></section>
+  <section id="sec-entities" tabindex="-1"><h2>Entities</h2><div class="lede">Every entity the scan recorded. Filter by type, scope and text.</div><div id="entities"></div></section>
+  <section id="sec-coverage" tabindex="-1"><div id="extra"></div></section>
+  <section id="sec-proof" tabindex="-1"><div id="proof"></div></section>
+  <div id="extra-after"></div>
+</main>
+
+<script type="application/json" id="data">{"ai": null, "attribution": {"bands": {"confirmed": 0, "possible": 0, "probable": 0, "unlikely": 12}, "candidates": [{"band": "unlikely", "entity_id": "domain:s1.example.org", "evidence_ids": ["b26f8720e480bd67dc9cc71f9a19147bbf50168cbff4cd43f415c4ece3fc048b"], "explanation": "s1.example.org scores 0.20 (unlikely) from scope_uses 0.20.", "premortem": [{"evidence_ids": ["b26f8720e480bd67dc9cc71f9a19147bbf50168cbff4cd43f415c4ece3fc048b"], "text": "Only one kind of evidence supports this (scope_uses); a second, independent kind would make it much stronger."}, {"evidence_ids": ["b26f8720e480bd67dc9cc71f9a19147bbf50168cbff4cd43f415c4ece3fc048b"], "text": "This name has not been looked at: the evidence holds no DNS records for it, so its name servers, mail and network could not be compared."}], "score": 0.2, "signals": [{"detail": "bulk.example.com uses s1.example.org for SPF", "evidence_ids": ["b26f8720e480bd67dc9cc71f9a19147bbf50168cbff4cd43f415c4ece3fc048b"], "kind": "scope_uses", "note": "", "raw_weight": 0.2, "weight": 0.2}], "state": "out", "value": "s1.example.org"}, {"band": "unlikely", "entity_id": "domain:s10.example.org", "evidence_ids": ["b26f8720e480bd67dc9cc71f9a19147bbf50168cbff4cd43f415c4ece3fc048b"], "explanation": "s10.example.org scores 0.20 (unlikely) from scope_uses 0.20.", "premortem": [{"evidence_ids": ["b26f8720e480bd67dc9cc71f9a19147bbf50168cbff4cd43f415c4ece3fc048b"], "text": "Only one kind of evidence supports this (scope_uses); a second, independent kind would make it much stronger."}, {"evidence_ids": ["b26f8720e480bd67dc9cc71f9a19147bbf50168cbff4cd43f415c4ece3fc048b"], "text": "This name has not been looked at: the evidence holds no DNS records for it, so its name servers, mail and network could not be compared."}], "score": 0.2, "signals": [{"detail": "bulk.example.com uses s10.example.org for SPF", "evidence_ids": ["b26f8720e480bd67dc9cc71f9a19147bbf50168cbff4cd43f415c4ece3fc048b"], "kind": "scope_uses", "note": "", "raw_weight": 0.2, "weight": 0.2}], "state": "out", "value": "s10.example.org"}, {"band": "unlikely", "entity_id": "domain:s11.example.org", "evidence_ids": ["b26f8720e480bd67dc9cc71f9a19147bbf50168cbff4cd43f415c4ece3fc048b"], "explanation": "s11.example.org scores 0.20 (unlikely) from scope_uses 0.20.", "premortem": [{"evidence_ids": ["b26f8720e480bd67dc9cc71f9a19147bbf50168cbff4cd43f415c4ece3fc048b"], "text": "Only one kind of evidence supports this (scope_uses); a second, independent kind would make it much stronger."}, {"evidence_ids": ["b26f8720e480bd67dc9cc71f9a19147bbf50168cbff4cd43f415c4ece3fc048b"], "text": "This name has not been looked at: the evidence holds no DNS records for it, so its name servers, mail and network could not be compared."}], "score": 0.2, "signals": [{"detail": "bulk.example.com uses s11.example.org for SPF", "evidence_ids": ["b26f8720e480bd67dc9cc71f9a19147bbf50168cbff4cd43f415c4ece3fc048b"], "kind": "scope_uses", "note": "", "raw_weight": 0.2, "weight": 0.2}], "state": "out", "value": "s11.example.org"}, {"band": "unlikely", "entity_id": "domain:s2.example.org", "evidence_ids": ["b26f8720e480bd67dc9cc71f9a19147bbf50168cbff4cd43f415c4ece3fc048b"], "explanation": "s2.example.org scores 0.20 (unlikely) from scope_uses 0.20.", "premortem": [{"evidence_ids": ["b26f8720e480bd67dc9cc71f9a19147bbf50168cbff4cd43f415c4ece3fc048b"], "text": "Only one kind of evidence supports this (scope_uses); a second, independent kind would make it much stronger."}, {"evidence_ids": ["b26f8720e480bd67dc9cc71f9a19147bbf50168cbff4cd43f415c4ece3fc048b"], "text": "This name has not been looked at: the evidence holds no DNS records for it, so its name servers, mail and network could not be compared."}], "score": 0.2, "signals": [{"detail": "bulk.example.com uses s2.example.org for SPF", "evidence_ids": ["b26f8720e480bd67dc9cc71f9a19147bbf50168cbff4cd43f415c4ece3fc048b"], "kind": "scope_uses", "note": "", "raw_weight": 0.2, "weight": 0.2}], "state": "out", "value": "s2.example.org"}, {"band": "unlikely", "entity_id": "domain:s3.example.org", "evidence_ids": ["b26f8720e480bd67dc9cc71f9a19147bbf50168cbff4cd43f415c4ece3fc048b"], "explanation": "s3.example.org scores 0.20 (unlikely) from scope_uses 0.20.", "premortem": [{"evidence_ids": ["b26f8720e480bd67dc9cc71f9a19147bbf50168cbff4cd43f415c4ece3fc048b"], "text": "Only one kind of evidence supports this (scope_uses); a second, independent kind would make it much stronger."}, {"evidence_ids": ["b26f8720e480bd67dc9cc71f9a19147bbf50168cbff4cd43f415c4ece3fc048b"], "text": "This name has not been looked at: the evidence holds no DNS records for it, so its name servers, mail and network could not be compared."}], "score": 0.2, "signals": [{"detail": "bulk.example.com uses s3.example.org for SPF", "evidence_ids": ["b26f8720e480bd67dc9cc71f9a19147bbf50168cbff4cd43f415c4ece3fc048b"], "kind": "scope_uses", "note": "", "raw_weight": 0.2, "weight": 0.2}], "state": "out", "value": "s3.example.org"}, {"band": "unlikely", "entity_id": "domain:s4.example.org", "evidence_ids": ["b26f8720e480bd67dc9cc71f9a19147bbf50168cbff4cd43f415c4ece3fc048b"], "explanation": "s4.example.org scores 0.20 (unlikely) from scope_uses 0.20.", "premortem": [{"evidence_ids": ["b26f8720e480bd67dc9cc71f9a19147bbf50168cbff4cd43f415c4ece3fc048b"], "text": "Only one kind of evidence supports this (scope_uses); a second, independent kind would make it much stronger."}, {"evidence_ids": ["b26f8720e480bd67dc9cc71f9a19147bbf50168cbff4cd43f415c4ece3fc048b"], "text": "This name has not been looked at: the evidence holds no DNS records for it, so its name servers, mail and network could not be compared."}], "score": 0.2, "signals": [{"detail": "bulk.example.com uses s4.example.org for SPF", "evidence_ids": ["b26f8720e480bd67dc9cc71f9a19147bbf50168cbff4cd43f415c4ece3fc048b"], "kind": "scope_uses", "note": "", "raw_weight": 0.2, "weight": 0.2}], "state": "out", "value": "s4.example.org"}, {"band": "unlikely", "entity_id": "domain:s5.example.org", "evidence_ids": ["b26f8720e480bd67dc9cc71f9a19147bbf50168cbff4cd43f415c4ece3fc048b"], "explanation": "s5.example.org scores 0.20 (unlikely) from scope_uses 0.20.", "premortem": [{"evidence_ids": ["b26f8720e480bd67dc9cc71f9a19147bbf50168cbff4cd43f415c4ece3fc048b"], "text": "Only one kind of evidence supports this (scope_uses); a second, independent kind would make it much stronger."}, {"evidence_ids": ["b26f8720e480bd67dc9cc71f9a19147bbf50168cbff4cd43f415c4ece3fc048b"], "text": "This name has not been looked at: the evidence holds no DNS records for it, so its name servers, mail and network could not be compared."}], "score": 0.2, "signals": [{"detail": "bulk.example.com uses s5.example.org for SPF", "evidence_ids": ["b26f8720e480bd67dc9cc71f9a19147bbf50168cbff4cd43f415c4ece3fc048b"], "kind": "scope_uses", "note": "", "raw_weight": 0.2, "weight": 0.2}], "state": "out", "value": "s5.example.org"}, {"band": "unlikely", "entity_id": "domain:s6.example.org", "evidence_ids": ["b26f8720e480bd67dc9cc71f9a19147bbf50168cbff4cd43f415c4ece3fc048b"], "explanation": "s6.example.org scores 0.20 (unlikely) from scope_uses 0.20.", "premortem": [{"evidence_ids": ["b26f8720e480bd67dc9cc71f9a19147bbf50168cbff4cd43f415c4ece3fc048b"], "text": "Only one kind of evidence supports this (scope_uses); a second, independent kind would make it much stronger."}, {"evidence_ids": ["b26f8720e480bd67dc9cc71f9a19147bbf50168cbff4cd43f415c4ece3fc048b"], "text": "This name has not been looked at: the evidence holds no DNS records for it, so its name servers, mail and network could not be compared."}], "score": 0.2, "signals": [{"detail": "bulk.example.com uses s6.example.org for SPF", "evidence_ids": ["b26f8720e480bd67dc9cc71f9a19147bbf50168cbff4cd43f415c4ece3fc048b"], "kind": "scope_uses", "note": "", "raw_weight": 0.2, "weight": 0.2}], "state": "out", "value": "s6.example.org"}, {"band": "unlikely", "entity_id": "domain:s7.example.org", "evidence_ids": ["b26f8720e480bd67dc9cc71f9a19147bbf50168cbff4cd43f415c4ece3fc048b"], "explanation": "s7.example.org scores 0.20 (unlikely) from scope_uses 0.20.", "premortem": [{"evidence_ids": ["b26f8720e480bd67dc9cc71f9a19147bbf50168cbff4cd43f415c4ece3fc048b"], "text": "Only one kind of evidence supports this (scope_uses); a second, independent kind would make it much stronger."}, {"evidence_ids": ["b26f8720e480bd67dc9cc71f9a19147bbf50168cbff4cd43f415c4ece3fc048b"], "text": "This name has not been looked at: the evidence holds no DNS records for it, so its name servers, mail and network could not be compared."}], "score": 0.2, "signals": [{"detail": "bulk.example.com uses s7.example.org for SPF", "evidence_ids": ["b26f8720e480bd67dc9cc71f9a19147bbf50168cbff4cd43f415c4ece3fc048b"], "kind": "scope_uses", "note": "", "raw_weight": 0.2, "weight": 0.2}], "state": "out", "value": "s7.example.org"}, {"band": "unlikely", "entity_id": "domain:s8.example.org", "evidence_ids": ["b26f8720e480bd67dc9cc71f9a19147bbf50168cbff4cd43f415c4ece3fc048b"], "explanation": "s8.example.org scores 0.20 (unlikely) from scope_uses 0.20.", "premortem": [{"evidence_ids": ["b26f8720e480bd67dc9cc71f9a19147bbf50168cbff4cd43f415c4ece3fc048b"], "text": "Only one kind of evidence supports this (scope_uses); a second, independent kind would make it much stronger."}, {"evidence_ids": ["b26f8720e480bd67dc9cc71f9a19147bbf50168cbff4cd43f415c4ece3fc048b"], "text": "This name has not been looked at: the evidence holds no DNS records for it, so its name servers, mail and network could not be compared."}], "score": 0.2, "signals": [{"detail": "bulk.example.com uses s8.example.org for SPF", "evidence_ids": ["b26f8720e480bd67dc9cc71f9a19147bbf50168cbff4cd43f415c4ece3fc048b"], "kind": "scope_uses", "note": "", "raw_weight": 0.2, "weight": 0.2}], "state": "out", "value": "s8.example.org"}, {"band": "unlikely", "entity_id": "domain:s9.example.org", "evidence_ids": ["b26f8720e480bd67dc9cc71f9a19147bbf50168cbff4cd43f415c4ece3fc048b"], "explanation": "s9.example.org scores 0.20 (unlikely) from scope_uses 0.20.", "premortem": [{"evidence_ids": ["b26f8720e480bd67dc9cc71f9a19147bbf50168cbff4cd43f415c4ece3fc048b"], "text": "Only one kind of evidence supports this (scope_uses); a second, independent kind would make it much stronger."}, {"evidence_ids": ["b26f8720e480bd67dc9cc71f9a19147bbf50168cbff4cd43f415c4ece3fc048b"], "text": "This name has not been looked at: the evidence holds no DNS records for it, so its name servers, mail and network could not be compared."}], "score": 0.2, "signals": [{"detail": "bulk.example.com uses s9.example.org for SPF", "evidence_ids": ["b26f8720e480bd67dc9cc71f9a19147bbf50168cbff4cd43f415c4ece3fc048b"], "kind": "scope_uses", "note": "", "raw_weight": 0.2, "weight": 0.2}], "state": "out", "value": "s9.example.org"}, {"band": "unlikely", "entity_id": "domain:spf.example.org", "evidence_ids": ["6389b626d20732228da26a58a919355bbb5faf3b54d6febf55fb10964ae6454c"], "explanation": "spf.example.org scores 0.20 (unlikely) from scope_uses 0.20.", "premortem": [{"evidence_ids": ["6389b626d20732228da26a58a919355bbb5faf3b54d6febf55fb10964ae6454c"], "text": "Only one kind of evidence supports this (scope_uses); a second, independent kind would make it much stronger."}, {"evidence_ids": ["6389b626d20732228da26a58a919355bbb5faf3b54d6febf55fb10964ae6454c"], "text": "This name has not been looked at: the evidence holds no DNS records for it, so its name servers, mail and network could not be compared."}], "score": 0.2, "signals": [{"detail": "example.com uses spf.example.org for SPF", "evidence_ids": ["6389b626d20732228da26a58a919355bbb5faf3b54d6febf55fb10964ae6454c"], "kind": "scope_uses", "note": "", "raw_weight": 0.2, "weight": 0.2}], "state": "out", "value": "spf.example.org"}], "omitted_unlikely": 0, "ruleset": 1}, "coverage": {"deadline_hit": false, "deadline_s": null, "sources_down": []}, "dependencies": [{"category": "ca", "evidence_ids": ["0bcd468119ee284a87e66d6bfe27f868e9fa4e55a0dafd1b5e24d8ba5dc9924c", "1f205fd8af518d4093ffefa32b25d025b452579bf865b47ecd4ff963452822df", "2e29c591d4c851d7d87a83c41255a3f27dd59de8410d1271388c5adc88e28ab6", "33272b595e759e4d505fb27f0f385cd97cacd436e745f1dc3b74526de9d6b97c", "35f2254265c06712d4c24cfeaad2bcddcec974c957ef2d0bed5643b827d8b2e5", "515155a776a6048a334b83c228b34efcacf84abde734491cd9107392231f4e1c", "5ce709da5d58faeaca25c71de5bfb5b7fc57c0187dadc5487fe613bc2c99ce2b", "5ee040e0005866b89020d87ee2230522407c35423795bbe0bc8788ad93ea830c", "623296034c6f3ec55f3570fb7a0a1e9e6f17d6463f4c764e12f749f929e248c7", "831d642a58b2ae690e6505dde146a84d487b4a3efeb140b6ff492f18a99ac782", "90c91a100a3ddc24dddb3fe77f02df1341de4b54e0d1a82dd110119650c6e06f", "968bc8e3a139e940a5a602c9b905444fb8c9457e23c8c70d55798183a9e58818", "a077c4cf6a393804dc21f4aadf5e89c0ef21640d965232258f1ff9d164a432aa", "b862d9832d8143d3c902c73fbb6a295ab78e327b85b8424cdedfe215e5a7fe2e", "eb6969220261232fc88632db4413f4fd88636e66334df9006caed2f51e319d3c", "f3ad8ba618674ed8756b567222e6a8686ac7dbf01f0084107f9b5a7dbf52ed42"], "hostnames": ["app1.example.com", "app2.example.com", "app4.example.com", "bulk.example.com", "dev.example.com", "docs.example.com", "ghost.example.com", "legacy.example.com", "multi.example.com", "neutral.example.com", "noall.example.com", "oldmail.example.com", "sales.example.com", "shop.example.com", "soft.example.com", "www.example.com"], "provider": "Let's Encrypt", "targets": ["C=US, O=Let's Encrypt, CN=R3"], "verified": false, "via": ["issuer"]}, {"category": "cdn", "evidence_ids": ["01e0d9f756c829c055cbb6fca028b332281a006d2dba0560c9ecd6c56f9070c2", "0ca4114e8c6a3d33dc886093bab987f268b2076e75229a7574f38135171b660b", "0f03aa66fc728d33cc76e83d372cd2f3dc6fbbd56d0f565b5dfa8ab691fc3a71", "1dab89720a1b08626b2bb016a98d27c11f7ee49a782efdeec4eff333d16544f4", "24d86e32684a6049ff7a3ad05c6771c1b3ee35cf9e488b4c1738cf41239bf348", "31618bb7c7a0025f530835cf1d160543c407316a0096ef3e00c4db05b01a345c", "4183e499e07dffbb041b653b4dc678fd33412027a88892ba8670331174aeb889", "454b918b6e9c4e9c4e262e2561cf4603e26497589712bd60495b604f254bd35d", "45662725b4f34428ce674d68a9290ec848c820d3e5dd32398d487d2e2ac09d03", "4adf860db08854230c27df2b82977f21cab144f608832cc0f287ab5664a1c5b0", "4af45bdc672e549ec2a077d9cda451aac2a70b992bb600db0745b3036dcacb31", "5936a350f8770c47ac8e4cd9f6b64f302a2f6fd493e5435a931daa90a1e4daf1", "6cf07b70fe54c8dc07202a916e21a75b44e68ac305f61af7dafb7d4e0f3eeeba", "723fd57994f3cafb746088ef8f2855ae4f96ac6239073953cb3c6d21e23f5eb8", "72cdd8aa0540c26b723a185837d883c34c7767df59f19f3cbc5e52e8b4bcd86c", "7eaf7a6e4ce1204f2398e144f2dd57a946ce7319fe5d49722977dcd10d2b5647", "7f5ace880243517166aa2c4143b3f1763167fd82691d40133b8d1675a8dfa217", "8796b00d0d58fc0d2f85096865b77609a632b6307af99de807e0a36b130c0741", "8b51c626a4c3a43ebfa1553cefee66319a43610865b21f03b7fe2c814989ea2d", "8fae92b68fbb16654d5fad999debccd50a13752a06791fb37d8e81e72b04f7e2", "928582d58494dfc3fd7603a1d48dbee1417b6f1e1ea4d99195c04a2dd0e1ac10", "9ba28d58c36cf437461ec87118bae7206a3e8ae854a09a1578907b3cfa6e15f6", "affd6716b8271b4f9d5bd7e0c902c9ecdcf9dad9fafe4e2fd66bcce9878dcdf2", "b2cc2a3bf3dd2f2efbf5bb2b3231e48db1f91b8ac3ad4b915262c9087b4394b6", "b66a08b9fea44f23abb9791edb152886dbd14bf7f74ec4ebbc39f9168ada3cf1", "b81d938641b238321d012b13932c3a32eacb1b503a2560c5210e6cb34555552a", "dcda18944133bf4d950b0f1b57cae1ee851f2aa2609173980098b3150726d24f", "e0ba3bebce56d65b6e52d31ef970b3df7cbb34274625da6da75828a958568ec0", "e463807d036cdb0194bad1001ffbdc8b5441dc766ed0e5f391024e12f5d6fc33", "ed67e58c5cf58145f110fcb0e775753d8c47392b22d15741a12b1a5131293b2f", "f66c746bc440c8d128f28b7796c4b66cb533c6c09266a1444c77bc63f93afa25", "fc3339d17634fafb1acdd94a4fb7ae0e899ea6534b99dd27f330805002f2894c", "ff153d7b83a713654896fc1e4ddb284d03f38ed6c0341f05cdd71f9ab4dcaba9", "ff472dc63ced2336cc4c8a7aa66af6b26a5279f741ccc1065182d56299f4fbf7"], "hostnames": ["app1.example.com", "app2.example.com", "app4.example.com", "bulk.example.com", "dev.example.com", "example.com", "example.net", "mail.example.com", "multi.example.com", "neutral.example.com", "noall.example.com", "ns1.dns.example.net", "ns2.dns.example.net", "oldmail.example.com", "sales.example.com", "soft.example.com", "www.example.com"], "provider": "Example Edge", "targets": ["AS64500"], "verified": true, "via": ["asn"]}, {"category": "dns", "evidence_ids": ["59edc5a1e9efc3048be4b7020fa262068351b81dcd7f3aee7a1c6d1536c597cb", "b343a685a88e2c255d6ba0cd11173a955fcb07dfeb8a1e2c35673a02a9b866e0"], "hostnames": ["app1.example.com", "app2.example.com", "app4.example.com", "bulk.example.com", "dev.example.com", "docs.example.com", "example.com", "example.net", "ghost.example.com", "legacy.example.com", "mail.example.com", "multi.example.com", "neutral.example.com", "noall.example.com", "ns1.dns.example.net", "ns2.dns.example.net", "ns9.old.example.net", "oldmail.example.com", "sales.example.com", "shop.example.com", "soft.example.com", "www.example.com"], "provider": "Example DNS", "targets": ["ns1.dns.example.net", "ns2.dns.example.net"], "verified": true, "via": ["ns"]}], "edges": [{"dst": "ip:192.0.2.61", "evidence_ids": ["72cdd8aa0540c26b723a185837d883c34c7767df59f19f3cbc5e52e8b4bcd86c"], "rel": "resolves_to", "src": "domain:app1.example.com"}, {"dst": "ip:192.0.2.62", "evidence_ids": ["affd6716b8271b4f9d5bd7e0c902c9ecdcf9dad9fafe4e2fd66bcce9878dcdf2"], "rel": "resolves_to", "src": "domain:app2.example.com"}, {"dst": "ip:192.0.2.64", "evidence_ids": ["5936a350f8770c47ac8e4cd9f6b64f302a2f6fd493e5435a931daa90a1e4daf1"], "rel": "resolves_to", "src": "domain:app4.example.com"}, {"dst": "ip:192.0.2.75", "evidence_ids": ["45662725b4f34428ce674d68a9290ec848c820d3e5dd32398d487d2e2ac09d03"], "rel": "resolves_to", "src": "domain:bulk.example.com"}, {"dst": "domain:s1.example.org", "evidence_ids": ["b26f8720e480bd67dc9cc71f9a19147bbf50168cbff4cd43f415c4ece3fc048b"], "rel": "spf_include", "src": "domain:bulk.example.com"}, {"dst": "domain:s10.example.org", "evidence_ids": ["b26f8720e480bd67dc9cc71f9a19147bbf50168cbff4cd43f415c4ece3fc048b"], "rel": "spf_include", "src": "domain:bulk.example.com"}, {"dst": "domain:s11.example.org", "evidence_ids": ["b26f8720e480bd67dc9cc71f9a19147bbf50168cbff4cd43f415c4ece3fc048b"], "rel": "spf_include", "src": "domain:bulk.example.com"}, {"dst": "domain:s2.example.org", "evidence_ids": ["b26f8720e480bd67dc9cc71f9a19147bbf50168cbff4cd43f415c4ece3fc048b"], "rel": "spf_include", "src": "domain:bulk.example.com"}, {"dst": "domain:s3.example.org", "evidence_ids": ["b26f8720e480bd67dc9cc71f9a19147bbf50168cbff4cd43f415c4ece3fc048b"], "rel": "spf_include", "src": "domain:bulk.example.com"}, {"dst": "domain:s4.example.org", "evidence_ids": ["b26f8720e480bd67dc9cc71f9a19147bbf50168cbff4cd43f415c4ece3fc048b"], "rel": "spf_include", "src": "domain:bulk.example.com"}, {"dst": "domain:s5.example.org", "evidence_ids": ["b26f8720e480bd67dc9cc71f9a19147bbf50168cbff4cd43f415c4ece3fc048b"], "rel": "spf_include", "src": "domain:bulk.example.com"}, {"dst": "domain:s6.example.org", "evidence_ids": ["b26f8720e480bd67dc9cc71f9a19147bbf50168cbff4cd43f415c4ece3fc048b"], "rel": "spf_include", "src": "domain:bulk.example.com"}, {"dst": "domain:s7.example.org", "evidence_ids": ["b26f8720e480bd67dc9cc71f9a19147bbf50168cbff4cd43f415c4ece3fc048b"], "rel": "spf_include", "src": "domain:bulk.example.com"}, {"dst": "domain:s8.example.org", "evidence_ids": ["b26f8720e480bd67dc9cc71f9a19147bbf50168cbff4cd43f415c4ece3fc048b"], "rel": "spf_include", "src": "domain:bulk.example.com"}, {"dst": "domain:s9.example.org", "evidence_ids": ["b26f8720e480bd67dc9cc71f9a19147bbf50168cbff4cd43f415c4ece3fc048b"], "rel": "spf_include", "src": "domain:bulk.example.com"}, {"dst": "ip:192.0.2.50", "evidence_ids": ["4af45bdc672e549ec2a077d9cda451aac2a70b992bb600db0745b3036dcacb31"], "rel": "resolves_to", "src": "domain:dev.example.com"}, {"dst": "domain:team.sites.example.org", "evidence_ids": ["77a939695ea957512ca610c24dbe7a662bba9c77ce5cd6d4dc9b6011134cf17b"], "rel": "cname_to", "src": "domain:docs.example.com"}, {"dst": "domain:app1.example.com", "evidence_ids": ["33272b595e759e4d505fb27f0f385cd97cacd436e745f1dc3b74526de9d6b97c"], "rel": "has_subdomain", "src": "domain:example.com"}, {"dst": "domain:app2.example.com", "evidence_ids": ["35f2254265c06712d4c24cfeaad2bcddcec974c957ef2d0bed5643b827d8b2e5"], "rel": "has_subdomain", "src": "domain:example.com"}, {"dst": "domain:app4.example.com", "evidence_ids": ["eb6969220261232fc88632db4413f4fd88636e66334df9006caed2f51e319d3c"], "rel": "has_subdomain", "src": "domain:example.com"}, {"dst": "domain:bulk.example.com", "evidence_ids": ["a077c4cf6a393804dc21f4aadf5e89c0ef21640d965232258f1ff9d164a432aa"], "rel": "has_subdomain", "src": "domain:example.com"}, {"dst": "domain:dev.example.com", "evidence_ids": ["515155a776a6048a334b83c228b34efcacf84abde734491cd9107392231f4e1c"], "rel": "has_subdomain", "src": "domain:example.com"}, {"dst": "domain:docs.example.com", "evidence_ids": ["968bc8e3a139e940a5a602c9b905444fb8c9457e23c8c70d55798183a9e58818"], "rel": "has_subdomain", "src": "domain:example.com"}, {"dst": "domain:ghost.example.com", "evidence_ids": ["2e29c591d4c851d7d87a83c41255a3f27dd59de8410d1271388c5adc88e28ab6", "c6db47b4d3e2e41a02daf80fc3aa006e2d04eb2c68709171bcbdce290fa2cdf0"], "rel": "has_subdomain", "src": "domain:example.com"}, {"dst": "domain:legacy.example.com", "evidence_ids": ["831d642a58b2ae690e6505dde146a84d487b4a3efeb140b6ff492f18a99ac782"], "rel": "has_subdomain", "src": "domain:example.com"}, {"dst": "domain:multi.example.com", "evidence_ids": ["1f205fd8af518d4093ffefa32b25d025b452579bf865b47ecd4ff963452822df"], "rel": "has_subdomain", "src": "domain:example.com"}, {"dst": "domain:neutral.example.com", "evidence_ids": ["623296034c6f3ec55f3570fb7a0a1e9e6f17d6463f4c764e12f749f929e248c7"], "rel": "has_subdomain", "src": "domain:example.com"}, {"dst": "domain:noall.example.com", "evidence_ids": ["90c91a100a3ddc24dddb3fe77f02df1341de4b54e0d1a82dd110119650c6e06f"], "rel": "has_subdomain", "src": "domain:example.com"}, {"dst": "domain:oldmail.example.com", "evidence_ids": ["5ee040e0005866b89020d87ee2230522407c35423795bbe0bc8788ad93ea830c"], "rel": "has_subdomain", "src": "domain:example.com"}, {"dst": "domain:sales.example.com", "evidence_ids": ["0bcd468119ee284a87e66d6bfe27f868e9fa4e55a0dafd1b5e24d8ba5dc9924c"], "rel": "has_subdomain", "src": "domain:example.com"}, {"dst": "domain:shop.example.com", "evidence_ids": ["b862d9832d8143d3c902c73fbb6a295ab78e327b85b8424cdedfe215e5a7fe2e"], "rel": "has_subdomain", "src": "domain:example.com"}, {"dst": "domain:soft.example.com", "evidence_ids": ["f3ad8ba618674ed8756b567222e6a8686ac7dbf01f0084107f9b5a7dbf52ed42"], "rel": "has_subdomain", "src": "domain:example.com"}, {"dst": "domain:www.example.com", "evidence_ids": ["5ce709da5d58faeaca25c71de5bfb5b7fc57c0187dadc5487fe613bc2c99ce2b"], "rel": "has_subdomain", "src": "domain:example.com"}, {"dst": "domain:mail.example.com", "evidence_ids": ["f371732585dd210fdb14b2ff3c790ce3cc13807bbe0d5e571b9f9e7e09ffe16c"], "rel": "mx", "src": "domain:example.com"}, {"dst": "domain:ns1.dns.example.net", "evidence_ids": ["59edc5a1e9efc3048be4b7020fa262068351b81dcd7f3aee7a1c6d1536c597cb", "756a4789100195ccf5b369a3870bf4c8fe33c40896cd9d7195f162c969466aad"], "rel": "ns", "src": "domain:example.com"}, {"dst": "domain:ns2.dns.example.net", "evidence_ids": ["59edc5a1e9efc3048be4b7020fa262068351b81dcd7f3aee7a1c6d1536c597cb"], "rel": "ns", "src": "domain:example.com"}, {"dst": "domain:ns9.old.example.net", "evidence_ids": ["756a4789100195ccf5b369a3870bf4c8fe33c40896cd9d7195f162c969466aad"], "rel": "ns", "src": "domain:example.com"}, {"dst": "ip:192.0.2.1", "evidence_ids": ["ed67e58c5cf58145f110fcb0e775753d8c47392b22d15741a12b1a5131293b2f"], "rel": "resolves_to", "src": "domain:example.com"}, {"dst": "domain:spf.example.org", "evidence_ids": ["6389b626d20732228da26a58a919355bbb5faf3b54d6febf55fb10964ae6454c"], "rel": "spf_include", "src": "domain:example.com"}, {"dst": "domain:ns1.dns.example.net", "evidence_ids": ["08f6bf5b1661d2c5bc9e628e2233f2faa440829756ed8158a5ae75adee73cde9", "b343a685a88e2c255d6ba0cd11173a955fcb07dfeb8a1e2c35673a02a9b866e0"], "rel": "ns", "src": "domain:example.net"}, {"dst": "domain:ns2.dns.example.net", "evidence_ids": ["08f6bf5b1661d2c5bc9e628e2233f2faa440829756ed8158a5ae75adee73cde9", "b343a685a88e2c255d6ba0cd11173a955fcb07dfeb8a1e2c35673a02a9b866e0"], "rel": "ns", "src": "domain:example.net"}, {"dst": "ip:198.51.100.10", "evidence_ids": ["7eaf7a6e4ce1204f2398e144f2dd57a946ce7319fe5d49722977dcd10d2b5647"], "rel": "resolves_to", "src": "domain:example.net"}, {"dst": "domain:gone.example.org", "evidence_ids": ["09d37eedacce26ac91966dba5222a482a7e3f695f4a976e24ac5d0a9e567aa91"], "rel": "cname_to", "src": "domain:legacy.example.com"}, {"dst": "ip:192.0.2.25", "evidence_ids": ["b66a08b9fea44f23abb9791edb152886dbd14bf7f74ec4ebbc39f9168ada3cf1"], "rel": "resolves_to", "src": "domain:mail.example.com"}, {"dst": "ip:192.0.2.74", "evidence_ids": ["ff472dc63ced2336cc4c8a7aa66af6b26a5279f741ccc1065182d56299f4fbf7"], "rel": "resolves_to", "src": "domain:multi.example.com"}, {"dst": "ip:192.0.2.71", "evidence_ids": ["ff153d7b83a713654896fc1e4ddb284d03f38ed6c0341f05cdd71f9ab4dcaba9"], "rel": "resolves_to", "src": "domain:neutral.example.com"}, {"dst": "ip:192.0.2.73", "evidence_ids": ["8b51c626a4c3a43ebfa1553cefee66319a43610865b21f03b7fe2c814989ea2d"], "rel": "resolves_to", "src": "domain:noall.example.com"}, {"dst": "ip:198.51.100.53", "evidence_ids": ["7f5ace880243517166aa2c4143b3f1763167fd82691d40133b8d1675a8dfa217"], "rel": "resolves_to", "src": "domain:ns1.dns.example.net"}, {"dst": "ip:198.51.100.54", "evidence_ids": ["1dab89720a1b08626b2bb016a98d27c11f7ee49a782efdeec4eff333d16544f4"], "rel": "resolves_to", "src": "domain:ns2.dns.example.net"}, {"dst": "domain:example.net", "evidence_ids": ["0fdfa5c4feac9b667cf909381eaa1a4b3073b64fab48c54602693fcf00fb8a9a"], "rel": "mx", "src": "domain:oldmail.example.com"}, {"dst": "ip:192.0.2.77", "evidence_ids": ["fc3339d17634fafb1acdd94a4fb7ae0e899ea6534b99dd27f330805002f2894c"], "rel": "resolves_to", "src": "domain:oldmail.example.com"}, {"dst": "domain:mail.example.com", "evidence_ids": ["398d513b6b1d17f503ce8383f911658a4ab399217c16a21e8f059af3f37200a5"], "rel": "mx", "src": "domain:sales.example.com"}, {"dst": "ip:192.0.2.76", "evidence_ids": ["0f03aa66fc728d33cc76e83d372cd2f3dc6fbbd56d0f565b5dfa8ab691fc3a71"], "rel": "resolves_to", "src": "domain:sales.example.com"}, {"dst": "domain:demo.pages.example.org", "evidence_ids": ["bcee36275bf029e102947eed8d592f7efd9e3228a3a0f2b836b4a2352d556249"], "rel": "cname_to", "src": "domain:shop.example.com"}, {"dst": "ip:192.0.2.72", "evidence_ids": ["8fae92b68fbb16654d5fad999debccd50a13752a06791fb37d8e81e72b04f7e2"], "rel": "resolves_to", "src": "domain:soft.example.com"}, {"dst": "ip:192.0.2.10", "evidence_ids": ["6cf07b70fe54c8dc07202a916e21a75b44e68ac305f61af7dafb7d4e0f3eeeba"], "rel": "resolves_to", "src": "domain:www.example.com"}, {"dst": "asn:AS64500", "evidence_ids": ["8796b00d0d58fc0d2f85096865b77609a632b6307af99de807e0a36b130c0741"], "rel": "announced_by", "src": "ip:192.0.2.1"}, {"dst": "asn:AS64500", "evidence_ids": ["31618bb7c7a0025f530835cf1d160543c407316a0096ef3e00c4db05b01a345c"], "rel": "announced_by", "src": "ip:192.0.2.10"}, {"dst": "asn:AS64500", "evidence_ids": ["b81d938641b238321d012b13932c3a32eacb1b503a2560c5210e6cb34555552a"], "rel": "announced_by", "src": "ip:192.0.2.25"}, {"dst": "asn:AS64500", "evidence_ids": ["4183e499e07dffbb041b653b4dc678fd33412027a88892ba8670331174aeb889"], "rel": "announced_by", "src": "ip:192.0.2.50"}, {"dst": "asn:AS64500", "evidence_ids": ["9ba28d58c36cf437461ec87118bae7206a3e8ae854a09a1578907b3cfa6e15f6"], "rel": "announced_by", "src": "ip:192.0.2.61"}, {"dst": "asn:AS64500", "evidence_ids": ["f66c746bc440c8d128f28b7796c4b66cb533c6c09266a1444c77bc63f93afa25"], "rel": "announced_by", "src": "ip:192.0.2.62"}, {"dst": "asn:AS64500", "evidence_ids": ["454b918b6e9c4e9c4e262e2561cf4603e26497589712bd60495b604f254bd35d"], "rel": "announced_by", "src": "ip:192.0.2.64"}, {"dst": "asn:AS64500", "evidence_ids": ["dcda18944133bf4d950b0f1b57cae1ee851f2aa2609173980098b3150726d24f"], "rel": "announced_by", "src": "ip:192.0.2.71"}, {"dst": "asn:AS64500", "evidence_ids": ["e0ba3bebce56d65b6e52d31ef970b3df7cbb34274625da6da75828a958568ec0"], "rel": "announced_by", "src": "ip:192.0.2.72"}, {"dst": "asn:AS64500", "evidence_ids": ["4adf860db08854230c27df2b82977f21cab144f608832cc0f287ab5664a1c5b0"], "rel": "announced_by", "src": "ip:192.0.2.73"}, {"dst": "asn:AS64500", "evidence_ids": ["24d86e32684a6049ff7a3ad05c6771c1b3ee35cf9e488b4c1738cf41239bf348"], "rel": "announced_by", "src": "ip:192.0.2.74"}, {"dst": "asn:AS64500", "evidence_ids": ["b2cc2a3bf3dd2f2efbf5bb2b3231e48db1f91b8ac3ad4b915262c9087b4394b6"], "rel": "announced_by", "src": "ip:192.0.2.75"}, {"dst": "asn:AS64500", "evidence_ids": ["0ca4114e8c6a3d33dc886093bab987f268b2076e75229a7574f38135171b660b"], "rel": "announced_by", "src": "ip:192.0.2.76"}, {"dst": "asn:AS64500", "evidence_ids": ["01e0d9f756c829c055cbb6fca028b332281a006d2dba0560c9ecd6c56f9070c2"], "rel": "announced_by", "src": "ip:192.0.2.77"}, {"dst": "asn:AS64500", "evidence_ids": ["723fd57994f3cafb746088ef8f2855ae4f96ac6239073953cb3c6d21e23f5eb8"], "rel": "announced_by", "src": "ip:198.51.100.10"}, {"dst": "asn:AS64500", "evidence_ids": ["e463807d036cdb0194bad1001ffbdc8b5441dc766ed0e5f391024e12f5d6fc33"], "rel": "announced_by", "src": "ip:198.51.100.53"}, {"dst": "asn:AS64500", "evidence_ids": ["928582d58494dfc3fd7603a1d48dbee1417b6f1e1ea4d99195c04a2dd0e1ac10"], "rel": "announced_by", "src": "ip:198.51.100.54"}], "egress": [], "entities": [{"id": "asn:AS64500", "state": "out", "type": "asn", "value": "AS64500"}, {"id": "domain:app1.example.com", "state": "in", "type": "domain", "value": "app1.example.com"}, {"id": "domain:app2.example.com", "state": "in", "type": "domain", "value": "app2.example.com"}, {"id": "domain:app4.example.com", "state": "in", "type": "domain", "value": "app4.example.com"}, {"id": "domain:bulk.example.com", "state": "in", "type": "domain", "value": "bulk.example.com"}, {"id": "domain:demo.pages.example.org", "state": "out", "type": "domain", "value": "demo.pages.example.org"}, {"id": "domain:dev.example.com", "state": "in", "type": "domain", "value": "dev.example.com"}, {"id": "domain:docs.example.com", "state": "in", "type": "domain", "value": "docs.example.com"}, {"id": "domain:example.com", "state": "in", "type": "domain", "value": "example.com"}, {"id": "domain:example.net", "state": "in", "type": "domain", "value": "example.net"}, {"id": "domain:ghost.example.com", "state": "in", "type": "domain", "value": "ghost.example.com"}, {"id": "domain:gone.example.org", "state": "out", "type": "domain", "value": "gone.example.org"}, {"id": "domain:legacy.example.com", "state": "in", "type": "domain", "value": "legacy.example.com"}, {"id": "domain:mail.example.com", "state": "in", "type": "domain", "value": "mail.example.com"}, {"id": "domain:multi.example.com", "state": "in", "type": "domain", "value": "multi.example.com"}, {"id": "domain:neutral.example.com", "state": "in", "type": "domain", "value": "neutral.example.com"}, {"id": "domain:noall.example.com", "state": "in", "type": "domain", "value": "noall.example.com"}, {"id": "domain:ns1.dns.example.net", "state": "in", "type": "domain", "value": "ns1.dns.example.net"}, {"id": "domain:ns2.dns.example.net", "state": "in", "type": "domain", "value": "ns2.dns.example.net"}, {"id": "domain:ns9.old.example.net", "state": "in", "type": "domain", "value": "ns9.old.example.net"}, {"id": "domain:oldmail.example.com", "state": "in", "type": "domain", "value": "oldmail.example.com"}, {"id": "domain:s1.example.org", "state": "out", "type": "domain", "value": "s1.example.org"}, {"id": "domain:s10.example.org", "state": "out", "type": "domain", "value": "s10.example.org"}, {"id": "domain:s11.example.org", "state": "out", "type": "domain", "value": "s11.example.org"}, {"id": "domain:s2.example.org", "state": "out", "type": "domain", "value": "s2.example.org"}, {"id": "domain:s3.example.org", "state": "out", "type": "domain", "value": "s3.example.org"}, {"id": "domain:s4.example.org", "state": "out", "type": "domain", "value": "s4.example.org"}, {"id": "domain:s5.example.org", "state": "out", "type": "domain", "value": "s5.example.org"}, {"id": "domain:s6.example.org", "state": "out", "type": "domain", "value": "s6.example.org"}, {"id": "domain:s7.example.org", "state": "out", "type": "domain", "value": "s7.example.org"}, {"id": "domain:s8.example.org", "state": "out", "type": "domain", "value": "s8.example.org"}, {"id": "domain:s9.example.org", "state": "out", "type": "domain", "value": "s9.example.org"}, {"id": "domain:sales.example.com", "state": "in", "type": "domain", "value": "sales.example.com"}, {"id": "domain:shop.example.com", "state": "in", "type": "domain", "value": "shop.example.com"}, {"id": "domain:soft.example.com", "state": "in", "type": "domain", "value": "soft.example.com"}, {"id": "domain:spf.example.org", "state": "out", "type": "domain", "value": "spf.example.org"}, {"id": "domain:team.sites.example.org", "state": "out", "type": "domain", "value": "team.sites.example.org"}, {"id": "domain:www.example.com", "state": "in", "type": "domain", "value": "www.example.com"}, {"id": "ip:192.0.2.1", "state": "linked", "type": "ip", "value": "192.0.2.1"}, {"id": "ip:192.0.2.10", "state": "linked", "type": "ip", "value": "192.0.2.10"}, {"id": "ip:192.0.2.25", "state": "linked", "type": "ip", "value": "192.0.2.25"}, {"id": "ip:192.0.2.50", "state": "linked", "type": "ip", "value": "192.0.2.50"}, {"id": "ip:192.0.2.61", "state": "linked", "type": "ip", "value": "192.0.2.61"}, {"id": "ip:192.0.2.62", "state": "linked", "type": "ip", "value": "192.0.2.62"}, {"id": "ip:192.0.2.64", "state": "linked", "type": "ip", "value": "192.0.2.64"}, {"id": "ip:192.0.2.71", "state": "linked", "type": "ip", "value": "192.0.2.71"}, {"id": "ip:192.0.2.72", "state": "linked", "type": "ip", "value": "192.0.2.72"}, {"id": "ip:192.0.2.73", "state": "linked", "type": "ip", "value": "192.0.2.73"}, {"id": "ip:192.0.2.74", "state": "linked", "type": "ip", "value": "192.0.2.74"}, {"id": "ip:192.0.2.75", "state": "linked", "type": "ip", "value": "192.0.2.75"}, {"id": "ip:192.0.2.76", "state": "linked", "type": "ip", "value": "192.0.2.76"}, {"id": "ip:192.0.2.77", "state": "linked", "type": "ip", "value": "192.0.2.77"}, {"id": "ip:198.51.100.10", "state": "linked", "type": "ip", "value": "198.51.100.10"}, {"id": "ip:198.51.100.53", "state": "linked", "type": "ip", "value": "198.51.100.53"}, {"id": "ip:198.51.100.54", "state": "linked", "type": "ip", "value": "198.51.100.54"}], "evidence": {"01e0d9f756c829c055cbb6fca028b332281a006d2dba0560c9ecd6c56f9070c2": {"collected_at": "2026-10-20T20:16:37+00:00", "payload": "{\"data\":{\"asns\":[{\"asn\":64500,\"holder\":\"EXAMPLE-EDGE\"}]}}", "request": "GET https://stat.ripe.net/data/prefix-overview/data.json?resource=192.0.2.77&sourceapp=scrutator", "source": "asn"}, "067fb14624bb13b80634beea67e5c22b8ab7fec13a5360c0f7721dcf19affbbf": {"collected_at": "2026-10-20T20:16:36+00:00", "payload": "\"v=spf1 mx ?all\"", "request": "DNS TXT neutral.example.com", "source": "dns"}, "08f6bf5b1661d2c5bc9e628e2233f2faa440829756ed8158a5ae75adee73cde9": {"collected_at": "2026-10-20T20:16:37+00:00", "payload": "{\"ldhName\":\"EXAMPLE.NET\",\"events\":[{\"eventAction\":\"registration\",\"eventDate\":\"1995-08-14T04:00:00Z\"},{\"eventAction\":\"expiration\",\"eventDate\":\"2026-10-15T20:16:36Z\"},{\"eventAction\":\"last update of RDAP database\",\"eventDate\":\"2026-10-20T20:16:37Z\"}],\"nameservers\":[{\"ldhName\":\"NS1.DNS.EXAMPLE.NET\"},{\"ldhName\":\"NS2.DNS.EXAMPLE.NET\"}]}", "request": "GET https://rdap.org/domain/example.net", "source": "rdap"}, "09d37eedacce26ac91966dba5222a482a7e3f695f4a976e24ac5d0a9e567aa91": {"collected_at": "2026-10-20T20:16:36+00:00", "payload": "gone.example.org.", "request": "DNS CNAME legacy.example.com", "source": "dns"}, "0bcd468119ee284a87e66d6bfe27f868e9fa4e55a0dafd1b5e24d8ba5dc9924c": {"collected_at": "2026-10-20T20:16:36+00:00", "payload": "[{\"id\": 114, \"issuer_name\": \"C=US, O=Let's Encrypt, CN=R3\", \"name_value\": \"sales.example.com\", \"not_after\": \"2026-12-19T20:16:36\", \"not_before\": \"2026-09-20T20:16:36\"}]", "request": "GET https://crt.sh/?q=%25.example.com&output=json", "source": "crtsh"}, "0ca4114e8c6a3d33dc886093bab987f268b2076e75229a7574f38135171b660b": {"collected_at": "2026-10-20T20:16:37+00:00", "payload": "{\"data\":{\"asns\":[{\"asn\":64500,\"holder\":\"EXAMPLE-EDGE\"}]}}", "request": "GET https://stat.ripe.net/data/prefix-overview/data.json?resource=192.0.2.76&sourceapp=scrutator", "source": "asn"}, "0f03aa66fc728d33cc76e83d372cd2f3dc6fbbd56d0f565b5dfa8ab691fc3a71": {"collected_at": "2026-10-20T20:16:36+00:00", "payload": "192.0.2.76", "request": "DNS A sales.example.com", "source": "dns"}, "0fdfa5c4feac9b667cf909381eaa1a4b3073b64fab48c54602693fcf00fb8a9a": {"collected_at": "2026-10-20T20:16:36+00:00", "payload": "10 example.net.", "request": "DNS MX oldmail.example.com", "source": "dns"}, "1dab89720a1b08626b2bb016a98d27c11f7ee49a782efdeec4eff333d16544f4": {"collected_at": "2026-10-20T20:16:37+00:00", "payload": "198.51.100.54", "request": "DNS A ns2.dns.example.net", "source": "dns"}, "1f205fd8af518d4093ffefa32b25d025b452579bf865b47ecd4ff963452822df": {"collected_at": "2026-10-20T20:16:36+00:00", "payload": "[{\"id\": 112, \"issuer_name\": \"C=US, O=Let's Encrypt, CN=R3\", \"name_value\": \"multi.example.com\", \"not_after\": \"2026-12-19T20:16:36\", \"not_before\": \"2026-09-20T20:16:36\"}]", "request": "GET https://crt.sh/?q=%25.example.com&output=json", "source": "crtsh"}, "22f8bc15441db090f585872819f10e08055a72b80f1b73978c8ef37774c62d47": {"collected_at": "2026-10-20T20:16:37+00:00", "payload": "[{\"ip\": \"192.0.2.50\", \"ports\": [80, 443, 6379]}]", "request": "GET https://internetdb.shodan.io/192.0.2.50", "source": "internetdb"}, "24d86e32684a6049ff7a3ad05c6771c1b3ee35cf9e488b4c1738cf41239bf348": {"collected_at": "2026-10-20T20:16:37+00:00", "payload": "{\"data\":{\"asns\":[{\"asn\":64500,\"holder\":\"EXAMPLE-EDGE\"}]}}", "request": "GET https://stat.ripe.net/data/prefix-overview/data.json?resource=192.0.2.74&sourceapp=scrutator", "source": "asn"}, "2e29c591d4c851d7d87a83c41255a3f27dd59de8410d1271388c5adc88e28ab6": {"collected_at": "2026-10-20T20:16:36+00:00", "payload": "[{\"id\": 100, \"issuer_name\": \"C=US, O=Let's Encrypt, CN=R3\", \"name_value\": \"ghost.example.com\", \"not_after\": \"2026-12-19T20:16:36\", \"not_before\": \"2026-09-20T20:16:36\"}]", "request": "GET https://crt.sh/?q=%25.example.com&output=json", "source": "crtsh"}, "31618bb7c7a0025f530835cf1d160543c407316a0096ef3e00c4db05b01a345c": {"collected_at": "2026-10-20T20:16:37+00:00", "payload": "{\"data\":{\"asns\":[{\"asn\":64500,\"holder\":\"EXAMPLE-EDGE\"}]}}", "request": "GET https://stat.ripe.net/data/prefix-overview/data.json?resource=192.0.2.10&sourceapp=scrutator", "source": "asn"}, "33272b595e759e4d505fb27f0f385cd97cacd436e745f1dc3b74526de9d6b97c": {"collected_at": "2026-10-20T20:16:36+00:00", "payload": "[{\"id\": 101, \"issuer_name\": \"C=US, O=Let's Encrypt, CN=R3\", \"name_value\": \"app1.example.com\", \"not_after\": \"2026-12-19T20:16:36\", \"not_before\": \"2026-09-20T20:16:36\"}]", "request": "GET https://crt.sh/?q=%25.example.com&output=json", "source": "crtsh"}, "35f2254265c06712d4c24cfeaad2bcddcec974c957ef2d0bed5643b827d8b2e5": {"collected_at": "2026-10-20T20:16:36+00:00", "payload": "[{\"id\": 102, \"issuer_name\": \"C=US, O=Let's Encrypt, CN=R3\", \"name_value\": \"app2.example.com\", \"not_after\": \"2026-12-19T20:16:36\", \"not_before\": \"2026-09-20T20:16:36\"}]", "request": "GET https://crt.sh/?q=%25.example.com&output=json", "source": "crtsh"}, "398d513b6b1d17f503ce8383f911658a4ab399217c16a21e8f059af3f37200a5": {"collected_at": "2026-10-20T20:16:36+00:00", "payload": "10 mail.example.com.", "request": "DNS MX sales.example.com", "source": "dns"}, "3a69e518f0e14c4c6ae76b88aa169a8f491159c0bdbb7a7795f766d5a080eb6f": {"collected_at": "2026-10-20T20:16:36+00:00", "payload": "NXDOMAIN", "request": "DNS A wc-probe-76f9f24d985f.example.com", "source": "dns"}, "4183e499e07dffbb041b653b4dc678fd33412027a88892ba8670331174aeb889": {"collected_at": "2026-10-20T20:16:37+00:00", "payload": "{\"data\":{\"asns\":[{\"asn\":64500,\"holder\":\"EXAMPLE-EDGE\"}]}}", "request": "GET https://stat.ripe.net/data/prefix-overview/data.json?resource=192.0.2.50&sourceapp=scrutator", "source": "asn"}, "454b918b6e9c4e9c4e262e2561cf4603e26497589712bd60495b604f254bd35d": {"collected_at": "2026-10-20T20:16:37+00:00", "payload": "{\"data\":{\"asns\":[{\"asn\":64500,\"holder\":\"EXAMPLE-EDGE\"}]}}", "request": "GET https://stat.ripe.net/data/prefix-overview/data.json?resource=192.0.2.64&sourceapp=scrutator", "source": "asn"}, "45662725b4f34428ce674d68a9290ec848c820d3e5dd32398d487d2e2ac09d03": {"collected_at": "2026-10-20T20:16:36+00:00", "payload": "192.0.2.75", "request": "DNS A bulk.example.com", "source": "dns"}, "4adf860db08854230c27df2b82977f21cab144f608832cc0f287ab5664a1c5b0": {"collected_at": "2026-10-20T20:16:37+00:00", "payload": "{\"data\":{\"asns\":[{\"asn\":64500,\"holder\":\"EXAMPLE-EDGE\"}]}}", "request": "GET https://stat.ripe.net/data/prefix-overview/data.json?resource=192.0.2.73&sourceapp=scrutator", "source": "asn"}, "4af45bdc672e549ec2a077d9cda451aac2a70b992bb600db0745b3036dcacb31": {"collected_at": "2026-10-20T20:16:36+00:00", "payload": "192.0.2.50", "request": "DNS A dev.example.com", "source": "dns"}, "4d011f45733f3304544004e96eaf1ff24a7dd1aa3ae133f0cd9ca3da1dc84ca0": {"collected_at": "2026-10-20T20:16:36+00:00", "payload": "NXDOMAIN", "request": "DNS AAAA wc-probe-76f9f24d985f.example.com", "source": "dns"}, "515155a776a6048a334b83c228b34efcacf84abde734491cd9107392231f4e1c": {"collected_at": "2026-10-20T20:16:36+00:00", "payload": "[{\"id\": 104, \"issuer_name\": \"C=US, O=Let's Encrypt, CN=R3\", \"name_value\": \"dev.example.com\", \"not_after\": \"2026-12-19T20:16:36\", \"not_before\": \"2026-09-20T20:16:36\"}]", "request": "GET https://crt.sh/?q=%25.example.com&output=json", "source": "crtsh"}, "5936a350f8770c47ac8e4cd9f6b64f302a2f6fd493e5435a931daa90a1e4daf1": {"collected_at": "2026-10-20T20:16:36+00:00", "payload": "192.0.2.64", "request": "DNS A app4.example.com", "source": "dns"}, "59edc5a1e9efc3048be4b7020fa262068351b81dcd7f3aee7a1c6d1536c597cb": {"collected_at": "2026-10-20T20:16:36+00:00", "payload": "ns1.dns.example.net.\nns2.dns.example.net.", "request": "DNS NS example.com", "source": "dns"}, "5ce709da5d58faeaca25c71de5bfb5b7fc57c0187dadc5487fe613bc2c99ce2b": {"collected_at": "2026-10-20T20:16:36+00:00", "payload": "[{\"id\": 105, \"issuer_name\": \"C=US, O=Let's Encrypt, CN=R3\", \"name_value\": \"www.example.com\", \"not_after\": \"2026-12-19T20:16:36\", \"not_before\": \"2026-09-20T20:16:36\"}]", "request": "GET https://crt.sh/?q=%25.example.com&output=json", "source": "crtsh"}, "5ee040e0005866b89020d87ee2230522407c35423795bbe0bc8788ad93ea830c": {"collected_at": "2026-10-20T20:16:36+00:00", "payload": "[{\"id\": 115, \"issuer_name\": \"C=US, O=Let's Encrypt, CN=R3\", \"name_value\": \"oldmail.example.com\", \"not_after\": \"2026-12-19T20:16:36\", \"not_before\": \"2026-09-20T20:16:36\"}]", "request": "GET https://crt.sh/?q=%25.example.com&output=json", "source": "crtsh"}, "623296034c6f3ec55f3570fb7a0a1e9e6f17d6463f4c764e12f749f929e248c7": {"collected_at": "2026-10-20T20:16:36+00:00", "payload": "[{\"id\": 109, \"issuer_name\": \"C=US, O=Let's Encrypt, CN=R3\", \"name_value\": \"neutral.example.com\", \"not_after\": \"2026-12-19T20:16:36\", \"not_before\": \"2026-09-20T20:16:36\"}]", "request": "GET https://crt.sh/?q=%25.example.com&output=json", "source": "crtsh"}, "6389b626d20732228da26a58a919355bbb5faf3b54d6febf55fb10964ae6454c": {"collected_at": "2026-10-20T20:16:36+00:00", "payload": "\"v=spf1 include:spf.example.org +all\"\n\"site-verification=lab\"", "request": "DNS TXT example.com", "source": "dns"}, "64cda6f69dada960e0446c3be5cd00e7c83ae461de1dad9e0a40f842920e57ff": {"collected_at": "2026-10-20T20:16:36+00:00", "payload": "NXDOMAIN", "request": "DNS A docs.example.com", "source": "dns"}, "6cf07b70fe54c8dc07202a916e21a75b44e68ac305f61af7dafb7d4e0f3eeeba": {"collected_at": "2026-10-20T20:16:36+00:00", "payload": "192.0.2.10", "request": "DNS A www.example.com", "source": "dns"}, "6fdf8beacd310dc932d0ca7108dd439a4a602f422622171aeac47280330f3afa": {"collected_at": "2026-10-20T20:16:37+00:00", "payload": "NXDOMAIN", "request": "DNS AAAA wc-probe-33b6b687d051.example.net", "source": "dns"}, "723fd57994f3cafb746088ef8f2855ae4f96ac6239073953cb3c6d21e23f5eb8": {"collected_at": "2026-10-20T20:16:37+00:00", "payload": "{\"data\":{\"asns\":[{\"asn\":64500,\"holder\":\"EXAMPLE-EDGE\"}]}}", "request": "GET https://stat.ripe.net/data/prefix-overview/data.json?resource=198.51.100.10&sourceapp=scrutator", "source": "asn"}, "72cdd8aa0540c26b723a185837d883c34c7767df59f19f3cbc5e52e8b4bcd86c": {"collected_at": "2026-10-20T20:16:36+00:00", "payload": "192.0.2.61", "request": "DNS A app1.example.com", "source": "dns"}, "756a4789100195ccf5b369a3870bf4c8fe33c40896cd9d7195f162c969466aad": {"collected_at": "2026-10-20T20:16:36+00:00", "payload": "{\"ldhName\":\"EXAMPLE.COM\",\"events\":[{\"eventAction\":\"registration\",\"eventDate\":\"1995-08-14T04:00:00Z\"},{\"eventAction\":\"expiration\",\"eventDate\":\"2026-11-09T20:16:36Z\"},{\"eventAction\":\"last update of RDAP database\",\"eventDate\":\"2026-10-20T20:16:36Z\"}],\"nameservers\":[{\"ldhName\":\"NS1.DNS.EXAMPLE.NET\"},{\"ldhName\":\"NS9.OLD.EXAMPLE.NET\"}]}", "request": "GET https://rdap.org/domain/example.com", "source": "rdap"}, "77a939695ea957512ca610c24dbe7a662bba9c77ce5cd6d4dc9b6011134cf17b": {"collected_at": "2026-10-20T20:16:36+00:00", "payload": "team.sites.example.org.", "request": "DNS CNAME docs.example.com", "source": "dns"}, "7eaf7a6e4ce1204f2398e144f2dd57a946ce7319fe5d49722977dcd10d2b5647": {"collected_at": "2026-10-20T20:16:37+00:00", "payload": "198.51.100.10", "request": "DNS A example.net", "source": "dns"}, "7f5ace880243517166aa2c4143b3f1763167fd82691d40133b8d1675a8dfa217": {"collected_at": "2026-10-20T20:16:36+00:00", "payload": "198.51.100.53", "request": "DNS A ns1.dns.example.net", "source": "dns"}, "80978d4d5f04b8a8ede40344cf32c7a7ce3c38820e7060ae7fdb4af4f84f8d4c": {"collected_at": "2026-10-20T20:16:36+00:00", "payload": "NXDOMAIN", "request": "DNS TXT _dmarc.example.com", "source": "dns"}, "831d642a58b2ae690e6505dde146a84d487b4a3efeb140b6ff492f18a99ac782": {"collected_at": "2026-10-20T20:16:36+00:00", "payload": "[{\"id\": 108, \"issuer_name\": \"C=US, O=Let's Encrypt, CN=R3\", \"name_value\": \"legacy.example.com\", \"not_after\": \"2026-12-19T20:16:36\", \"not_before\": \"2026-09-20T20:16:36\"}]", "request": "GET https://crt.sh/?q=%25.example.com&output=json", "source": "crtsh"}, "8388b89816b7a62cd0007e6cd69123383930a96e35185782dd5482a4328ebe02": {"collected_at": "2026-10-20T20:16:36+00:00", "payload": "NXDOMAIN", "request": "DNS A legacy.example.com", "source": "dns"}, "85cfb2338240edbf669f8fbb339599904e977c9c8a52ed193893d3587aefbb40": {"collected_at": "2026-10-20T20:16:36+00:00", "payload": "\"v=spf1 mx ~all\"", "request": "DNS TXT soft.example.com", "source": "dns"}, "8796b00d0d58fc0d2f85096865b77609a632b6307af99de807e0a36b130c0741": {"collected_at": "2026-10-20T20:16:36+00:00", "payload": "{\"data\":{\"asns\":[{\"asn\":64500,\"holder\":\"EXAMPLE-EDGE\"}]}}", "request": "GET https://stat.ripe.net/data/prefix-overview/data.json?resource=192.0.2.1&sourceapp=scrutator", "source": "asn"}, "89ed0ed79d51a1d9178ead6ccdd079412f99ffda1d68e588639e486f38518a3c": {"collected_at": "2026-10-20T20:16:36+00:00", "payload": "NXDOMAIN", "request": "DNS TXT _dmarc.oldmail.example.com", "source": "dns"}, "8b51c626a4c3a43ebfa1553cefee66319a43610865b21f03b7fe2c814989ea2d": {"collected_at": "2026-10-20T20:16:36+00:00", "payload": "192.0.2.73", "request": "DNS A noall.example.com", "source": "dns"}, "8c098ea384c98b8f0e74bebf16b2ffbee0549b864d3599188037fb37054235e6": {"collected_at": "2026-10-20T20:16:36+00:00", "payload": "NXDOMAIN", "request": "DNS A ns9.old.example.net", "source": "dns"}, "8fae92b68fbb16654d5fad999debccd50a13752a06791fb37d8e81e72b04f7e2": {"collected_at": "2026-10-20T20:16:36+00:00", "payload": "192.0.2.72", "request": "DNS A soft.example.com", "source": "dns"}, "90c91a100a3ddc24dddb3fe77f02df1341de4b54e0d1a82dd110119650c6e06f": {"collected_at": "2026-10-20T20:16:36+00:00", "payload": "[{\"id\": 111, \"issuer_name\": \"C=US, O=Let's Encrypt, CN=R3\", \"name_value\": \"noall.example.com\", \"not_after\": \"2026-12-19T20:16:36\", \"not_before\": \"2026-09-20T20:16:36\"}]", "request": "GET https://crt.sh/?q=%25.example.com&output=json", "source": "crtsh"}, "928582d58494dfc3fd7603a1d48dbee1417b6f1e1ea4d99195c04a2dd0e1ac10": {"collected_at": "2026-10-20T20:16:37+00:00", "payload": "{\"data\":{\"asns\":[{\"asn\":64500,\"holder\":\"EXAMPLE-EDGE\"}]}}", "request": "GET https://stat.ripe.net/data/prefix-overview/data.json?resource=198.51.100.54&sourceapp=scrutator", "source": "asn"}, "968bc8e3a139e940a5a602c9b905444fb8c9457e23c8c70d55798183a9e58818": {"collected_at": "2026-10-20T20:16:36+00:00", "payload": "[{\"id\": 107, \"issuer_name\": \"C=US, O=Let's Encrypt, CN=R3\", \"name_value\": \"docs.example.com\", \"not_after\": \"2026-12-19T20:16:36\", \"not_before\": \"2026-09-20T20:16:36\"}]", "request": "GET https://crt.sh/?q=%25.example.com&output=json", "source": "crtsh"}, "9ba28d58c36cf437461ec87118bae7206a3e8ae854a09a1578907b3cfa6e15f6": {"collected_at": "2026-10-20T20:16:37+00:00", "payload": "{\"data\":{\"asns\":[{\"asn\":64500,\"holder\":\"EXAMPLE-EDGE\"}]}}", "request": "GET https://stat.ripe.net/data/prefix-overview/data.json?resource=192.0.2.61&sourceapp=scrutator", "source": "asn"}, "a077c4cf6a393804dc21f4aadf5e89c0ef21640d965232258f1ff9d164a432aa": {"collected_at": "2026-10-20T20:16:36+00:00", "payload": "[{\"id\": 113, \"issuer_name\": \"C=US, O=Let's Encrypt, CN=R3\", \"name_value\": \"bulk.example.com\", \"not_after\": \"2026-12-19T20:16:36\", \"not_before\": \"2026-09-20T20:16:36\"}]", "request": "GET https://crt.sh/?q=%25.example.com&output=json", "source": "crtsh"}, "a732812e78acb79c37637625f9bdfea10fc46c9bc7864097758d1cd7ef5ab82b": {"collected_at": "2026-10-20T20:16:37+00:00", "payload": "NXDOMAIN", "request": "DNS TXT _dmarc.example.net", "source": "dns"}, "affd6716b8271b4f9d5bd7e0c902c9ecdcf9dad9fafe4e2fd66bcce9878dcdf2": {"collected_at": "2026-10-20T20:16:36+00:00", "payload": "192.0.2.62", "request": "DNS A app2.example.com", "source": "dns"}, "b26f8720e480bd67dc9cc71f9a19147bbf50168cbff4cd43f415c4ece3fc048b": {"collected_at": "2026-10-20T20:16:36+00:00", "payload": "\"v=spf1 include:s1.example.org include:s2.example.org include:s3.example.org include:s4.example.org include:s5.example.org include:s6.example.org include:s7.example.org include:s8.example.org include:s9.example.org include:s10.example.org include:s11.example.org -all\"", "request": "DNS TXT bulk.example.com", "source": "dns"}, "b2cc2a3bf3dd2f2efbf5bb2b3231e48db1f91b8ac3ad4b915262c9087b4394b6": {"collected_at": "2026-10-20T20:16:37+00:00", "payload": "{\"data\":{\"asns\":[{\"asn\":64500,\"holder\":\"EXAMPLE-EDGE\"}]}}", "request": "GET https://stat.ripe.net/data/prefix-overview/data.json?resource=192.0.2.75&sourceapp=scrutator", "source": "asn"}, "b343a685a88e2c255d6ba0cd11173a955fcb07dfeb8a1e2c35673a02a9b866e0": {"collected_at": "2026-10-20T20:16:37+00:00", "payload": "ns1.dns.example.net.\nns2.dns.example.net.", "request": "DNS NS example.net", "source": "dns"}, "b66a08b9fea44f23abb9791edb152886dbd14bf7f74ec4ebbc39f9168ada3cf1": {"collected_at": "2026-10-20T20:16:37+00:00", "payload": "192.0.2.25", "request": "DNS A mail.example.com", "source": "dns"}, "b81d938641b238321d012b13932c3a32eacb1b503a2560c5210e6cb34555552a": {"collected_at": "2026-10-20T20:16:37+00:00", "payload": "{\"data\":{\"asns\":[{\"asn\":64500,\"holder\":\"EXAMPLE-EDGE\"}]}}", "request": "GET https://stat.ripe.net/data/prefix-overview/data.json?resource=192.0.2.25&sourceapp=scrutator", "source": "asn"}, "b862d9832d8143d3c902c73fbb6a295ab78e327b85b8424cdedfe215e5a7fe2e": {"collected_at": "2026-10-20T20:16:36+00:00", "payload": "[{\"id\": 106, \"issuer_name\": \"C=US, O=Let's Encrypt, CN=R3\", \"name_value\": \"shop.example.com\", \"not_after\": \"2026-12-19T20:16:36\", \"not_before\": \"2026-09-20T20:16:36\"}]", "request": "GET https://crt.sh/?q=%25.example.com&output=json", "source": "crtsh"}, "bcee36275bf029e102947eed8d592f7efd9e3228a3a0f2b836b4a2352d556249": {"collected_at": "2026-10-20T20:16:36+00:00", "payload": "demo.pages.example.org.", "request": "DNS CNAME shop.example.com", "source": "dns"}, "c4d48be7276d6db6a9820b2c468a7a21e4221da00c3b8d35d5ccf2bddc711b9b": {"collected_at": "2026-10-20T20:16:36+00:00", "payload": "NXDOMAIN", "request": "DNS A shop.example.com", "source": "dns"}, "c6db47b4d3e2e41a02daf80fc3aa006e2d04eb2c68709171bcbdce290fa2cdf0": {"collected_at": "2026-10-20T20:16:36+00:00", "payload": "[\"http://ghost.example.com/\"]", "request": "GET https://web.archive.org/cdx/search/cdx?url=%2A.example.com&output=json&fl=original&collapse=urlkey&limit=500", "source": "wayback"}, "cf9ad543171412b3791ad9a87b2c0f0acbf046eea457d1e92c76e1ab63ec1265": {"collected_at": "2026-10-20T20:16:36+00:00", "payload": "\"v=spf1 mx -all\"\n\"v=spf1 a -all\"", "request": "DNS TXT multi.example.com", "source": "dns"}, "dcda18944133bf4d950b0f1b57cae1ee851f2aa2609173980098b3150726d24f": {"collected_at": "2026-10-20T20:16:37+00:00", "payload": "{\"data\":{\"asns\":[{\"asn\":64500,\"holder\":\"EXAMPLE-EDGE\"}]}}", "request": "GET https://stat.ripe.net/data/prefix-overview/data.json?resource=192.0.2.71&sourceapp=scrutator", "source": "asn"}, "e0ba3bebce56d65b6e52d31ef970b3df7cbb34274625da6da75828a958568ec0": {"collected_at": "2026-10-20T20:16:37+00:00", "payload": "{\"data\":{\"asns\":[{\"asn\":64500,\"holder\":\"EXAMPLE-EDGE\"}]}}", "request": "GET https://stat.ripe.net/data/prefix-overview/data.json?resource=192.0.2.72&sourceapp=scrutator", "source": "asn"}, "e38fa3477046df1145f76497684ed45cf1bfa7ee959501e068aa353923b0b7e2": {"collected_at": "2026-10-20T20:16:36+00:00", "payload": "\"v=DMARC1; p=none; rua=mailto:dmarc@example.com\"", "request": "DNS TXT _dmarc.sales.example.com", "source": "dns"}, "e463807d036cdb0194bad1001ffbdc8b5441dc766ed0e5f391024e12f5d6fc33": {"collected_at": "2026-10-20T20:16:37+00:00", "payload": "{\"data\":{\"asns\":[{\"asn\":64500,\"holder\":\"EXAMPLE-EDGE\"}]}}", "request": "GET https://stat.ripe.net/data/prefix-overview/data.json?resource=198.51.100.53&sourceapp=scrutator", "source": "asn"}, "eb6969220261232fc88632db4413f4fd88636e66334df9006caed2f51e319d3c": {"collected_at": "2026-10-20T20:16:36+00:00", "payload": "[{\"id\": 103, \"issuer_name\": \"C=US, O=Let's Encrypt, CN=R3\", \"name_value\": \"app4.example.com\", \"not_after\": \"2026-12-19T20:16:36\", \"not_before\": \"2026-09-20T20:16:36\"}]", "request": "GET https://crt.sh/?q=%25.example.com&output=json", "source": "crtsh"}, "ec591befd7d6842d1c52eb92279b48ca09c7ef371abb4b02bb99b0bd1c9bbddd": {"collected_at": "2026-10-20T20:16:36+00:00", "payload": "\"v=spf1 mx\"", "request": "DNS TXT noall.example.com", "source": "dns"}, "ed67e58c5cf58145f110fcb0e775753d8c47392b22d15741a12b1a5131293b2f": {"collected_at": "2026-10-20T20:16:36+00:00", "payload": "192.0.2.1", "request": "DNS A example.com", "source": "dns"}, "f371732585dd210fdb14b2ff3c790ce3cc13807bbe0d5e571b9f9e7e09ffe16c": {"collected_at": "2026-10-20T20:16:36+00:00", "payload": "10 mail.example.com.", "request": "DNS MX example.com", "source": "dns"}, "f3ad8ba618674ed8756b567222e6a8686ac7dbf01f0084107f9b5a7dbf52ed42": {"collected_at": "2026-10-20T20:16:36+00:00", "payload": "[{\"id\": 110, \"issuer_name\": \"C=US, O=Let's Encrypt, CN=R3\", \"name_value\": \"soft.example.com\", \"not_after\": \"2026-12-19T20:16:36\", \"not_before\": \"2026-09-20T20:16:36\"}]", "request": "GET https://crt.sh/?q=%25.example.com&output=json", "source": "crtsh"}, "f66c746bc440c8d128f28b7796c4b66cb533c6c09266a1444c77bc63f93afa25": {"collected_at": "2026-10-20T20:16:37+00:00", "payload": "{\"data\":{\"asns\":[{\"asn\":64500,\"holder\":\"EXAMPLE-EDGE\"}]}}", "request": "GET https://stat.ripe.net/data/prefix-overview/data.json?resource=192.0.2.62&sourceapp=scrutator", "source": "asn"}, "f9b081024eaef68c11e2f13713d461eff9512456735b023e2f701400f81d4cfb": {"collected_at": "2026-10-20T20:16:36+00:00", "payload": "NXDOMAIN", "request": "DNS A ghost.example.com", "source": "dns"}, "fb32292266be3658dd3466092102faafbc15fa5559699d1e6c263f9019cccec5": {"collected_at": "2026-10-20T20:16:36+00:00", "payload": "NODATA", "request": "DNS CAA example.com", "source": "dns"}, "fb41a659ee47efe30954c8bd8af078086c6e17f849ff559924e06d04e48996d6": {"collected_at": "2026-10-20T20:16:37+00:00", "payload": "NODATA", "request": "DNS CAA example.net", "source": "dns"}, "fb65803be8e7ea16372d87f90a01abdbd17f20f2538a636047c0548eebff4236": {"collected_at": "2026-10-20T20:16:37+00:00", "payload": "NXDOMAIN", "request": "DNS A wc-probe-33b6b687d051.example.net", "source": "dns"}, "fc3339d17634fafb1acdd94a4fb7ae0e899ea6534b99dd27f330805002f2894c": {"collected_at": "2026-10-20T20:16:36+00:00", "payload": "192.0.2.77", "request": "DNS A oldmail.example.com", "source": "dns"}, "ff153d7b83a713654896fc1e4ddb284d03f38ed6c0341f05cdd71f9ab4dcaba9": {"collected_at": "2026-10-20T20:16:36+00:00", "payload": "192.0.2.71", "request": "DNS A neutral.example.com", "source": "dns"}, "ff472dc63ced2336cc4c8a7aa66af6b26a5279f741ccc1065182d56299f4fbf7": {"collected_at": "2026-10-20T20:16:36+00:00", "payload": "192.0.2.74", "request": "DNS A multi.example.com", "source": "dns"}}, "exposure": [{"abuse_contacts": [], "country": "", "cpes": [], "description": "", "evidence_ids": ["22f8bc15441db090f585872819f10e08055a72b80f1b73978c8ef37774c62d47"], "hostnames": [], "ip": "192.0.2.50", "netname": "", "ports": [80, 443, 6379], "state": "linked", "vulns": []}], "findings": [{"claim": "app1.example.com resolves to 192.0.2.61", "confidence": "low", "entity_ids": ["domain:app1.example.com", "ip:192.0.2.61"], "evidence_ids": ["72cdd8aa0540c26b723a185837d883c34c7767df59f19f3cbc5e52e8b4bcd86c"], "tier": "verified"}, {"claim": "app2.example.com resolves to 192.0.2.62", "confidence": "low", "entity_ids": ["domain:app2.example.com", "ip:192.0.2.62"], "evidence_ids": ["affd6716b8271b4f9d5bd7e0c902c9ecdcf9dad9fafe4e2fd66bcce9878dcdf2"], "tier": "verified"}, {"claim": "app4.example.com resolves to 192.0.2.64", "confidence": "low", "entity_ids": ["domain:app4.example.com", "ip:192.0.2.64"], "evidence_ids": ["5936a350f8770c47ac8e4cd9f6b64f302a2f6fd493e5435a931daa90a1e4daf1"], "tier": "verified"}, {"claim": "bulk.example.com resolves to 192.0.2.75", "confidence": "low", "entity_ids": ["domain:bulk.example.com", "ip:192.0.2.75"], "evidence_ids": ["45662725b4f34428ce674d68a9290ec848c820d3e5dd32398d487d2e2ac09d03"], "tier": "verified"}, {"claim": "bulk.example.com authorises senders via SPF include s1.example.org", "confidence": "low", "entity_ids": ["domain:bulk.example.com", "domain:s1.example.org"], "evidence_ids": ["b26f8720e480bd67dc9cc71f9a19147bbf50168cbff4cd43f415c4ece3fc048b"], "tier": "verified"}, {"claim": "bulk.example.com authorises senders via SPF include s10.example.org", "confidence": "low", "entity_ids": ["domain:bulk.example.com", "domain:s10.example.org"], "evidence_ids": ["b26f8720e480bd67dc9cc71f9a19147bbf50168cbff4cd43f415c4ece3fc048b"], "tier": "verified"}, {"claim": "bulk.example.com authorises senders via SPF include s11.example.org", "confidence": "low", "entity_ids": ["domain:bulk.example.com", "domain:s11.example.org"], "evidence_ids": ["b26f8720e480bd67dc9cc71f9a19147bbf50168cbff4cd43f415c4ece3fc048b"], "tier": "verified"}, {"claim": "bulk.example.com authorises senders via SPF include s2.example.org", "confidence": "low", "entity_ids": ["domain:bulk.example.com", "domain:s2.example.org"], "evidence_ids": ["b26f8720e480bd67dc9cc71f9a19147bbf50168cbff4cd43f415c4ece3fc048b"], "tier": "verified"}, {"claim": "bulk.example.com authorises senders via SPF include s3.example.org", "confidence": "low", "entity_ids": ["domain:bulk.example.com", "domain:s3.example.org"], "evidence_ids": ["b26f8720e480bd67dc9cc71f9a19147bbf50168cbff4cd43f415c4ece3fc048b"], "tier": "verified"}, {"claim": "bulk.example.com authorises senders via SPF include s4.example.org", "confidence": "low", "entity_ids": ["domain:bulk.example.com", "domain:s4.example.org"], "evidence_ids": ["b26f8720e480bd67dc9cc71f9a19147bbf50168cbff4cd43f415c4ece3fc048b"], "tier": "verified"}, {"claim": "bulk.example.com authorises senders via SPF include s5.example.org", "confidence": "low", "entity_ids": ["domain:bulk.example.com", "domain:s5.example.org"], "evidence_ids": ["b26f8720e480bd67dc9cc71f9a19147bbf50168cbff4cd43f415c4ece3fc048b"], "tier": "verified"}, {"claim": "bulk.example.com authorises senders via SPF include s6.example.org", "confidence": "low", "entity_ids": ["domain:bulk.example.com", "domain:s6.example.org"], "evidence_ids": ["b26f8720e480bd67dc9cc71f9a19147bbf50168cbff4cd43f415c4ece3fc048b"], "tier": "verified"}, {"claim": "bulk.example.com authorises senders via SPF include s7.example.org", "confidence": "low", "entity_ids": ["domain:bulk.example.com", "domain:s7.example.org"], "evidence_ids": ["b26f8720e480bd67dc9cc71f9a19147bbf50168cbff4cd43f415c4ece3fc048b"], "tier": "verified"}, {"claim": "bulk.example.com authorises senders via SPF include s8.example.org", "confidence": "low", "entity_ids": ["domain:bulk.example.com", "domain:s8.example.org"], "evidence_ids": ["b26f8720e480bd67dc9cc71f9a19147bbf50168cbff4cd43f415c4ece3fc048b"], "tier": "verified"}, {"claim": "bulk.example.com authorises senders via SPF include s9.example.org", "confidence": "low", "entity_ids": ["domain:bulk.example.com", "domain:s9.example.org"], "evidence_ids": ["b26f8720e480bd67dc9cc71f9a19147bbf50168cbff4cd43f415c4ece3fc048b"], "tier": "verified"}, {"claim": "dev.example.com resolves to 192.0.2.50", "confidence": "low", "entity_ids": ["domain:dev.example.com", "ip:192.0.2.50"], "evidence_ids": ["4af45bdc672e549ec2a077d9cda451aac2a70b992bb600db0745b3036dcacb31"], "tier": "verified"}, {"claim": "example.com has subdomain app1.example.com", "confidence": "low", "entity_ids": ["domain:example.com", "domain:app1.example.com"], "evidence_ids": ["33272b595e759e4d505fb27f0f385cd97cacd436e745f1dc3b74526de9d6b97c"], "tier": "verified"}, {"claim": "example.com has subdomain app2.example.com", "confidence": "low", "entity_ids": ["domain:example.com", "domain:app2.example.com"], "evidence_ids": ["35f2254265c06712d4c24cfeaad2bcddcec974c957ef2d0bed5643b827d8b2e5"], "tier": "verified"}, {"claim": "example.com has subdomain app4.example.com", "confidence": "low", "entity_ids": ["domain:example.com", "domain:app4.example.com"], "evidence_ids": ["eb6969220261232fc88632db4413f4fd88636e66334df9006caed2f51e319d3c"], "tier": "verified"}, {"claim": "example.com has subdomain bulk.example.com", "confidence": "low", "entity_ids": ["domain:example.com", "domain:bulk.example.com"], "evidence_ids": ["a077c4cf6a393804dc21f4aadf5e89c0ef21640d965232258f1ff9d164a432aa"], "tier": "verified"}, {"claim": "example.com has subdomain dev.example.com", "confidence": "low", "entity_ids": ["domain:example.com", "domain:dev.example.com"], "evidence_ids": ["515155a776a6048a334b83c228b34efcacf84abde734491cd9107392231f4e1c"], "tier": "verified"}, {"claim": "example.com has subdomain multi.example.com", "confidence": "low", "entity_ids": ["domain:example.com", "domain:multi.example.com"], "evidence_ids": ["1f205fd8af518d4093ffefa32b25d025b452579bf865b47ecd4ff963452822df"], "tier": "verified"}, {"claim": "example.com has subdomain neutral.example.com", "confidence": "low", "entity_ids": ["domain:example.com", "domain:neutral.example.com"], "evidence_ids": ["623296034c6f3ec55f3570fb7a0a1e9e6f17d6463f4c764e12f749f929e248c7"], "tier": "verified"}, {"claim": "example.com has subdomain noall.example.com", "confidence": "low", "entity_ids": ["domain:example.com", "domain:noall.example.com"], "evidence_ids": ["90c91a100a3ddc24dddb3fe77f02df1341de4b54e0d1a82dd110119650c6e06f"], "tier": "verified"}, {"claim": "example.com has subdomain oldmail.example.com", "confidence": "low", "entity_ids": ["domain:example.com", "domain:oldmail.example.com"], "evidence_ids": ["5ee040e0005866b89020d87ee2230522407c35423795bbe0bc8788ad93ea830c"], "tier": "verified"}, {"claim": "example.com has subdomain sales.example.com", "confidence": "low", "entity_ids": ["domain:example.com", "domain:sales.example.com"], "evidence_ids": ["0bcd468119ee284a87e66d6bfe27f868e9fa4e55a0dafd1b5e24d8ba5dc9924c"], "tier": "verified"}, {"claim": "example.com has subdomain soft.example.com", "confidence": "low", "entity_ids": ["domain:example.com", "domain:soft.example.com"], "evidence_ids": ["f3ad8ba618674ed8756b567222e6a8686ac7dbf01f0084107f9b5a7dbf52ed42"], "tier": "verified"}, {"claim": "example.com has subdomain www.example.com", "confidence": "low", "entity_ids": ["domain:example.com", "domain:www.example.com"], "evidence_ids": ["5ce709da5d58faeaca25c71de5bfb5b7fc57c0187dadc5487fe613bc2c99ce2b"], "tier": "verified"}, {"claim": "example.com uses mail server mail.example.com", "confidence": "low", "entity_ids": ["domain:example.com", "domain:mail.example.com"], "evidence_ids": ["f371732585dd210fdb14b2ff3c790ce3cc13807bbe0d5e571b9f9e7e09ffe16c"], "tier": "verified"}, {"claim": "example.com uses name server ns1.dns.example.net", "confidence": "medium", "entity_ids": ["domain:example.com", "domain:ns1.dns.example.net"], "evidence_ids": ["59edc5a1e9efc3048be4b7020fa262068351b81dcd7f3aee7a1c6d1536c597cb", "756a4789100195ccf5b369a3870bf4c8fe33c40896cd9d7195f162c969466aad"], "tier": "verified"}, {"claim": "example.com uses name server ns2.dns.example.net", "confidence": "low", "entity_ids": ["domain:example.com", "domain:ns2.dns.example.net"], "evidence_ids": ["59edc5a1e9efc3048be4b7020fa262068351b81dcd7f3aee7a1c6d1536c597cb"], "tier": "verified"}, {"claim": "example.com uses name server ns9.old.example.net", "confidence": "low", "entity_ids": ["domain:example.com", "domain:ns9.old.example.net"], "evidence_ids": ["756a4789100195ccf5b369a3870bf4c8fe33c40896cd9d7195f162c969466aad"], "tier": "verified"}, {"claim": "example.com resolves to 192.0.2.1", "confidence": "low", "entity_ids": ["domain:example.com", "ip:192.0.2.1"], "evidence_ids": ["ed67e58c5cf58145f110fcb0e775753d8c47392b22d15741a12b1a5131293b2f"], "tier": "verified"}, {"claim": "example.com authorises senders via SPF include spf.example.org", "confidence": "low", "entity_ids": ["domain:example.com", "domain:spf.example.org"], "evidence_ids": ["6389b626d20732228da26a58a919355bbb5faf3b54d6febf55fb10964ae6454c"], "tier": "verified"}, {"claim": "example.net uses name server ns1.dns.example.net", "confidence": "medium", "entity_ids": ["domain:example.net", "domain:ns1.dns.example.net"], "evidence_ids": ["08f6bf5b1661d2c5bc9e628e2233f2faa440829756ed8158a5ae75adee73cde9", "b343a685a88e2c255d6ba0cd11173a955fcb07dfeb8a1e2c35673a02a9b866e0"], "tier": "verified"}, {"claim": "example.net uses name server ns2.dns.example.net", "confidence": "medium", "entity_ids": ["domain:example.net", "domain:ns2.dns.example.net"], "evidence_ids": ["08f6bf5b1661d2c5bc9e628e2233f2faa440829756ed8158a5ae75adee73cde9", "b343a685a88e2c255d6ba0cd11173a955fcb07dfeb8a1e2c35673a02a9b866e0"], "tier": "verified"}, {"claim": "example.net resolves to 198.51.100.10", "confidence": "low", "entity_ids": ["domain:example.net", "ip:198.51.100.10"], "evidence_ids": ["7eaf7a6e4ce1204f2398e144f2dd57a946ce7319fe5d49722977dcd10d2b5647"], "tier": "verified"}, {"claim": "mail.example.com resolves to 192.0.2.25", "confidence": "low", "entity_ids": ["domain:mail.example.com", "ip:192.0.2.25"], "evidence_ids": ["b66a08b9fea44f23abb9791edb152886dbd14bf7f74ec4ebbc39f9168ada3cf1"], "tier": "verified"}, {"claim": "multi.example.com resolves to 192.0.2.74", "confidence": "low", "entity_ids": ["domain:multi.example.com", "ip:192.0.2.74"], "evidence_ids": ["ff472dc63ced2336cc4c8a7aa66af6b26a5279f741ccc1065182d56299f4fbf7"], "tier": "verified"}, {"claim": "neutral.example.com resolves to 192.0.2.71", "confidence": "low", "entity_ids": ["domain:neutral.example.com", "ip:192.0.2.71"], "evidence_ids": ["ff153d7b83a713654896fc1e4ddb284d03f38ed6c0341f05cdd71f9ab4dcaba9"], "tier": "verified"}, {"claim": "noall.example.com resolves to 192.0.2.73", "confidence": "low", "entity_ids": ["domain:noall.example.com", "ip:192.0.2.73"], "evidence_ids": ["8b51c626a4c3a43ebfa1553cefee66319a43610865b21f03b7fe2c814989ea2d"], "tier": "verified"}, {"claim": "ns1.dns.example.net resolves to 198.51.100.53", "confidence": "low", "entity_ids": ["domain:ns1.dns.example.net", "ip:198.51.100.53"], "evidence_ids": ["7f5ace880243517166aa2c4143b3f1763167fd82691d40133b8d1675a8dfa217"], "tier": "verified"}, {"claim": "ns2.dns.example.net resolves to 198.51.100.54", "confidence": "low", "entity_ids": ["domain:ns2.dns.example.net", "ip:198.51.100.54"], "evidence_ids": ["1dab89720a1b08626b2bb016a98d27c11f7ee49a782efdeec4eff333d16544f4"], "tier": "verified"}, {"claim": "oldmail.example.com uses mail server example.net", "confidence": "low", "entity_ids": ["domain:oldmail.example.com", "domain:example.net"], "evidence_ids": ["0fdfa5c4feac9b667cf909381eaa1a4b3073b64fab48c54602693fcf00fb8a9a"], "tier": "verified"}, {"claim": "oldmail.example.com resolves to 192.0.2.77", "confidence": "low", "entity_ids": ["domain:oldmail.example.com", "ip:192.0.2.77"], "evidence_ids": ["fc3339d17634fafb1acdd94a4fb7ae0e899ea6534b99dd27f330805002f2894c"], "tier": "verified"}, {"claim": "sales.example.com uses mail server mail.example.com", "confidence": "low", "entity_ids": ["domain:sales.example.com", "domain:mail.example.com"], "evidence_ids": ["398d513b6b1d17f503ce8383f911658a4ab399217c16a21e8f059af3f37200a5"], "tier": "verified"}, {"claim": "sales.example.com resolves to 192.0.2.76", "confidence": "low", "entity_ids": ["domain:sales.example.com", "ip:192.0.2.76"], "evidence_ids": ["0f03aa66fc728d33cc76e83d372cd2f3dc6fbbd56d0f565b5dfa8ab691fc3a71"], "tier": "verified"}, {"claim": "soft.example.com resolves to 192.0.2.72", "confidence": "low", "entity_ids": ["domain:soft.example.com", "ip:192.0.2.72"], "evidence_ids": ["8fae92b68fbb16654d5fad999debccd50a13752a06791fb37d8e81e72b04f7e2"], "tier": "verified"}, {"claim": "www.example.com resolves to 192.0.2.10", "confidence": "low", "entity_ids": ["domain:www.example.com", "ip:192.0.2.10"], "evidence_ids": ["6cf07b70fe54c8dc07202a916e21a75b44e68ac305f61af7dafb7d4e0f3eeeba"], "tier": "verified"}, {"claim": "192.0.2.1 is announced by AS64500", "confidence": "low", "entity_ids": ["ip:192.0.2.1", "asn:AS64500"], "evidence_ids": ["8796b00d0d58fc0d2f85096865b77609a632b6307af99de807e0a36b130c0741"], "tier": "other"}, {"claim": "192.0.2.10 is announced by AS64500", "confidence": "low", "entity_ids": ["ip:192.0.2.10", "asn:AS64500"], "evidence_ids": ["31618bb7c7a0025f530835cf1d160543c407316a0096ef3e00c4db05b01a345c"], "tier": "other"}, {"claim": "192.0.2.25 is announced by AS64500", "confidence": "low", "entity_ids": ["ip:192.0.2.25", "asn:AS64500"], "evidence_ids": ["b81d938641b238321d012b13932c3a32eacb1b503a2560c5210e6cb34555552a"], "tier": "other"}, {"claim": "192.0.2.50 is announced by AS64500", "confidence": "low", "entity_ids": ["ip:192.0.2.50", "asn:AS64500"], "evidence_ids": ["4183e499e07dffbb041b653b4dc678fd33412027a88892ba8670331174aeb889"], "tier": "other"}, {"claim": "192.0.2.61 is announced by AS64500", "confidence": "low", "entity_ids": ["ip:192.0.2.61", "asn:AS64500"], "evidence_ids": ["9ba28d58c36cf437461ec87118bae7206a3e8ae854a09a1578907b3cfa6e15f6"], "tier": "other"}, {"claim": "192.0.2.62 is announced by AS64500", "confidence": "low", "entity_ids": ["ip:192.0.2.62", "asn:AS64500"], "evidence_ids": ["f66c746bc440c8d128f28b7796c4b66cb533c6c09266a1444c77bc63f93afa25"], "tier": "other"}, {"claim": "192.0.2.64 is announced by AS64500", "confidence": "low", "entity_ids": ["ip:192.0.2.64", "asn:AS64500"], "evidence_ids": ["454b918b6e9c4e9c4e262e2561cf4603e26497589712bd60495b604f254bd35d"], "tier": "other"}, {"claim": "192.0.2.71 is announced by AS64500", "confidence": "low", "entity_ids": ["ip:192.0.2.71", "asn:AS64500"], "evidence_ids": ["dcda18944133bf4d950b0f1b57cae1ee851f2aa2609173980098b3150726d24f"], "tier": "other"}, {"claim": "192.0.2.72 is announced by AS64500", "confidence": "low", "entity_ids": ["ip:192.0.2.72", "asn:AS64500"], "evidence_ids": ["e0ba3bebce56d65b6e52d31ef970b3df7cbb34274625da6da75828a958568ec0"], "tier": "other"}, {"claim": "192.0.2.73 is announced by AS64500", "confidence": "low", "entity_ids": ["ip:192.0.2.73", "asn:AS64500"], "evidence_ids": ["4adf860db08854230c27df2b82977f21cab144f608832cc0f287ab5664a1c5b0"], "tier": "other"}, {"claim": "192.0.2.74 is announced by AS64500", "confidence": "low", "entity_ids": ["ip:192.0.2.74", "asn:AS64500"], "evidence_ids": ["24d86e32684a6049ff7a3ad05c6771c1b3ee35cf9e488b4c1738cf41239bf348"], "tier": "other"}, {"claim": "192.0.2.75 is announced by AS64500", "confidence": "low", "entity_ids": ["ip:192.0.2.75", "asn:AS64500"], "evidence_ids": ["b2cc2a3bf3dd2f2efbf5bb2b3231e48db1f91b8ac3ad4b915262c9087b4394b6"], "tier": "other"}, {"claim": "192.0.2.76 is announced by AS64500", "confidence": "low", "entity_ids": ["ip:192.0.2.76", "asn:AS64500"], "evidence_ids": ["0ca4114e8c6a3d33dc886093bab987f268b2076e75229a7574f38135171b660b"], "tier": "other"}, {"claim": "192.0.2.77 is announced by AS64500", "confidence": "low", "entity_ids": ["ip:192.0.2.77", "asn:AS64500"], "evidence_ids": ["01e0d9f756c829c055cbb6fca028b332281a006d2dba0560c9ecd6c56f9070c2"], "tier": "other"}, {"claim": "198.51.100.10 is announced by AS64500", "confidence": "low", "entity_ids": ["ip:198.51.100.10", "asn:AS64500"], "evidence_ids": ["723fd57994f3cafb746088ef8f2855ae4f96ac6239073953cb3c6d21e23f5eb8"], "tier": "other"}, {"claim": "198.51.100.53 is announced by AS64500", "confidence": "low", "entity_ids": ["ip:198.51.100.53", "asn:AS64500"], "evidence_ids": ["e463807d036cdb0194bad1001ffbdc8b5441dc766ed0e5f391024e12f5d6fc33"], "tier": "other"}, {"claim": "198.51.100.54 is announced by AS64500", "confidence": "low", "entity_ids": ["ip:198.51.100.54", "asn:AS64500"], "evidence_ids": ["928582d58494dfc3fd7603a1d48dbee1417b6f1e1ea4d99195c04a2dd0e1ac10"], "tier": "other"}, {"claim": "docs.example.com is an alias (CNAME) of team.sites.example.org", "confidence": "low", "entity_ids": ["domain:docs.example.com", "domain:team.sites.example.org"], "evidence_ids": ["77a939695ea957512ca610c24dbe7a662bba9c77ce5cd6d4dc9b6011134cf17b"], "tier": "stale"}, {"claim": "example.com has subdomain docs.example.com", "confidence": "low", "entity_ids": ["domain:example.com", "domain:docs.example.com"], "evidence_ids": ["968bc8e3a139e940a5a602c9b905444fb8c9457e23c8c70d55798183a9e58818"], "tier": "stale"}, {"claim": "example.com has subdomain ghost.example.com", "confidence": "medium", "entity_ids": ["domain:example.com", "domain:ghost.example.com"], "evidence_ids": ["2e29c591d4c851d7d87a83c41255a3f27dd59de8410d1271388c5adc88e28ab6", "c6db47b4d3e2e41a02daf80fc3aa006e2d04eb2c68709171bcbdce290fa2cdf0"], "tier": "stale"}, {"claim": "example.com has subdomain legacy.example.com", "confidence": "low", "entity_ids": ["domain:example.com", "domain:legacy.example.com"], "evidence_ids": ["831d642a58b2ae690e6505dde146a84d487b4a3efeb140b6ff492f18a99ac782"], "tier": "stale"}, {"claim": "example.com has subdomain shop.example.com", "confidence": "low", "entity_ids": ["domain:example.com", "domain:shop.example.com"], "evidence_ids": ["b862d9832d8143d3c902c73fbb6a295ab78e327b85b8424cdedfe215e5a7fe2e"], "tier": "stale"}, {"claim": "legacy.example.com is an alias (CNAME) of gone.example.org", "confidence": "low", "entity_ids": ["domain:legacy.example.com", "domain:gone.example.org"], "evidence_ids": ["09d37eedacce26ac91966dba5222a482a7e3f695f4a976e24ac5d0a9e567aa91"], "tier": "stale"}, {"claim": "shop.example.com is an alias (CNAME) of demo.pages.example.org", "confidence": "low", "entity_ids": ["domain:shop.example.com", "domain:demo.pages.example.org"], "evidence_ids": ["bcee36275bf029e102947eed8d592f7efd9e3228a3a0f2b836b4a2352d556249"], "tier": "stale"}], "generated_at": "2026-10-20T20:17:51+00:00", "hypotheses": [], "leads": {"rejected": [], "verified": []}, "names": [{"addresses": ["192.0.2.61"], "basis": "dns", "evidence_ids": ["72cdd8aa0540c26b723a185837d883c34c7767df59f19f3cbc5e52e8b4bcd86c"], "name": "app1.example.com", "named_by": ["crtsh"], "reason": "resolves to 192.0.2.61", "state": "live", "tier": "verified", "tier_reason": "resolves to 192.0.2.61"}, {"addresses": ["192.0.2.62"], "basis": "dns", "evidence_ids": ["affd6716b8271b4f9d5bd7e0c902c9ecdcf9dad9fafe4e2fd66bcce9878dcdf2"], "name": "app2.example.com", "named_by": ["crtsh"], "reason": "resolves to 192.0.2.62", "state": "live", "tier": "verified", "tier_reason": "resolves to 192.0.2.62"}, {"addresses": ["192.0.2.64"], "basis": "dns", "evidence_ids": ["5936a350f8770c47ac8e4cd9f6b64f302a2f6fd493e5435a931daa90a1e4daf1"], "name": "app4.example.com", "named_by": ["crtsh"], "reason": "resolves to 192.0.2.64", "state": "live", "tier": "verified", "tier_reason": "resolves to 192.0.2.64"}, {"addresses": ["192.0.2.75"], "basis": "dns", "evidence_ids": ["45662725b4f34428ce674d68a9290ec848c820d3e5dd32398d487d2e2ac09d03"], "name": "bulk.example.com", "named_by": ["crtsh"], "reason": "resolves to 192.0.2.75", "state": "live", "tier": "verified", "tier_reason": "resolves to 192.0.2.75"}, {"addresses": ["192.0.2.50"], "basis": "dns", "evidence_ids": ["4af45bdc672e549ec2a077d9cda451aac2a70b992bb600db0745b3036dcacb31"], "name": "dev.example.com", "named_by": ["crtsh"], "reason": "resolves to 192.0.2.50", "state": "live", "tier": "verified", "tier_reason": "resolves to 192.0.2.50"}, {"addresses": ["192.0.2.1"], "basis": "dns", "evidence_ids": ["ed67e58c5cf58145f110fcb0e775753d8c47392b22d15741a12b1a5131293b2f"], "name": "example.com", "named_by": [], "reason": "resolves to 192.0.2.1", "state": "live", "tier": "verified", "tier_reason": "resolves to 192.0.2.1"}, {"addresses": ["198.51.100.10"], "basis": "dns", "evidence_ids": ["7eaf7a6e4ce1204f2398e144f2dd57a946ce7319fe5d49722977dcd10d2b5647"], "name": "example.net", "named_by": [], "reason": "resolves to 198.51.100.10", "state": "live", "tier": "verified", "tier_reason": "resolves to 198.51.100.10"}, {"addresses": ["192.0.2.25"], "basis": "dns", "evidence_ids": ["b66a08b9fea44f23abb9791edb152886dbd14bf7f74ec4ebbc39f9168ada3cf1"], "name": "mail.example.com", "named_by": [], "reason": "resolves to 192.0.2.25", "state": "live", "tier": "verified", "tier_reason": "resolves to 192.0.2.25"}, {"addresses": ["192.0.2.74"], "basis": "dns", "evidence_ids": ["ff472dc63ced2336cc4c8a7aa66af6b26a5279f741ccc1065182d56299f4fbf7"], "name": "multi.example.com", "named_by": ["crtsh"], "reason": "resolves to 192.0.2.74", "state": "live", "tier": "verified", "tier_reason": "resolves to 192.0.2.74"}, {"addresses": ["192.0.2.71"], "basis": "dns", "evidence_ids": ["ff153d7b83a713654896fc1e4ddb284d03f38ed6c0341f05cdd71f9ab4dcaba9"], "name": "neutral.example.com", "named_by": ["crtsh"], "reason": "resolves to 192.0.2.71", "state": "live", "tier": "verified", "tier_reason": "resolves to 192.0.2.71"}, {"addresses": ["192.0.2.73"], "basis": "dns", "evidence_ids": ["8b51c626a4c3a43ebfa1553cefee66319a43610865b21f03b7fe2c814989ea2d"], "name": "noall.example.com", "named_by": ["crtsh"], "reason": "resolves to 192.0.2.73", "state": "live", "tier": "verified", "tier_reason": "resolves to 192.0.2.73"}, {"addresses": ["198.51.100.53"], "basis": "dns", "evidence_ids": ["7f5ace880243517166aa2c4143b3f1763167fd82691d40133b8d1675a8dfa217"], "name": "ns1.dns.example.net", "named_by": [], "reason": "resolves to 198.51.100.53", "state": "live", "tier": "verified", "tier_reason": "resolves to 198.51.100.53"}, {"addresses": ["198.51.100.54"], "basis": "dns", "evidence_ids": ["1dab89720a1b08626b2bb016a98d27c11f7ee49a782efdeec4eff333d16544f4"], "name": "ns2.dns.example.net", "named_by": [], "reason": "resolves to 198.51.100.54", "state": "live", "tier": "verified", "tier_reason": "resolves to 198.51.100.54"}, {"addresses": ["192.0.2.77"], "basis": "dns", "evidence_ids": ["fc3339d17634fafb1acdd94a4fb7ae0e899ea6534b99dd27f330805002f2894c"], "name": "oldmail.example.com", "named_by": ["crtsh"], "reason": "resolves to 192.0.2.77", "state": "live", "tier": "verified", "tier_reason": "resolves to 192.0.2.77"}, {"addresses": ["192.0.2.76"], "basis": "dns", "evidence_ids": ["0f03aa66fc728d33cc76e83d372cd2f3dc6fbbd56d0f565b5dfa8ab691fc3a71"], "name": "sales.example.com", "named_by": ["crtsh"], "reason": "resolves to 192.0.2.76", "state": "live", "tier": "verified", "tier_reason": "resolves to 192.0.2.76"}, {"addresses": ["192.0.2.72"], "basis": "dns", "evidence_ids": ["8fae92b68fbb16654d5fad999debccd50a13752a06791fb37d8e81e72b04f7e2"], "name": "soft.example.com", "named_by": ["crtsh"], "reason": "resolves to 192.0.2.72", "state": "live", "tier": "verified", "tier_reason": "resolves to 192.0.2.72"}, {"addresses": ["192.0.2.10"], "basis": "dns", "evidence_ids": ["6cf07b70fe54c8dc07202a916e21a75b44e68ac305f61af7dafb7d4e0f3eeeba"], "name": "www.example.com", "named_by": ["crtsh"], "reason": "resolves to 192.0.2.10", "state": "live", "tier": "verified", "tier_reason": "resolves to 192.0.2.10"}, {"addresses": [], "basis": null, "evidence_ids": ["8c098ea384c98b8f0e74bebf16b2ffbee0549b864d3599188037fb37054235e6"], "name": "ns9.old.example.net", "named_by": [], "reason": "the address lookup returned NXDOMAIN", "state": "stale", "tier": "claimed", "tier_reason": "only no list names it, and the address lookup returned NXDOMAIN"}, {"addresses": [], "basis": null, "evidence_ids": ["64cda6f69dada960e0446c3be5cd00e7c83ae461de1dad9e0a40f842920e57ff", "968bc8e3a139e940a5a602c9b905444fb8c9457e23c8c70d55798183a9e58818"], "name": "docs.example.com", "named_by": ["crtsh"], "reason": "the address lookup returned NXDOMAIN", "state": "stale", "tier": "stale", "tier_reason": "a certificate naming it (valid until 2026-12-19) existed, but the address lookup returned NXDOMAIN"}, {"addresses": [], "basis": null, "evidence_ids": ["2e29c591d4c851d7d87a83c41255a3f27dd59de8410d1271388c5adc88e28ab6", "f9b081024eaef68c11e2f13713d461eff9512456735b023e2f701400f81d4cfb"], "name": "ghost.example.com", "named_by": ["crtsh", "wayback"], "reason": "the address lookup returned NXDOMAIN", "state": "stale", "tier": "stale", "tier_reason": "a certificate naming it (valid until 2026-12-19) existed, but the address lookup returned NXDOMAIN"}, {"addresses": [], "basis": null, "evidence_ids": ["831d642a58b2ae690e6505dde146a84d487b4a3efeb140b6ff492f18a99ac782", "8388b89816b7a62cd0007e6cd69123383930a96e35185782dd5482a4328ebe02"], "name": "legacy.example.com", "named_by": ["crtsh"], "reason": "the address lookup returned NXDOMAIN", "state": "stale", "tier": "stale", "tier_reason": "a certificate naming it (valid until 2026-12-19) existed, but the address lookup returned NXDOMAIN"}, {"addresses": [], "basis": null, "evidence_ids": ["b862d9832d8143d3c902c73fbb6a295ab78e327b85b8424cdedfe215e5a7fe2e", "c4d48be7276d6db6a9820b2c468a7a21e4221da00c3b8d35d5ccf2bddc711b9b"], "name": "shop.example.com", "named_by": ["crtsh"], "reason": "the address lookup returned NXDOMAIN", "state": "stale", "tier": "stale", "tier_reason": "a certificate naming it (valid until 2026-12-19) existed, but the address lookup returned NXDOMAIN"}], "packs": {"effective": {"providers": [{"asn": [20940, 16625], "category": "cdn", "cname": [], "examples": ["AS20940"], "id": "akamai-asn", "issuer": [], "mx": [], "note": "", "ns": [], "provider": "Akamai", "source": "https://www.akamai.com/", "spf": [], "verified": false}, {"asn": [], "category": "cdn", "cname": ["edgekey.net", "edgesuite.net", "akamaiedge.net", "akamai.net"], "examples": ["e1234.a.akamaiedge.net", "www.example.com.edgekey.net"], "id": "akamai-cdn", "issuer": [], "mx": [], "note": "", "ns": [], "provider": "Akamai", "source": "https://techdocs.akamai.com/", "spf": [], "verified": false}, {"asn": [], "category": "dns", "cname": [], "examples": ["a1-64.akam.net"], "id": "akamai-edge-dns", "issuer": [], "mx": [], "note": "", "ns": ["akam.net"], "provider": "Akamai Edge DNS", "source": "https://www.akamai.com/products/edge-dns", "spf": [], "verified": false}, {"asn": [], "category": "mail", "cname": [], "examples": ["inbound-smtp.us-east-1.amazonaws.com", "amazonses.com"], "id": "amazon-ses", "issuer": [], "mx": ["inbound-smtp.*.amazonaws.com"], "note": "", "ns": [], "provider": "Amazon SES", "source": "https://docs.aws.amazon.com/ses/latest/dg/receiving-email-mx-record.html", "spf": ["amazonses.com"], "verified": false}, {"asn": [], "category": "ca", "cname": [], "examples": ["C=US, O=Amazon, CN=Amazon RSA 2048 M01"], "id": "amazon-trust-services", "issuer": ["o=amazon"], "mx": [], "note": "", "ns": [], "provider": "Amazon Trust Services", "source": "https://www.amazontrust.com/repository/", "spf": [], "verified": false}, {"asn": [16509, 14618], "category": "hosting", "cname": [], "examples": ["AS16509"], "id": "aws-asn", "issuer": [], "mx": [], "note": "", "ns": [], "provider": "Amazon Web Services", "source": "https://docs.aws.amazon.com/vpc/latest/userguide/aws-ip-ranges.html", "spf": [], "verified": false}, {"asn": [], "category": "cdn", "cname": ["cloudfront.net"], "examples": ["d111111abcdef8.cloudfront.net"], "id": "aws-cloudfront", "issuer": [], "mx": [], "note": "", "ns": [], "provider": "Amazon CloudFront", "source": "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/CNAMEs.html", "spf": [], "verified": false}, {"asn": [], "category": "hosting", "cname": ["elb.amazonaws.com", "s3.amazonaws.com", "elasticbeanstalk.com"], "examples": ["my-lb-123.us-east-1.elb.amazonaws.com", "assets.s3.amazonaws.com", "demo.elasticbeanstalk.com"], "id": "aws-hosting", "issuer": [], "mx": [], "note": "Suffixes as listed upstream on 2026-10-16.", "ns": [], "provider": "Amazon Web Services", "source": "https://github.com/EdOverflow/can-i-take-over-xyz", "spf": [], "verified": true}, {"asn": [], "category": "dns", "cname": [], "examples": ["ns-2048.awsdns-64.com", "ns-2051.awsdns-67.co.uk"], "id": "aws-route53", "issuer": [], "mx": [], "note": "", "ns": ["awsdns-*.com", "awsdns-*.net", "awsdns-*.org", "awsdns-*.co.uk"], "provider": "Amazon Route 53", "source": "https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/white-label-name-servers.html", "spf": [], "verified": true}, {"asn": [], "category": "cdn", "cname": ["azureedge.net"], "examples": ["demo.azureedge.net"], "id": "azure-cdn", "issuer": [], "mx": [], "note": "Listed upstream with the Azure services; checked against the project's fingerprint list on 2026-10-16.", "ns": [], "provider": "Microsoft Azure", "source": "https://github.com/EdOverflow/can-i-take-over-xyz", "spf": [], "verified": true}, {"asn": [], "category": "dns", "cname": [], "examples": ["ns1-37.azure-dns.com", "ns4-37.azure-dns.info"], "id": "azure-dns", "issuer": [], "mx": [], "note": "", "ns": ["azure-dns.com", "azure-dns.net", "azure-dns.org", "azure-dns.info"], "provider": "Microsoft Azure DNS", "source": "https://learn.microsoft.com/en-us/azure/dns/dns-delegate-domain-azure-dns", "spf": [], "verified": true}, {"asn": [], "category": "hosting", "cname": ["cloudapp.net", "cloudapp.azure.com", "azurewebsites.net", "blob.core.windows.net", "azure-api.net", "azurehdinsight.net", "azurecontainer.io", "database.windows.net", "azuredatalakestore.net", "search.windows.net", "azurecr.io", "redis.cache.windows.net", "servicebus.windows.net", "visualstudio.com"], "examples": ["demo.azurewebsites.net", "demo.cloudapp.net", "demo.blob.core.windows.net"], "id": "azure-hosting", "issuer": [], "mx": [], "note": "Suffixes as listed upstream on 2026-10-16.", "ns": [], "provider": "Microsoft Azure", "source": "https://github.com/EdOverflow/can-i-take-over-xyz", "spf": [], "verified": true}, {"asn": [], "category": "mail", "cname": [], "examples": ["d123456a.ess.barracudanetworks.com"], "id": "barracuda-email", "issuer": [], "mx": ["barracudanetworks.com"], "note": "", "ns": [], "provider": "Barracuda Email Security", "source": "https://www.barracuda.com/", "spf": [], "verified": false}, {"asn": [], "category": "mail", "cname": [], "examples": ["mx1.hc1234-56.iphmx.com"], "id": "cisco-secure-email", "issuer": [], "mx": ["iphmx.com"], "note": "", "ns": [], "provider": "Cisco Secure Email", "source": "https://www.cisco.com/c/en/us/products/security/email-security/", "spf": [], "verified": false}, {"asn": [], "category": "ca", "cname": [], "examples": ["C=US, O=Cloudflare, Inc., CN=Cloudflare Inc ECC CA-3"], "id": "cloudflare-ca", "issuer": ["cloudflare inc"], "mx": [], "note": "", "ns": [], "provider": "Cloudflare", "source": "https://developers.cloudflare.com/ssl/reference/certificate-authorities/", "spf": [], "verified": false}, {"asn": [], "category": "dns", "cname": [], "examples": ["hera.ns.cloudflare.com"], "id": "cloudflare-dns", "issuer": [], "mx": [], "note": "", "ns": ["ns.cloudflare.com"], "provider": "Cloudflare", "source": "https://developers.cloudflare.com/dns/nameservers/", "spf": [], "verified": true}, {"asn": [13335], "category": "cdn", "cname": [], "examples": ["AS13335"], "id": "cloudflare-edge", "issuer": [], "mx": [], "note": "AS13335 and the netblock owner CLOUDFLARENET were observed for example.com in a live scan on 2026-10-15.", "ns": [], "provider": "Cloudflare", "source": "https://developers.cloudflare.com/fundamentals/concepts/cloudflare-ip-addresses/", "spf": [], "verified": true}, {"asn": [], "category": "ca", "cname": [], "examples": ["C=US, O=DigiCert Inc, CN=DigiCert TLS RSA SHA256 2020 CA1"], "id": "digicert", "issuer": ["digicert"], "mx": [], "note": "", "ns": [], "provider": "DigiCert", "source": "https://www.digicert.com/kb/digicert-root-certificates.htm", "spf": [], "verified": false}, {"asn": [14061], "category": "hosting", "cname": [], "examples": ["AS14061"], "id": "digitalocean-asn", "issuer": [], "mx": [], "note": "", "ns": [], "provider": "DigitalOcean", "source": "https://www.digitalocean.com/", "spf": [], "verified": false}, {"asn": [], "category": "dns", "cname": [], "examples": ["ns1.digitalocean.com"], "id": "digitalocean-dns", "issuer": [], "mx": [], "note": "", "ns": ["ns1.digitalocean.com", "ns2.digitalocean.com", "ns3.digitalocean.com"], "provider": "DigitalOcean DNS", "source": "https://docs.digitalocean.com/products/networking/dns/", "spf": [], "verified": false}, {"asn": [15133], "category": "cdn", "cname": [], "examples": ["AS15133"], "id": "edgio-asn", "issuer": [], "mx": [], "note": "", "ns": [], "provider": "Edgio (Edgecast)", "source": "https://edg.io/", "spf": [], "verified": false}, {"asn": [], "category": "ca", "cname": [], "examples": ["C=US, O=Entrust, Inc., CN=Entrust Certification Authority - L1K"], "id": "entrust", "issuer": ["entrust"], "mx": [], "note": "", "ns": [], "provider": "Entrust", "source": "https://www.entrust.com/", "spf": [], "verified": false}, {"asn": [54113], "category": "cdn", "cname": [], "examples": ["AS54113"], "id": "fastly-asn", "issuer": [], "mx": [], "note": "", "ns": [], "provider": "Fastly", "source": "https://www.fastly.com/documentation/reference/network/", "spf": [], "verified": false}, {"asn": [], "category": "cdn", "cname": ["fastly.net"], "examples": ["dualstack.nonssl.global.fastly.net"], "id": "fastly-cdn", "issuer": [], "mx": [], "note": "", "ns": [], "provider": "Fastly", "source": "https://www.fastly.com/documentation/guides/getting-started/domains/working-with-domains/working-with-cname-records-and-your-dns-provider", "spf": [], "verified": true}, {"asn": [], "category": "mail", "cname": [], "examples": ["in1-smtp.messagingengine.com", "spf.messagingengine.com"], "id": "fastmail", "issuer": [], "mx": ["messagingengine.com"], "note": "", "ns": [], "provider": "Fastmail", "source": "https://www.fastmail.help/", "spf": ["spf.messagingengine.com"], "verified": false}, {"asn": [], "category": "dns", "cname": [], "examples": ["a.dns.gandi.net"], "id": "gandi-dns", "issuer": [], "mx": [], "note": "", "ns": ["dns.gandi.net"], "provider": "Gandi LiveDNS", "source": "https://docs.gandi.net/en/domain_names/", "spf": [], "verified": false}, {"asn": [36459], "category": "hosting", "cname": [], "examples": ["AS36459"], "id": "github-asn", "issuer": [], "mx": [], "note": "", "ns": [], "provider": "GitHub", "source": "https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/about-githubs-ip-addresses", "spf": [], "verified": false}, {"asn": [], "category": "hosting", "cname": ["github.io"], "examples": ["example-org.github.io"], "id": "github-pages", "issuer": [], "mx": [], "note": "", "ns": [], "provider": "GitHub Pages", "source": "https://docs.github.com/en/pages/configuring-a-custom-domain-for-your-github-pages-site/managing-a-custom-domain-for-your-github-pages-site", "spf": [], "verified": true}, {"asn": [], "category": "ca", "cname": [], "examples": ["C=BE, O=GlobalSign nv-sa, CN=GlobalSign Atlas R3 DV TLS CA 2024 Q1"], "id": "globalsign", "issuer": ["globalsign"], "mx": [], "note": "", "ns": [], "provider": "GlobalSign", "source": "https://www.globalsign.com/en/repository", "spf": [], "verified": false}, {"asn": [], "category": "ca", "cname": [], "examples": ["C=US, O=GoDaddy.com, Inc., CN=Go Daddy Secure Certificate Authority - G2"], "id": "godaddy-ca", "issuer": ["godaddy", "go daddy"], "mx": [], "note": "", "ns": [], "provider": "GoDaddy", "source": "https://certs.godaddy.com/repository", "spf": [], "verified": false}, {"asn": [], "category": "dns", "cname": [], "examples": ["ns01.domaincontrol.com"], "id": "godaddy-dns", "issuer": [], "mx": [], "note": "", "ns": ["domaincontrol.com"], "provider": "GoDaddy DNS", "source": "https://www.godaddy.com/", "spf": [], "verified": false}, {"asn": [15169, 396982], "category": "hosting", "cname": [], "examples": ["AS15169"], "id": "google-cloud-asn", "issuer": [], "mx": [], "note": "", "ns": [], "provider": "Google", "source": "https://cloud.google.com/compute/docs/faq", "spf": [], "verified": false}, {"asn": [], "category": "dns", "cname": [], "examples": ["ns-cloud-a1.googledomains.com"], "id": "google-cloud-dns", "issuer": [], "mx": [], "note": "Only the a-shard example is on the cited page; the other shard letters follow the same pattern.", "ns": ["ns-cloud-*.googledomains.com"], "provider": "Google Cloud DNS", "source": "https://docs.cloud.google.com/dns/docs/update-name-servers", "spf": [], "verified": true}, {"asn": [], "category": "ca", "cname": [], "examples": ["C=US, O=Google Trust Services, CN=WR2"], "id": "google-trust-services", "issuer": ["google trust services"], "mx": [], "note": "", "ns": [], "provider": "Google Trust Services", "source": "https://pki.goog/", "spf": [], "verified": false}, {"asn": [], "category": "mail", "cname": [], "examples": ["smtp.google.com", "alt1.aspmx.l.google.com"], "id": "google-workspace-mail", "issuer": [], "mx": ["smtp.google.com", "aspmx.l.google.com", "googlemail.com"], "note": "smtp.google.com is the current MX; the page says older aspmx. names remain supported.", "ns": [], "provider": "Google Workspace", "source": "https://knowledge.workspace.google.com/admin/domains/set-up-mx-records-for-google-workspace", "spf": [], "verified": true}, {"asn": [], "category": "mail", "cname": [], "examples": ["_spf.google.com"], "id": "google-workspace-spf", "issuer": [], "mx": [], "note": "", "ns": [], "provider": "Google Workspace", "source": "https://knowledge.workspace.google.com/admin/domains/set-up-mx-records-for-google-workspace", "spf": ["_spf.google.com"], "verified": false}, {"asn": [], "category": "hosting", "cname": ["herokuapp.com", "herokudns.com"], "examples": ["demo.herokuapp.com", "demo-1234.herokudns.com"], "id": "heroku", "issuer": [], "mx": [], "note": "", "ns": [], "provider": "Heroku", "source": "https://devcenter.heroku.com/articles/custom-domains", "spf": [], "verified": false}, {"asn": [24940], "category": "hosting", "cname": [], "examples": ["AS24940"], "id": "hetzner-asn", "issuer": [], "mx": [], "note": "", "ns": [], "provider": "Hetzner", "source": "https://www.hetzner.com/", "spf": [], "verified": false}, {"asn": [], "category": "dns", "cname": [], "examples": ["hydrogen.ns.hetzner.com"], "id": "hetzner-dns", "issuer": [], "mx": [], "note": "", "ns": ["ns.hetzner.com", "ns.hetzner.de"], "provider": "Hetzner DNS", "source": "https://docs.hetzner.com/dns-console/dns/general/dns-overview/", "spf": [], "verified": false}, {"asn": [], "category": "dns", "cname": [], "examples": ["a.iana-servers.net"], "id": "icann-iana-dns", "issuer": [], "mx": [], "note": "", "ns": ["iana-servers.net"], "provider": "ICANN (IANA example domains)", "source": "https://www.iana.org/help/example-domains", "spf": [], "verified": false}, {"asn": [], "category": "mail", "cname": [], "examples": ["mx01.mail.icloud.com"], "id": "icloud-mail", "issuer": [], "mx": ["mail.icloud.com"], "note": "", "ns": [], "provider": "iCloud Mail", "source": "https://support.apple.com/", "spf": [], "verified": false}, {"asn": [], "category": "dns", "cname": [], "examples": [], "id": "lab-example-dns", "issuer": [], "mx": [], "note": "", "ns": ["dns.example.net"], "provider": "Example DNS", "source": "https://docs.example.net/nameservers", "spf": [], "verified": true}, {"asn": [64500], "category": "cdn", "cname": [], "examples": [], "id": "lab-example-edge", "issuer": [], "mx": [], "note": "", "ns": [], "provider": "Example Edge", "source": "https://docs.example.net/nameservers", "spf": [], "verified": true}, {"asn": [], "category": "ca", "cname": [], "examples": ["C=US, O=Let's Encrypt, CN=R3"], "id": "lets-encrypt", "issuer": ["let's encrypt"], "mx": [], "note": "", "ns": [], "provider": "Let's Encrypt", "source": "https://letsencrypt.org/certificates/", "spf": [], "verified": false}, {"asn": [63949], "category": "hosting", "cname": [], "examples": ["AS63949"], "id": "linode-asn", "issuer": [], "mx": [], "note": "", "ns": [], "provider": "Akamai (Linode)", "source": "https://www.linode.com/", "spf": [], "verified": false}, {"asn": [], "category": "mail", "cname": [], "examples": ["mxa.mailgun.org", "mailgun.org"], "id": "mailgun", "issuer": [], "mx": ["mailgun.org"], "note": "", "ns": [], "provider": "Mailgun", "source": "https://documentation.mailgun.com/", "spf": ["mailgun.org"], "verified": false}, {"asn": [], "category": "mail", "cname": [], "examples": ["contoso-com.mail.protection.outlook.com", "spf.protection.outlook.com"], "id": "microsoft-365-mail", "issuer": [], "mx": ["mail.protection.outlook.com"], "note": "", "ns": [], "provider": "Microsoft 365", "source": "https://learn.microsoft.com/en-us/microsoft-365/enterprise/external-domain-name-system-records", "spf": ["spf.protection.outlook.com"], "verified": true}, {"asn": [8075], "category": "hosting", "cname": [], "examples": ["AS8075"], "id": "microsoft-asn", "issuer": [], "mx": [], "note": "", "ns": [], "provider": "Microsoft Azure", "source": "https://learn.microsoft.com/en-us/azure/virtual-network/service-tags-overview", "spf": [], "verified": false}, {"asn": [], "category": "mail", "cname": [], "examples": ["us-smtp-inbound-1.mimecast.com", "_netblocks.mimecast.com"], "id": "mimecast-mail", "issuer": [], "mx": ["mimecast.com", "mimecast-offshore.com"], "note": "", "ns": [], "provider": "Mimecast", "source": "https://www.mimecast.com/", "spf": ["_netblocks.mimecast.com"], "verified": false}, {"asn": [], "category": "dns", "cname": [], "examples": ["dns1.registrar-servers.com"], "id": "namecheap-dns", "issuer": [], "mx": [], "note": "", "ns": ["registrar-servers.com"], "provider": "Namecheap DNS", "source": "https://www.namecheap.com/support/knowledgebase/", "spf": [], "verified": false}, {"asn": [], "category": "hosting", "cname": ["netlify.app"], "examples": ["demo.netlify.app"], "id": "netlify", "issuer": [], "mx": [], "note": "", "ns": [], "provider": "Netlify", "source": "https://docs.netlify.com/domains-https/custom-domains/", "spf": [], "verified": false}, {"asn": [], "category": "dns", "cname": [], "examples": ["dns1.p01.nsone.net"], "id": "nsone-dns", "issuer": [], "mx": [], "note": "", "ns": ["nsone.net"], "provider": "NS1", "source": "https://ns1.com/", "spf": [], "verified": false}, {"asn": [], "category": "dns", "cname": [], "examples": ["ns1.p01.dynect.net"], "id": "oracle-dyn-dns", "issuer": [], "mx": [], "note": "", "ns": ["dynect.net"], "provider": "Oracle Dyn DNS", "source": "https://www.oracle.com/cloud/networking/dns/", "spf": [], "verified": false}, {"asn": [16276], "category": "hosting", "cname": [], "examples": ["AS16276"], "id": "ovh-asn", "issuer": [], "mx": [], "note": "", "ns": [], "provider": "OVHcloud", "source": "https://www.ovhcloud.com/", "spf": [], "verified": false}, {"asn": [], "category": "dns", "cname": [], "examples": ["dns200.anycast.me", "ns200.ovh.net"], "id": "ovh-dns", "issuer": [], "mx": [], "note": "", "ns": ["ovh.net", "anycast.me"], "provider": "OVHcloud DNS", "source": "https://help.ovhcloud.com/", "spf": [], "verified": false}, {"asn": [], "category": "mail", "cname": [], "examples": ["mxa-00123456.gslb.pphosted.com"], "id": "proofpoint-mail", "issuer": [], "mx": ["pphosted.com", "ppe-hosted.com"], "note": "", "ns": [], "provider": "Proofpoint", "source": "https://www.proofpoint.com/", "spf": [], "verified": false}, {"asn": [], "category": "mail", "cname": [], "examples": ["mail.protonmail.ch", "_spf.protonmail.ch"], "id": "proton-mail", "issuer": [], "mx": ["protonmail.ch"], "note": "", "ns": [], "provider": "Proton Mail", "source": "https://proton.me/support/custom-domain", "spf": ["_spf.protonmail.ch"], "verified": false}, {"asn": [], "category": "ca", "cname": [], "examples": ["C=GB, O=Sectigo Limited, CN=Sectigo Public Server Authentication CA OV R36"], "id": "sectigo", "issuer": ["sectigo"], "mx": [], "note": "This issuer string was observed in crt.sh output for example.com in a live scan on 2026-10-15.", "ns": [], "provider": "Sectigo", "source": "https://crt.sh/", "spf": [], "verified": true}, {"asn": [], "category": "mail", "cname": [], "examples": ["sendgrid.net"], "id": "sendgrid", "issuer": [], "mx": [], "note": "", "ns": [], "provider": "Twilio SendGrid", "source": "https://www.twilio.com/docs/sendgrid", "spf": ["sendgrid.net"], "verified": false}, {"asn": [], "category": "hosting", "cname": ["myshopify.com"], "examples": ["shops.myshopify.com"], "id": "shopify", "issuer": [], "mx": [], "note": "", "ns": [], "provider": "Shopify", "source": "https://help.shopify.com/en/manual/domains", "spf": [], "verified": false}, {"asn": [], "category": "hosting", "cname": ["squarespace.com"], "examples": ["ext-cust.squarespace.com"], "id": "squarespace", "issuer": [], "mx": [], "note": "", "ns": [], "provider": "Squarespace", "source": "https://support.squarespace.com/", "spf": [], "verified": false}, {"asn": [], "category": "ca", "cname": [], "examples": ["C=US, O=\"thawte, Inc.\", CN=thawte SSL CA - G2", "C=US, O=Symantec Corporation, OU=Symantec Trust Network, CN=Symantec Class 3 Secure Server CA - G4"], "id": "symantec-legacy", "issuer": ["symantec", "thawte"], "mx": [], "note": "Both issuer strings were observed in crt.sh output for example.com on 2026-10-15; these CAs no longer issue (DigiCert took over the business).", "ns": [], "provider": "Symantec and Thawte (legacy)", "source": "https://crt.sh/", "spf": [], "verified": true}, {"asn": [], "category": "dns", "cname": [], "examples": ["pdns1.ultradns.net"], "id": "ultradns", "issuer": [], "mx": [], "note": "", "ns": ["ultradns.net", "ultradns.com", "ultradns.org", "ultradns.biz"], "provider": "UltraDNS", "source": "https://vercara.com/ultradns", "spf": [], "verified": false}, {"asn": [], "category": "dns", "cname": [], "examples": ["ns1.vercel-dns.com"], "id": "vercel-dns", "issuer": [], "mx": [], "note": "", "ns": ["vercel-dns.com"], "provider": "Vercel DNS", "source": "https://vercel.com/docs/domains", "spf": [], "verified": false}, {"asn": [], "category": "hosting", "cname": ["vercel-dns.com", "vercel.app"], "examples": ["cname.vercel-dns.com", "demo.vercel.app"], "id": "vercel-hosting", "issuer": [], "mx": [], "note": "", "ns": [], "provider": "Vercel", "source": "https://vercel.com/docs/domains", "spf": [], "verified": false}, {"asn": [], "category": "hosting", "cname": ["wixdns.net"], "examples": ["demo.wixdns.net"], "id": "wix", "issuer": [], "mx": [], "note": "", "ns": [], "provider": "Wix", "source": "https://support.wix.com/", "spf": [], "verified": false}, {"asn": [], "category": "hosting", "cname": ["wpengine.com"], "examples": ["demo.wpengine.com"], "id": "wpengine", "issuer": [], "mx": [], "note": "", "ns": [], "provider": "WP Engine", "source": "https://wpengine.com/support/", "spf": [], "verified": false}, {"asn": [], "category": "mail", "cname": [], "examples": ["mx.yandex.net", "_spf.yandex.net"], "id": "yandex-mail", "issuer": [], "mx": ["mx.yandex.net", "mx.yandex.ru"], "note": "", "ns": [], "provider": "Yandex Mail", "source": "https://yandex.com/support/connect/", "spf": ["_spf.yandex.net"], "verified": false}, {"asn": [], "category": "ca", "cname": [], "examples": ["C=AT, O=ZeroSSL, CN=ZeroSSL RSA Domain Secure Site CA"], "id": "zerossl", "issuer": ["zerossl"], "mx": [], "note": "", "ns": [], "provider": "ZeroSSL", "source": "https://zerossl.com/", "spf": [], "verified": false}, {"asn": [], "category": "mail", "cname": [], "examples": ["mx.zoho.com", "zoho.eu"], "id": "zoho-mail", "issuer": [], "mx": ["zoho.com", "zoho.eu", "zoho.in"], "note": "", "ns": [], "provider": "Zoho Mail", "source": "https://www.zoho.com/mail/help/adminconsole/configure-email-delivery.html", "spf": ["zoho.com", "zoho.eu"], "verified": false}], "signals": [], "takeover": [{"cname": ["agilecrm.com"], "dangling": "http-fingerprint", "examples": ["demo.agilecrm.com"], "fingerprint": "", "id": "agile-crm", "note": "", "provider": "Agile CRM", "source": "https://github.com/EdOverflow/can-i-take-over-xyz", "status": "vulnerable", "verified": true}, {"cname": ["airee.ru"], "dangling": "http-fingerprint", "examples": ["demo.airee.ru"], "fingerprint": "", "id": "airee", "note": "", "provider": "Airee", "source": "https://github.com/EdOverflow/can-i-take-over-xyz", "status": "vulnerable", "verified": true}, {"cname": ["animaapp.io"], "dangling": "http-fingerprint", "examples": ["demo.animaapp.io"], "fingerprint": "", "id": "anima", "note": "", "provider": "Anima", "source": "https://docs.animaapp.com/v1/launchpad/08-custom-domain.html", "status": "vulnerable", "verified": true}, {"cname": ["elasticbeanstalk.com"], "dangling": "nxdomain", "examples": ["demo.us-east-1.elasticbeanstalk.com"], "fingerprint": "", "id": "aws-elastic-beanstalk", "note": "", "provider": "AWS Elastic Beanstalk", "source": "https://github.com/EdOverflow/can-i-take-over-xyz", "status": "vulnerable", "verified": true}, {"cname": ["s3.amazonaws.com"], "dangling": "http-fingerprint", "examples": ["assets.s3.amazonaws.com"], "fingerprint": "", "id": "aws-s3", "note": "", "provider": "AWS S3 website bucket", "source": "https://github.com/EdOverflow/can-i-take-over-xyz", "status": "vulnerable", "verified": true}, {"cname": ["bitbucket.io"], "dangling": "http-fingerprint", "examples": ["team.bitbucket.io"], "fingerprint": "", "id": "bitbucket-io", "note": "", "provider": "Bitbucket", "source": "https://github.com/EdOverflow/can-i-take-over-xyz", "status": "vulnerable", "verified": true}, {"cname": ["trydiscourse.com"], "dangling": "nxdomain", "examples": ["forum.trydiscourse.com"], "fingerprint": "", "id": "discourse-hosted", "note": "", "provider": "Discourse (hosted)", "source": "https://hackerone.com/reports/264494", "status": "vulnerable", "verified": true}, {"cname": ["furyns.com"], "dangling": "http-fingerprint", "examples": ["demo.furyns.com"], "fingerprint": "", "id": "gemfury", "note": "", "provider": "Gemfury", "source": "https://khaledibnalwalid.wordpress.com/2020/06/25/gemfury-subdomain-takeover/", "status": "vulnerable", "verified": true}, {"cname": ["ghost.io"], "dangling": "http-fingerprint", "examples": ["blog.ghost.io"], "fingerprint": "", "id": "ghost-pro", "note": "", "provider": "Ghost", "source": "https://github.com/EdOverflow/can-i-take-over-xyz", "status": "vulnerable", "verified": true}, {"cname": ["github.io"], "dangling": "http-fingerprint", "examples": ["example-org.github.io"], "fingerprint": "", "id": "github-pages-takeover", "note": "Upstream lists GitHub as an edge case without a CNAME pattern; the github.io suffix comes from GitHub's own Pages documentation.", "provider": "GitHub Pages", "source": "https://github.com/EdOverflow/can-i-take-over-xyz", "status": "edge-case", "verified": false}, {"cname": ["hatenablog.com"], "dangling": "http-fingerprint", "examples": ["demo.hatenablog.com"], "fingerprint": "", "id": "hatenablog", "note": "", "provider": "Hatena Blog", "source": "https://github.com/EdOverflow/can-i-take-over-xyz", "status": "vulnerable", "verified": true}, {"cname": ["helpjuice.com"], "dangling": "http-fingerprint", "examples": ["help.helpjuice.com"], "fingerprint": "", "id": "helpjuice", "note": "", "provider": "Helpjuice", "source": "https://help.helpjuice.com/en_US/using-your-custom-domain/how-to-set-up-a-custom-domain", "status": "vulnerable", "verified": true}, {"cname": ["helprace.com"], "dangling": "http-fingerprint", "examples": ["help.helprace.com"], "fingerprint": "", "id": "helprace", "note": "", "provider": "Helprace", "source": "https://github.com/EdOverflow/can-i-take-over-xyz", "status": "vulnerable", "verified": true}, {"cname": ["helpscoutdocs.com"], "dangling": "http-fingerprint", "examples": ["docs.helpscoutdocs.com"], "fingerprint": "", "id": "helpscout-docs", "note": "", "provider": "Help Scout Docs", "source": "https://docs.helpscout.net/article/42-setup-custom-domain", "status": "vulnerable", "verified": true}, {"cname": ["pages.example.org"], "dangling": "nxdomain", "examples": [], "fingerprint": "", "id": "lab-pages", "note": "", "provider": "Example Pages", "source": "https://docs.example.net/custom-domains", "status": "vulnerable", "verified": true}, {"cname": ["sites.example.org"], "dangling": "http-fingerprint", "examples": [], "fingerprint": "", "id": "lab-sites", "note": "", "provider": "Example Sites", "source": "https://docs.example.net/custom-domains", "status": "vulnerable", "verified": true}, {"cname": ["launchrock.com"], "dangling": "http-fingerprint", "examples": ["demo.launchrock.com"], "fingerprint": "", "id": "launchrock", "note": "", "provider": "LaunchRock", "source": "https://github.com/EdOverflow/can-i-take-over-xyz", "status": "vulnerable", "verified": true}, {"cname": ["cloudapp.net", "cloudapp.azure.com", "azurewebsites.net", "blob.core.windows.net", "azure-api.net", "azurehdinsight.net", "azureedge.net", "azurecontainer.io", "database.windows.net", "azuredatalakestore.net", "search.windows.net", "azurecr.io", "redis.cache.windows.net", "servicebus.windows.net", "visualstudio.com"], "dangling": "nxdomain", "examples": ["shop-demo.azurewebsites.net", "demo.cloudapp.net", "demo.blob.core.windows.net"], "fingerprint": "", "id": "microsoft-azure", "note": "", "provider": "Microsoft Azure", "source": "https://github.com/EdOverflow/can-i-take-over-xyz", "status": "vulnerable", "verified": true}, {"cname": ["ngrok.io"], "dangling": "http-fingerprint", "examples": ["demo.ngrok.io"], "fingerprint": "", "id": "ngrok", "note": "", "provider": "ngrok", "source": "https://ngrok.com/docs", "status": "vulnerable", "verified": true}, {"cname": ["readme.io"], "dangling": "http-fingerprint", "examples": ["docs.readme.io"], "fingerprint": "", "id": "readme-io", "note": "", "provider": "Readme", "source": "https://github.com/EdOverflow/can-i-take-over-xyz", "status": "vulnerable", "verified": true}, {"cname": ["s.strikinglydns.com"], "dangling": "http-fingerprint", "examples": ["s.strikinglydns.com"], "fingerprint": "", "id": "strikingly", "note": "", "provider": "Strikingly", "source": "https://medium.com/@sherif0x00/takeover-subdomains-pointing-to-strikingly-5e67df80cdfd", "status": "vulnerable", "verified": true}, {"cname": ["na-west1.surge.sh"], "dangling": "http-fingerprint", "examples": ["na-west1.surge.sh"], "fingerprint": "", "id": "surge-sh", "note": "", "provider": "Surge", "source": "https://surge.sh/help/adding-a-custom-domain", "status": "vulnerable", "verified": true}, {"cname": ["surveysparrow.com"], "dangling": "http-fingerprint", "examples": ["demo.surveysparrow.com"], "fingerprint": "", "id": "surveysparrow", "note": "", "provider": "SurveySparrow", "source": "https://help.surveysparrow.com/custom-domain", "status": "vulnerable", "verified": true}, {"cname": ["read.uberflip.com"], "dangling": "http-fingerprint", "examples": ["read.uberflip.com"], "fingerprint": "", "id": "uberflip", "note": "", "provider": "Uberflip", "source": "https://help.uberflip.com/hc/en-us/articles/360018786372-Custom-Domain-Set-up-Your-Hub-on-a-Subdomain", "status": "vulnerable", "verified": true}, {"cname": ["stats.uptimerobot.com"], "dangling": "http-fingerprint", "examples": ["stats.uptimerobot.com"], "fingerprint": "", "id": "uptimerobot", "note": "", "provider": "UptimeRobot status page", "source": "https://exploit.linuxsec.org/uptimerobot-com-custom-domain-subdomain-takeover/", "status": "vulnerable", "verified": true}, {"cname": ["wordpress.com"], "dangling": "http-fingerprint", "examples": ["blog.wordpress.com"], "fingerprint": "", "id": "wordpress-com", "note": "", "provider": "WordPress.com", "source": "https://github.com/EdOverflow/can-i-take-over-xyz", "status": "vulnerable", "verified": true}, {"cname": ["youtrack.cloud"], "dangling": "http-fingerprint", "examples": ["demo.youtrack.cloud"], "fingerprint": "", "id": "youtrack-cloud", "note": "", "provider": "JetBrains YouTrack Cloud", "source": "https://www.jetbrains.com/help/youtrack/incloud/Domain-Settings.html", "status": "vulnerable", "verified": true}]}, "effective_sha256": "44bbd66959eeacfccbde5db3a28570ad1652fda758b804753a5eeac101446fc7", "files": [{"content_sha256": "ee30a584985827370e934cfe272187ebf379e541b89bb12b0844f19bd7b20584", "entries": 7, "kind": "playbooks", "name": "playbooks.yaml", "origin": "bundled", "version": "2026.10.1"}, {"content_sha256": "1c0e28669407643d97446fc6519834f42a346310326bb5634f535032be8fb52f", "entries": 68, "kind": "providers", "name": "providers.yaml", "origin": "bundled", "version": "2026.10.1"}, {"content_sha256": "2c79d4496eb1e5be186378e0cb0d32357c978fb35a0949bb3fd60387cdcb5da9", "entries": 0, "kind": "signals", "name": "signals.yaml", "origin": "bundled", "version": "2026.10.1"}, {"content_sha256": "ea3dcc41bad9d020a5a2320883588b97d6002530ef7177258e54d8374e16754d", "entries": 25, "kind": "takeover", "name": "takeover.yaml", "origin": "bundled", "version": "2026.10.1"}, {"content_sha256": "5a5ee9a2dc7ff1aef356c72d8a0ed1a773ce73649e0f92b3845bd994bac496d3", "entries": 2, "kind": "providers", "name": "lab-providers.yaml", "origin": "user", "version": "2026.10.1"}, {"content_sha256": "6f1b5859611c38e8ffa04bb16a6d0ff80e4ea31fb742f2a55f1455c51a8ad5e4", "entries": 2, "kind": "takeover", "name": "lab-takeover.yaml", "origin": "user", "version": "2026.10.1"}]}, "promotions": [], "risks": [{"category": "risk", "confidence": "high", "entity_ids": ["domain:shop.example.com", "domain:demo.pages.example.org"], "evidence_ids": ["c4d48be7276d6db6a9820b2c468a7a21e4221da00c3b8d35d5ccf2bddc711b9b", "bcee36275bf029e102947eed8d592f7efd9e3228a3a0f2b836b4a2352d556249"], "explanation": "shop.example.com is an alias (CNAME) of demo.pages.example.org, and the address lookup for shop.example.com returned NXDOMAIN, so the target does not exist. demo.pages.example.org matches the takeover fingerprint lab-pages (Example Pages, rated vulnerable, shown by NXDOMAIN).", "fingerprint": "8d9a3e9596c9f1c8760a2392129abfa8", "remediation": "Delete the CNAME record, or re-create the resource at the service so the name is yours again. Check what else (cookies, OAuth redirects, SPF) trusted the name.", "rule_id": "dangling-cname-claimable", "severity": "high", "title": "CNAME to a claimable service that no longer exists"}, {"category": "risk", "confidence": "high", "entity_ids": ["domain:example.net"], "evidence_ids": ["08f6bf5b1661d2c5bc9e628e2233f2faa440829756ed8158a5ae75adee73cde9"], "explanation": "RDAP lists the expiration of example.net as 2026-10-15T20:16:36Z; the data was collected 2026-10-20T20:16:37+00:00, after that date.", "fingerprint": "f3b2b1c2be21a3d27e4a69ee2507f6b9", "remediation": "Renew the domain at once, or confirm that it is meant to lapse and remove what depends on it.", "rule_id": "domain-expired", "severity": "high", "title": "Domain registration has expired"}, {"category": "risk", "confidence": "high", "entity_ids": ["domain:example.com"], "evidence_ids": ["6389b626d20732228da26a58a919355bbb5faf3b54d6febf55fb10964ae6454c"], "explanation": "example.com publishes the SPF record \"v=spf1 include:spf.example.org +all\", which ends with \"+all\".", "fingerprint": "08a6cc6e9ebacf0f6051fd0787cd2ee1", "remediation": "End the record with -all (or ~all while rolling out) and list only the senders you use.", "rule_id": "spf-allows-all", "severity": "high", "title": "SPF record authorises every sender"}, {"category": "risk", "confidence": "medium", "entity_ids": ["domain:legacy.example.com", "domain:gone.example.org"], "evidence_ids": ["8388b89816b7a62cd0007e6cd69123383930a96e35185782dd5482a4328ebe02", "09d37eedacce26ac91966dba5222a482a7e3f695f4a976e24ac5d0a9e567aa91"], "explanation": "legacy.example.com is an alias (CNAME) of gone.example.org, and the address lookup for legacy.example.com returned NXDOMAIN, so the target does not exist.", "fingerprint": "9179634e67847a99a6ad910e5957f82d", "remediation": "Delete the CNAME record if the target is no longer used, or restore the target.", "rule_id": "dangling-cname", "severity": "medium", "title": "CNAME to a host that does not exist"}, {"category": "risk", "confidence": "medium", "entity_ids": ["domain:docs.example.com", "domain:team.sites.example.org"], "evidence_ids": ["64cda6f69dada960e0446c3be5cd00e7c83ae461de1dad9e0a40f842920e57ff", "77a939695ea957512ca610c24dbe7a662bba9c77ce5cd6d4dc9b6011134cf17b"], "explanation": "docs.example.com is an alias (CNAME) of team.sites.example.org, and the address lookup for docs.example.com returned NXDOMAIN, so the target does not exist. team.sites.example.org matches the takeover fingerprint lab-sites (Example Sites, rated vulnerable, shown by http-fingerprint).", "fingerprint": "f778d263360b0541739f3ed1f77217cf", "remediation": "Delete the CNAME record or re-create the resource at the service. In an authorised assessment, confirm with an active check.", "rule_id": "dangling-cname-known-service", "severity": "medium", "title": "CNAME to a host that no longer exists, at a service known for takeovers"}, {"category": "risk", "confidence": "high", "entity_ids": ["domain:example.com"], "evidence_ids": ["f371732585dd210fdb14b2ff3c790ce3cc13807bbe0d5e571b9f9e7e09ffe16c", "80978d4d5f04b8a8ede40344cf32c7a7ce3c38820e7060ae7fdb4af4f84f8d4c"], "explanation": "example.com has MX records, and the TXT lookup for _dmarc.example.com returned NXDOMAIN.", "fingerprint": "e266d5133141e2cf436b90681841e760", "remediation": "Publish a DMARC record at _dmarc.\u003cdomain>, starting with p=none and reporting addresses, then move to quarantine and reject.", "rule_id": "dmarc-missing", "severity": "medium", "title": "Mail domain without a DMARC record"}, {"category": "risk", "confidence": "high", "entity_ids": ["domain:oldmail.example.com"], "evidence_ids": ["0fdfa5c4feac9b667cf909381eaa1a4b3073b64fab48c54602693fcf00fb8a9a", "89ed0ed79d51a1d9178ead6ccdd079412f99ffda1d68e588639e486f38518a3c"], "explanation": "oldmail.example.com has MX records, and the TXT lookup for _dmarc.oldmail.example.com returned NXDOMAIN.", "fingerprint": "fd1dfe70126f68bd56d434468f1c0b99", "remediation": "Publish a DMARC record at _dmarc.\u003cdomain>, starting with p=none and reporting addresses, then move to quarantine and reject.", "rule_id": "dmarc-missing", "severity": "medium", "title": "Mail domain without a DMARC record"}, {"category": "risk", "confidence": "high", "entity_ids": ["domain:example.com"], "evidence_ids": ["756a4789100195ccf5b369a3870bf4c8fe33c40896cd9d7195f162c969466aad"], "explanation": "RDAP lists the expiration of example.com as 2026-11-09T20:16:36Z; the data was collected 2026-10-20T20:16:36+00:00, 20 day(s) before it.", "fingerprint": "3b5e2742ead2a1913a95d9d4edea82c1", "remediation": "Renew the domain and enable auto-renewal.", "rule_id": "domain-expiring", "severity": "medium", "title": "Domain registration expires within 30 days"}, {"category": "risk", "confidence": "low", "entity_ids": ["ip:192.0.2.50"], "evidence_ids": ["22f8bc15441db090f585872819f10e08055a72b80f1b73978c8ef37774c62d47"], "explanation": "Shodan InternetDB lists these open ports on 192.0.2.50: 6379 (Redis). InternetDB reports an earlier scan by Shodan, not a check made now.", "fingerprint": "6d0a955d218a6eca31d4b9bbade2c3e4", "remediation": "Confirm with the owner whether the port is open now; if it is, close it at the firewall or restrict it to known addresses, and require authentication.", "rule_id": "exposed-risky-service", "severity": "medium", "title": "A database, remote-administration or file-sharing port is open to the internet"}, {"category": "risk", "confidence": "high", "entity_ids": ["domain:multi.example.com"], "evidence_ids": ["cf9ad543171412b3791ad9a87b2c0f0acbf046eea457d1e92c76e1ab63ec1265"], "explanation": "multi.example.com publishes 2 TXT records that start with v=spf1.", "fingerprint": "77a354dd910dbfe02771e816a375fdd6", "remediation": "Merge the records into one.", "rule_id": "spf-multiple-records", "severity": "medium", "title": "More than one SPF record"}, {"category": "risk", "confidence": "high", "entity_ids": ["domain:neutral.example.com"], "evidence_ids": ["067fb14624bb13b80634beea67e5c22b8ab7fec13a5360c0f7721dcf19affbbf"], "explanation": "neutral.example.com publishes the SPF record \"v=spf1 mx ?all\", which ends with \"?all\".", "fingerprint": "2045da3219c549be4d77a5ab95fc25f7", "remediation": "End the record with -all (or ~all while rolling out).", "rule_id": "spf-neutral-all", "severity": "medium", "title": "SPF record takes no position on unlisted senders"}, {"category": "risk", "confidence": "high", "entity_ids": ["domain:noall.example.com"], "evidence_ids": ["ec591befd7d6842d1c52eb92279b48ca09c7ef371abb4b02bb99b0bd1c9bbddd"], "explanation": "noall.example.com publishes the SPF record \"v=spf1 mx\", which has no all mechanism and no redirect.", "fingerprint": "76c7ff1b082a981fc7258e15e6d4a96c", "remediation": "End the record with -all (or ~all while rolling out).", "rule_id": "spf-no-all", "severity": "medium", "title": "SPF record has no default result"}, {"category": "risk", "confidence": "high", "entity_ids": ["domain:bulk.example.com"], "evidence_ids": ["b26f8720e480bd67dc9cc71f9a19147bbf50168cbff4cd43f415c4ece3fc048b"], "explanation": "bulk.example.com publishes the SPF record \"v=spf1 include:s1.example.org include:s2.example.org include:s3.example.org include:s4.example.org include:s5.example.org include:s6.example.org include:s7.example.org include:s8.example.org includ...\", whose own terms contain 11 mechanisms that cause a DNS lookup.", "fingerprint": "45699d85cae2f8353a22f20495494441", "remediation": "Remove unused includes, replace includes with ip4/ip6 ranges, or flatten the record.", "rule_id": "spf-too-many-lookups", "severity": "medium", "title": "SPF record needs more than ten DNS lookups"}, {"category": "risk", "confidence": "high", "entity_ids": ["domain:example.com"], "evidence_ids": ["fb32292266be3658dd3466092102faafbc15fa5559699d1e6c263f9019cccec5", "59edc5a1e9efc3048be4b7020fa262068351b81dcd7f3aee7a1c6d1536c597cb"], "explanation": "example.com has name server records and the CAA lookup for example.com returned no record.", "fingerprint": "17834f67d71c51199ede0bda77bf0a05", "remediation": "Publish CAA records naming the certificate authorities you use.", "rule_id": "caa-missing", "severity": "low", "title": "No CAA record at a zone apex"}, {"category": "risk", "confidence": "high", "entity_ids": ["domain:example.net"], "evidence_ids": ["fb41a659ee47efe30954c8bd8af078086c6e17f849ff559924e06d04e48996d6", "b343a685a88e2c255d6ba0cd11173a955fcb07dfeb8a1e2c35673a02a9b866e0"], "explanation": "example.net has name server records and the CAA lookup for example.net returned no record.", "fingerprint": "0a2673b6afea1e688655bc7b24e53236", "remediation": "Publish CAA records naming the certificate authorities you use.", "rule_id": "caa-missing", "severity": "low", "title": "No CAA record at a zone apex"}, {"category": "risk", "confidence": "high", "entity_ids": ["domain:example.com", "domain:example.net"], "evidence_ids": ["59edc5a1e9efc3048be4b7020fa262068351b81dcd7f3aee7a1c6d1536c597cb", "b343a685a88e2c255d6ba0cd11173a955fcb07dfeb8a1e2c35673a02a9b866e0"], "explanation": "The name servers of example.com, example.net all belong to Example DNS; 22 in-scope name(s) sit in these zones.", "fingerprint": "c74c1585250c3a78d6d3afac2b91777f", "remediation": "Consider a secondary DNS provider on a different network, and protect the account with strong authentication.", "rule_id": "concentration-dns", "severity": "low", "title": "All names depend on one DNS provider"}, {"category": "risk", "confidence": "high", "entity_ids": ["domain:app1.example.com", "domain:app2.example.com", "domain:app4.example.com", "domain:bulk.example.com", "domain:dev.example.com", "domain:example.com", "domain:example.net", "domain:mail.example.com", "domain:multi.example.com", "domain:neutral.example.com"], "evidence_ids": ["01e0d9f756c829c055cbb6fca028b332281a006d2dba0560c9ecd6c56f9070c2", "0ca4114e8c6a3d33dc886093bab987f268b2076e75229a7574f38135171b660b", "0f03aa66fc728d33cc76e83d372cd2f3dc6fbbd56d0f565b5dfa8ab691fc3a71", "1dab89720a1b08626b2bb016a98d27c11f7ee49a782efdeec4eff333d16544f4", "24d86e32684a6049ff7a3ad05c6771c1b3ee35cf9e488b4c1738cf41239bf348", "31618bb7c7a0025f530835cf1d160543c407316a0096ef3e00c4db05b01a345c", "4183e499e07dffbb041b653b4dc678fd33412027a88892ba8670331174aeb889", "454b918b6e9c4e9c4e262e2561cf4603e26497589712bd60495b604f254bd35d", "45662725b4f34428ce674d68a9290ec848c820d3e5dd32398d487d2e2ac09d03", "4adf860db08854230c27df2b82977f21cab144f608832cc0f287ab5664a1c5b0", "4af45bdc672e549ec2a077d9cda451aac2a70b992bb600db0745b3036dcacb31", "5936a350f8770c47ac8e4cd9f6b64f302a2f6fd493e5435a931daa90a1e4daf1", "6cf07b70fe54c8dc07202a916e21a75b44e68ac305f61af7dafb7d4e0f3eeeba", "723fd57994f3cafb746088ef8f2855ae4f96ac6239073953cb3c6d21e23f5eb8", "72cdd8aa0540c26b723a185837d883c34c7767df59f19f3cbc5e52e8b4bcd86c", "7eaf7a6e4ce1204f2398e144f2dd57a946ce7319fe5d49722977dcd10d2b5647", "7f5ace880243517166aa2c4143b3f1763167fd82691d40133b8d1675a8dfa217", "8796b00d0d58fc0d2f85096865b77609a632b6307af99de807e0a36b130c0741", "8b51c626a4c3a43ebfa1553cefee66319a43610865b21f03b7fe2c814989ea2d", "8fae92b68fbb16654d5fad999debccd50a13752a06791fb37d8e81e72b04f7e2", "928582d58494dfc3fd7603a1d48dbee1417b6f1e1ea4d99195c04a2dd0e1ac10", "9ba28d58c36cf437461ec87118bae7206a3e8ae854a09a1578907b3cfa6e15f6", "affd6716b8271b4f9d5bd7e0c902c9ecdcf9dad9fafe4e2fd66bcce9878dcdf2", "b2cc2a3bf3dd2f2efbf5bb2b3231e48db1f91b8ac3ad4b915262c9087b4394b6", "b66a08b9fea44f23abb9791edb152886dbd14bf7f74ec4ebbc39f9168ada3cf1", "b81d938641b238321d012b13932c3a32eacb1b503a2560c5210e6cb34555552a", "dcda18944133bf4d950b0f1b57cae1ee851f2aa2609173980098b3150726d24f", "e0ba3bebce56d65b6e52d31ef970b3df7cbb34274625da6da75828a958568ec0", "e463807d036cdb0194bad1001ffbdc8b5441dc766ed0e5f391024e12f5d6fc33", "ed67e58c5cf58145f110fcb0e775753d8c47392b22d15741a12b1a5131293b2f", "f66c746bc440c8d128f28b7796c4b66cb533c6c09266a1444c77bc63f93afa25", "fc3339d17634fafb1acdd94a4fb7ae0e899ea6534b99dd27f330805002f2894c", "ff153d7b83a713654896fc1e4ddb284d03f38ed6c0341f05cdd71f9ab4dcaba9", "ff472dc63ced2336cc4c8a7aa66af6b26a5279f741ccc1065182d56299f4fbf7"], "explanation": "17 in-scope names are served through Example Edge (app1.example.com, app2.example.com, app4.example.com, bulk.example.com, dev.example.com, example.com, example.net, mail.example.com, multi.example.com, neutral.example.com).", "fingerprint": "53928795edd3263d6b3cad74f72035d0", "remediation": "Know the provider's outage and incident process; consider whether critical names need an alternative.", "rule_id": "concentration-edge", "severity": "low", "title": "Several names depend on one CDN or hosting provider"}, {"category": "risk", "confidence": "high", "entity_ids": ["domain:sales.example.com"], "evidence_ids": ["e38fa3477046df1145f76497684ed45cf1bfa7ee959501e068aa353923b0b7e2"], "explanation": "_dmarc.sales.example.com publishes \"v=DMARC1; p=none; rua=mailto:dmarc@example.com\", whose policy is p=none.", "fingerprint": "e3fef59dbae2a10f5d4c23f6b968dab8", "remediation": "Move to p=quarantine and then p=reject once the reports show only legitimate senders.", "rule_id": "dmarc-monitoring-only", "severity": "low", "title": "DMARC policy is monitoring only"}, {"category": "risk", "confidence": "low", "entity_ids": ["domain:dev.example.com"], "evidence_ids": ["4af45bdc672e549ec2a077d9cda451aac2a70b992bb600db0745b3036dcacb31"], "explanation": "dev.example.com contains the label \"dev\" and resolves to 192.0.2.50.", "fingerprint": "a4aebac21eadfa1c9a1eac112a65fb5a", "remediation": "Confirm the system is still needed and maintained; otherwise remove the DNS record and the system.", "rule_id": "forgotten-name", "severity": "low", "title": "Name that looks like a forgotten test or staging system"}, {"category": "analyst", "confidence": "medium", "entity_ids": ["domain:example.com"], "evidence_ids": ["756a4789100195ccf5b369a3870bf4c8fe33c40896cd9d7195f162c969466aad", "59edc5a1e9efc3048be4b7020fa262068351b81dcd7f3aee7a1c6d1536c597cb"], "explanation": "For example.com, only RDAP lists ns9.old.example.net and only the zone's NS records list ns2.dns.example.net.", "fingerprint": "1af732f95250e89e78781fe9170c3313", "remediation": "Make the registry delegation and the zone's NS records identical.", "rule_id": "source-disagreement", "severity": "low", "title": "Registry and DNS disagree about the name servers"}, {"category": "risk", "confidence": "high", "entity_ids": ["domain:soft.example.com"], "evidence_ids": ["85cfb2338240edbf669f8fbb339599904e977c9c8a52ed193893d3587aefbb40"], "explanation": "soft.example.com publishes the SPF record \"v=spf1 mx ~all\", which ends with \"~all\".", "fingerprint": "eb982f6026dd3ce889d4d43f7ea22999", "remediation": "Move to -all once the sender list is complete, and publish a DMARC policy.", "rule_id": "spf-softfail-all", "severity": "low", "title": "SPF record soft-fails unlisted senders"}, {"category": "analyst", "confidence": "medium", "entity_ids": ["domain:ghost.example.com"], "evidence_ids": ["2e29c591d4c851d7d87a83c41255a3f27dd59de8410d1271388c5adc88e28ab6", "c6db47b4d3e2e41a02daf80fc3aa006e2d04eb2c68709171bcbdce290fa2cdf0", "f9b081024eaef68c11e2f13713d461eff9512456735b023e2f701400f81d4cfb"], "explanation": "ghost.example.com is named by crtsh, wayback, and the address lookup for ghost.example.com returned NXDOMAIN.", "fingerprint": "c5a256e85ea07e7fdf5dc10d5e1d6c88", "remediation": "Check whether the name is still referenced (certificates, links, configuration) and whether DNS or the certificate should be cleaned up.", "rule_id": "ghost-hostname", "severity": "info", "title": "A certificate or archive names a host that DNS does not know"}, {"category": "analyst", "confidence": "low", "entity_ids": ["domain:app1.example.com", "domain:app2.example.com", "domain:app4.example.com"], "evidence_ids": ["33272b595e759e4d505fb27f0f385cd97cacd436e745f1dc3b74526de9d6b97c", "35f2254265c06712d4c24cfeaad2bcddcec974c957ef2d0bed5643b827d8b2e5", "eb6969220261232fc88632db4413f4fd88636e66334df9006caed2f51e319d3c"], "explanation": "3 names follow the pattern app\u003cnumber>.example.com (app1.example.com, app2.example.com, app4.example.com); the number(s) 3 are missing, for example app3.example.com.", "fingerprint": "0e614f00e263d0d388e34676a19ec4cf", "remediation": "Check whether the missing number is a retired or unlisted system.", "rule_id": "numbering-gap", "severity": "info", "title": "A gap in a numbered series of names"}], "scan": {"id": 1, "seed": "example.com", "started_at": "2026-10-20T20:16:36+00:00"}, "scope": {"asns": [], "cidrs": [], "domains": ["example.com", "example.net"]}, "source_policy": {"allow": null, "disabled": {}, "enabled": ["asn", "certspotter", "commoncrawl", "crtsh", "dns", "hackertarget", "internetdb", "mnemonic", "rdap", "ripestat", "subdomaincenter", "urlscan", "wayback", "wildcard"], "exclude": [], "no_noncommercial": false}, "sources": {"asn": {"cancelled": 0, "denied": 0, "down": false, "error": 0, "errors": [], "ok": 17, "skipped": 0}, "certspotter": {"cancelled": 0, "denied": 0, "down": false, "error": 0, "errors": [], "ok": 2, "skipped": 0}, "commoncrawl": {"cancelled": 0, "denied": 0, "down": false, "error": 0, "errors": [], "ok": 2, "skipped": 0}, "crtsh": {"cancelled": 0, "denied": 0, "down": false, "error": 0, "errors": [], "ok": 2, "skipped": 0}, "dns": {"cancelled": 0, "denied": 0, "down": false, "error": 0, "errors": [], "ok": 22, "skipped": 0}, "hackertarget": {"cancelled": 0, "denied": 0, "down": false, "error": 0, "errors": [], "ok": 2, "skipped": 0}, "internetdb": {"cancelled": 0, "denied": 0, "down": false, "error": 0, "errors": [], "ok": 17, "skipped": 0}, "mnemonic": {"cancelled": 0, "denied": 0, "down": false, "error": 0, "errors": [], "ok": 2, "skipped": 0}, "rdap": {"cancelled": 0, "denied": 0, "down": false, "error": 0, "errors": [], "ok": 19, "skipped": 0}, "ripestat": {"cancelled": 0, "denied": 0, "down": false, "error": 17, "errors": ["ModuleError: ripestat returned HTTP 404"], "ok": 0, "skipped": 0}, "subdomaincenter": {"cancelled": 0, "denied": 0, "down": false, "error": 0, "errors": [], "ok": 2, "skipped": 0}, "urlscan": {"cancelled": 0, "denied": 0, "down": false, "error": 0, "errors": [], "ok": 2, "skipped": 0}, "wayback": {"cancelled": 0, "denied": 0, "down": false, "error": 0, "errors": [], "ok": 2, "skipped": 0}, "wildcard": {"cancelled": 0, "denied": 0, "down": false, "error": 0, "errors": [], "ok": 2, "skipped": 0}}, "summary": {"by_scope": {"in": 22, "linked": 17, "out": 16}, "by_type": {"asn": 1, "domain": 37, "ip": 17}, "candidates": 0, "edges": 73, "entities": 55, "findings": 73, "findings_by_tier": {"claimed": 0, "other": 17, "stale": 7, "verified": 49, "wildcard": 0}, "headline": "17 verified, 1 claimed (4 stale, 0 wildcard-covered)", "leads": 0, "names": {"live": 17, "stale": 5, "unresolved": 0, "wildcard": 0}, "risks": 23, "tiers": {"claimed": 1, "stale": 4, "verified": 17, "wildcard": 0}}, "summary_statements": [], "tool": {"name": "scrutator", "version": "0.7.0"}, "unverified_leads": []}</script>
+<script>
+const D = JSON.parse(document.getElementById("data").textContent);
+const el = (tag, props = {}, ...kids) => {
+  const node = document.createElement(tag);
+  for (const [key, value] of Object.entries(props)) node[key] = value;
+  for (const kid of kids) if (kid !== null && kid !== undefined) node.append(kid);
+  return node;
+};
+const chip = (cls, text) => el("span", {className: "chip " + cls}, el("span", {className: "dot"}), text);
+const frag = (...kids) => el("span", {}, ...kids);
+
+/* ---- the receipt: a sha256 drawn as 16 bars, same hash → same mark ---- */
+const NS = "http://www.w3.org/2000/svg";
+function receiptMark(id, hollow) {
+  const svg = document.createElementNS(NS, "svg");
+  svg.setAttribute("class", "mark" + (hollow ? " hollow" : ""));
+  svg.setAttribute("viewBox", "0 0 40 18");
+  svg.setAttribute("aria-hidden", "true");
+  const hex = (id || "").slice(0, 16);
+  for (let i = 0; i < 16; i++) {
+    const v = parseInt(hex[i] || "0", 16);
+    const h = 3 + (v / 15) * 14;
+    const bar = document.createElementNS(NS, "rect");
+    bar.setAttribute("x", String(i * 2.5 + 0.4));
+    bar.setAttribute("y", String(18 - h));
+    bar.setAttribute("width", "1.7");
+    bar.setAttribute("height", String(h));
+    bar.setAttribute("rx", "0.6");
+    bar.setAttribute("fill", "currentColor");
+    bar.setAttribute("fill-opacity", hollow ? "0.5" : "0.9");
+    svg.append(bar);
+  }
+  return svg;
+}
+const shortId = (id) => (id || "").slice(0, 10);
+
+function copyButton(text, label) {
+  const btn = el("button", {className: "copybtn", type: "button", textContent: label || "copy id"});
+  btn.addEventListener("click", (e) => {
+    if (e && e.stopPropagation) e.stopPropagation();
+    try { navigator.clipboard.writeText(text); btn.textContent = "copied"; setTimeout(() => (btn.textContent = label || "copy id"), 1200); }
+    catch (_) { btn.textContent = text; }
+  });
+  return btn;
+}
+
+/* One evidence record as an inline, keyboard-reachable, printable disclosure that carries the full trace:
+   source, request, collection time, sha256 id (copyable), the command to re-verify it, and the payload with
+   the claimed text highlighted. The drawer shows the same records; this stays in the page without any click. */
+function evidenceRecord(id, highlight) {
+  const ev = D.evidence[id];
+  if (!ev) return null;
+  const det = el("details", {className: "ev"});
+  det.append(el("summary", {},
+    receiptMark(id, false),
+    el("span", {className: "src", textContent: ev.source}),
+    el("span", {className: "req", textContent: ev.request})));
+  const body = el("div", {className: "ev-body"});
+  const meta = el("div", {className: "ev-meta"},
+    el("span", {textContent: "collected " + ev.collected_at}),
+    el("span", {className: "ev-id", textContent: "sha256 " + id}),
+    copyButton(id, "copy id"));
+  body.append(meta,
+    el("div", {className: "verify-hint", textContent: "scrutator verify proof.scrutator --replay  ·  record " + shortId(id)}),
+    payloadPre(ev.payload, highlight));
+  det.append(body);
+  return det;
+}
+function payloadPre(payload, highlight) {
+  const pre = el("pre");
+  const text = (payload || "").slice(0, 20000);
+  const needle = highlight && highlight.length > 2 ? text.indexOf(highlight) : -1;
+  if (needle >= 0) {
+    pre.append(text.slice(0, needle), el("mark", {textContent: highlight}), text.slice(needle + highlight.length));
+  } else {
+    pre.append(text);
+  }
+  return pre;
+}
+function evidenceDetails(ids, highlight) {
+  const cell = el("div");
+  for (const id of ids) { const r = evidenceRecord(id, highlight); if (r) cell.append(r); }
+  if (!ids.length) cell.append(el("span", {className: "faint", textContent: "no evidence record"}));
+  return cell;
+}
+
+/* The drawer: the same records, opened on demand for one subject. */
+let lastFocus = null;
+function openEvidence(title, sub, ids, highlight) {
+  const body = document.getElementById("drawer-body");
+  body.replaceChildren();
+  document.getElementById("drawer-title").textContent = title;
+  document.getElementById("drawer-sub").textContent = sub || (ids.length + " evidence record(s)");
+  for (const id of ids) { const r = evidenceRecord(id, highlight); if (r) { r.open = true; body.append(r); } }
+  if (!ids.length) body.append(el("p", {className: "muted", textContent: "No evidence record backs this directly."}));
+  const d = document.getElementById("drawer"), s = document.getElementById("drawer-scrim");
+  d.className = "drawer open"; s.className = "drawer-scrim open"; d.setAttribute("aria-hidden", "false");
+  lastFocus = (typeof document.activeElement !== "undefined") ? document.activeElement : null;
+  if (d.focus) d.focus();
+}
+function closeEvidence() {
+  const d = document.getElementById("drawer"), s = document.getElementById("drawer-scrim");
+  d.className = "drawer"; s.className = "drawer-scrim"; d.setAttribute("aria-hidden", "true");
+  if (lastFocus && lastFocus.focus) lastFocus.focus();
+}
+function rowOpensEvidence(tr, title, sub, ids, highlight) {
+  if (!ids || !ids.length) return tr;
+  tr.className = (tr.className ? tr.className + " " : "") + "clickable";
+  tr.setAttribute("tabindex", "0");
+  tr.setAttribute("role", "button");
+  tr.setAttribute("aria-label", "Show evidence for " + title);
+  const open = () => openEvidence(title, sub, ids, highlight);
+  tr.addEventListener("click", open);
+  tr.addEventListener("keydown", (e) => { if (e && (e.key === "Enter" || e.key === " ")) { if (e.preventDefault) e.preventDefault(); open(); } });
+  return tr;
+}
+
+/* ---- masthead ---- */
+const aiLine = D.ai
+  ? " · AI " + Object.entries(D.ai.providers || {}).map(([role, p]) => `${role} ${p.provider}/${p.model} (${p.local ? "local" : "cloud"})`).join(", ")
+  : " · AI off (deterministic)";
+document.getElementById("meta").textContent =
+  `${D.scan.seed} · scan #${D.scan.id} · started ${D.scan.started_at || "?"} · generated ${D.generated_at} · scrutator ${D.tool.version}${aiLine}`;
+
+if (D.summary.headline) {
+  document.getElementById("headline").append(el("p", {className: "lede", id: "headline-text",
+    textContent: "Names: " + D.summary.headline + ". Verified names are backed by evidence shown in place; claimed names are kept with the reason they are only claims."}));
+}
+
+function buildVerdict() {
+  const host = document.getElementById("cards");
+  const t = D.summary.tiers || {};
+  const by = D.summary.by_scope || {};
+  const sev = {high: 0, medium: 0, low: 0, info: 0};
+  for (const r of D.risks || []) sev[r.severity] = (sev[r.severity] || 0) + 1;
+  const evidenceCount = Object.keys(D.evidence || {}).length;
+  const cells = [];
+  if (D.names && D.names.length) {
+    cells.push(["lead", t.verified || 0, "Verified names"]);
+    cells.push([(t.claimed || 0) ? "warn" : "", t.claimed || 0, "Claimed names"]);
+  }
+  const topSev = sev.high ? "sev-high" : sev.medium ? "sev-medium" : "";
+  cells.push([topSev, (D.risks || []).length, "Risks"]);
+  if (sev.high || sev.medium) cells.push(["", `${sev.high} / ${sev.medium}`, "High / medium"]);
+  cells.push(["", by.in || 0, "In scope"]);
+  if (by.linked) cells.push(["", by.linked, "Linked"]);
+  if (D.summary.candidates) cells.push(["", D.summary.candidates, "Candidates"]);
+  cells.push(["lead", evidenceCount, "Evidence records"]);
+  host.setAttribute("data-n", String(cells.length));
+  for (const [cls, n, k] of cells) {
+    host.append(el("div", {className: "vcell " + cls}, el("span", {className: "n", textContent: String(n)}), el("span", {className: "k", textContent: k})));
+  }
+}
+
+/* ---- table of contents ---- */
+function buildToc() {
+  const host = document.getElementById("toc");
+  const items = [
+    ["sec-names", "Names", (D.names || []).length],
+    ["sec-risks", "Risks", (D.risks || []).length],
+    ["sec-attribution", "Attribution", D.summary.candidates || 0],
+    ["sec-findings", "Findings", D.summary.findings || 0],
+    ["sec-graph", "Infrastructure", null],
+    ["sec-entities", "Entities", D.summary.entities || 0],
+    ["sec-coverage", "Coverage", null],
+    ["sec-proof", "Proof", null],
+  ];
+  for (const [id, label, count] of items) {
+    if ((id === "sec-names") && !(D.names || []).length) continue;
+    if ((id === "sec-attribution") && !D.attribution) continue;
+    const a = el("a", {href: "#" + id, textContent: label});
+    if (count !== null) a.append(el("span", {className: "c", textContent: String(count)}));
+    host.append(a);
+  }
+}
+
+function section(hostId, title, lede, node) {
+  const host = document.getElementById(hostId);
+  host.append(el("div", {className: "sec-head"}, el("h2", {textContent: title})));
+  if (lede) host.append(el("p", {className: "lede", textContent: lede}));
+  host.append(node);
+}
+
+function renderNarrative() {
+  const statements = D.summary_statements || [];
+  if (!statements.length) return;
+  const list = el("ul", {className: "plain"});
+  for (const s of statements) {
+    const li = el("li", {},
+      el("span", {textContent: s.text + " "}),
+      chip(s.confidence === "high" ? "verified" : s.confidence === "medium" ? "band-probable" : "tag", s.confidence),
+      evidenceDetails(s.evidence_ids, s.text));
+    list.append(li);
+  }
+  const panel = el("div", {className: "panel"}, el("div", {className: "panel-pad"}, list));
+  section("extra", "AI summary", "Every statement was checked against the evidence it cites before it was published.", panel);
+}
+
+function renderSources() {
+  const rows = Object.entries(D.sources || {}).sort(([a], [b]) => a.localeCompare(b));
+  if (!rows.length) return;
+  const head = el("tr", {}, ...["Source", "OK", "Failed", "Denied", "Skipped", "Cancelled", "State", "First errors"].map((t, i) => el("th", {className: i >= 1 && i <= 5 ? "right" : "", textContent: t})));
+  const body = el("tbody");
+  let gaps = 0;
+  for (const [name, h] of rows) {
+    gaps += h.error + (h.cancelled || 0);
+    const stateCell = h.down ? chip("stale", "down") : (h.error && !h.ok) ? chip("stale", "failing") : h.ok ? chip("verified", "answered") : chip("state", "idle");
+    body.append(el("tr", {},
+      el("td", {className: "mono", textContent: name}),
+      el("td", {className: "right num", textContent: String(h.ok)}),
+      el("td", {className: "right num" + (h.error ? " sev-high" : ""), textContent: String(h.error)}),
+      el("td", {className: "right num", textContent: String(h.denied)}),
+      el("td", {className: "right num", textContent: String(h.skipped)}),
+      el("td", {className: "right num" + (h.cancelled ? " sev-high" : ""), textContent: String(h.cancelled || 0)}),
+      el("td", {}, stateCell),
+      el("td", {className: "muted", textContent: (h.errors || []).join("; ")})));
+  }
+  const cov = D.coverage || {};
+  const down = cov.sources_down || [];
+  const notes = [el("p", {className: "lede", textContent: gaps
+    ? `${gaps} source run(s) failed or were cut. Coverage has gaps: a missing name may only mean a source did not answer, not that the name is absent.`
+    : "Every source run answered."})];
+  if (down.length) notes.push(el("p", {className: "sev-high", textContent: `Marked down after repeated failures, not asked again this scan: ${down.join(", ")}.`}));
+  if (cov.deadline_hit) notes.push(el("p", {className: "sev-high", textContent: `The scan hit its ${cov.deadline_s} s deadline: lookups still running were cancelled. This report is partial.`}));
+  const panel = el("div", {className: "panel"},
+    el("div", {className: "panel-pad"}, ...notes),
+    el("div", {className: "tablewrap"}, el("table", {}, el("thead", {}, head), body)));
+  section("extra", "Source coverage", "What answered, what failed, what was off, and why — so a thin result is never read as a clean one.", panel);
+}
+
+function renderAttribution() {
+  const att = D.attribution;
+  if (!att) return;
+  const all = att.candidates || [];
+  const promoted = new Set((D.promotions || []).map(p => p.entity));
+  const bands = att.bands || {};
+  const host = document.getElementById("attribution");
+  host.append(el("div", {className: "sec-head"}, el("h2", {textContent: "Attribution (candidates for the scope)"})));
+  host.append(el("p", {className: "lede", textContent: all.length
+    ? `Names outside the scope with evidence tying them to the organisation: ${bands.confirmed || 0} confirmed, ${bands.probable || 0} probable, ${bands.possible || 0} possible, ${bands.unlikely || 0} unlikely` + (att.omitted_unlikely ? ` (${att.omitted_unlikely} more unlikely not listed)` : "") + ". Scores are heuristic and every signal cites its evidence. A candidate is only looked at passively until you promote it with scrutator promote."
+    : "No name outside the scope has evidence tying it to the organisation. That is not proof that none exists: a name no certificate, record or registration links to the scope cannot be found this way."}));
+  if (!all.length) return;
+  const panel = el("div", {className: "panel"});
+  const filter = el("select", {}, ...[["", "possible or better"], ["all", "all bands"], ["confirmed", "confirmed"], ["probable", "probable"], ["possible", "possible"], ["unlikely", "unlikely"]].map(([value, label]) => el("option", {value, textContent: label})));
+  const controls = el("div", {className: "controls"}, el("label", {className: "ctl"}, "Band", filter));
+  const body = el("tbody");
+  const wanted = (band) => filter.value === "all" || (filter.value === "" ? band !== "unlikely" : band === filter.value);
+  const draw = () => {
+    body.replaceChildren();
+    for (const c of all) {
+      if (!wanted(c.band)) continue;
+      const signals = el("ul", {className: "signals"});
+      for (const s of c.signals) {
+        const item = el("li", {}, el("b", {className: "mono", textContent: `${s.kind} ${s.weight.toFixed(2)}`}), el("span", {textContent: " " + s.detail}));
+        if (s.note) item.append(el("div", {className: "muted", textContent: s.note}));
+        item.append(evidenceDetails(s.evidence_ids, c.value));
+        signals.append(item);
+      }
+      const name = el("td", {}, el("b", {className: "cell-name", textContent: c.value}), el("span", {textContent: " "}), chip("state", c.state));
+      if (promoted.has(c.entity_id)) name.append(el("span", {textContent: " "}), chip("verified", "promoted"));
+      name.append(el("div", {className: "muted", textContent: c.explanation}));
+      const doubts = el("td");
+      if (!c.premortem.length) doubts.append(el("span", {className: "faint", textContent: "none found by the rules"}));
+      for (const note of c.premortem) doubts.append(el("div", {}, el("span", {textContent: note.text}), evidenceDetails(note.evidence_ids, null)));
+      body.append(el("tr", {},
+        name,
+        el("td", {}, chip("band-" + c.band, c.band), el("div", {className: "muted num", textContent: `score ${c.score.toFixed(2)}`})),
+        el("td", {}, signals),
+        doubts));
+    }
+  };
+  filter.addEventListener("input", draw);
+  draw();
+  panel.append(controls, el("div", {className: "tablewrap"}, el("table", {}, el("thead", {}, el("tr", {}, ...["Name", "Band", "Why it may be ours", "What could make it wrong"].map(t => el("th", {textContent: t})))), body)));
+  host.append(panel);
+}
+
+function renderAnalystLeads() {
+  const verified = (D.leads || {}).verified || [];
+  if (!verified.length) return;
+  const list = el("ul", {className: "plain"});
+  for (const lead of verified) {
+    const li = el("li", {},
+      chip("tag", lead.kind === "premortem" ? "pre-mortem" : "lead"),
+      el("span", {textContent: " " + lead.claim}));
+    if (lead.check) li.append(el("div", {className: "muted", textContent: "Suggested check (not run): " + lead.check}));
+    li.append(evidenceDetails(lead.evidence_ids, lead.claim));
+    list.append(li);
+  }
+  const host = document.getElementById("attribution");
+  host.append(el("div", {className: "sec-head"}, el("h3", {textContent: "Analyst leads"})));
+  host.append(el("p", {className: "lede", textContent: "Written by the AI, each checked against the evidence it cites."}));
+  host.append(el("div", {className: "panel"}, el("div", {className: "panel-pad"}, list)));
+}
+
+function renderLeads() {
+  const rejected = ((D.leads || {}).rejected || []).map(l => ({text: l.claim, reason: l.reason}));
+  const leads = [...(D.unverified_leads || []), ...rejected];
+  if (!leads.length) return;
+  const list = el("ul", {className: "plain"});
+  for (const l of leads) list.append(el("li", {}, el("span", {textContent: l.text + " "}), el("span", {className: "faint", textContent: `(rejected: ${l.reason})`})));
+  section("extra-after", "Unverified leads (not part of the report)", "Kept for the record; none reached the report.", el("div", {className: "panel"}, el("div", {className: "panel-pad"}, list)));
+}
+
+const SEV_RANK = {high: 0, medium: 1, low: 2, info: 3};
+function sevBadge(sev) { return el("span", {className: "sev-badge sev-" + sev}, el("span", {className: "bar"}), sev); }
+
+function renderRisks() {
+  const risks = (D.risks || []).slice().sort((a, b) => (SEV_RANK[a.severity] - SEV_RANK[b.severity]) || a.rule_id.localeCompare(b.rule_id));
+  const counts = {high: 0, medium: 0, low: 0, info: 0};
+  for (const r of risks) counts[r.severity] = (counts[r.severity] || 0) + 1;
+  const host = document.getElementById("risks");
+  host.append(el("div", {className: "sec-head"}, el("h2", {textContent: "Risks"})));
+  host.append(el("p", {className: "lede", textContent: risks.length
+    ? `${risks.length} risk(s): ${counts.high} high, ${counts.medium} medium, ${counts.low} low, ${counts.info} info. Each cites the evidence it rests on; the analyst category marks oddities a reviewer could miss. Grouped by severity, highest first.`
+    : "No risks were derived from the evidence this scan collected. That is not a clean bill of health: a source that failed or a lookup that did not run produces no finding."}));
+  if (!risks.length) return;
+  const panel = el("div", {className: "panel"});
+  const filter = el("select", {}, el("option", {value: "", textContent: "all categories"}), el("option", {value: "risk", textContent: "risk"}), el("option", {value: "analyst", textContent: "analyst"}));
+  const body = el("tbody");
+  const draw = () => {
+    body.replaceChildren();
+    for (const r of risks) {
+      if (filter.value && r.category !== filter.value) continue;
+      const what = el("td", {}, el("b", {textContent: r.title}), el("span", {textContent: " "}), chip("tag", r.rule_id));
+      if (r.category === "analyst") what.append(el("span", {textContent: " "}), chip("band-probable", "analyst"));
+      what.append(el("div", {textContent: r.explanation}),
+        el("div", {className: "muted", textContent: "Remediation: " + r.remediation}),
+        el("div", {className: "faint mono", textContent: r.entity_ids.join(", ")}));
+      const tr = el("tr", {},
+        el("td", {}, sevBadge(r.severity), el("div", {className: "faint num", textContent: "confidence " + r.confidence})),
+        what,
+        el("td", {}, receiptStack(r.evidence_ids)));
+      rowOpensEvidence(tr, r.title, r.rule_id + " · " + r.severity, r.evidence_ids, r.explanation);
+      body.append(tr);
+    }
+  };
+  filter.addEventListener("input", draw);
+  draw();
+  panel.append(el("div", {className: "controls"}, el("label", {className: "ctl"}, "Category", filter), el("span", {className: "count-hint grow", textContent: "Click a row for its evidence"})),
+    el("div", {className: "tablewrap"}, el("table", {}, el("thead", {}, el("tr", {}, ...["Severity", "Risk & remediation", "Receipts"].map(t => el("th", {textContent: t})))), body)));
+  host.append(panel);
+}
+
+function receiptStack(ids) {
+  const wrap = el("div", {className: "receipt"});
+  const shown = ids.slice(0, 3);
+  for (const id of shown) wrap.append(receiptMark(id, false));
+  if (ids.length > shown.length) wrap.append(el("span", {className: "faint num", textContent: "+" + (ids.length - shown.length)}));
+  if (!ids.length) wrap.append(receiptMark("", true), el("span", {className: "faint", textContent: "no record"}));
+  return wrap;
+}
+
+function renderDependencies() {
+  const deps = (D.dependencies || []).slice().sort((a, b) => (b.hostnames.length - a.hostnames.length));
+  if (!deps.length) return;
+  const body = el("tbody");
+  for (const d of deps) {
+    const names = el("details", {className: "ev"},
+      el("summary", {}, el("span", {className: "src", textContent: d.hostnames.length + " name(s)"})),
+      el("div", {className: "ev-body"}, el("div", {className: "mono muted", textContent: d.hostnames.join(", ")})));
+    const provider = el("td", {}, el("b", {textContent: d.provider}));
+    if (!d.verified) provider.append(el("span", {textContent: " "}), chip("stale", "pattern not verified"));
+    const tr = el("tr", {},
+      el("td", {}, chip("tag", d.category)),
+      provider,
+      el("td", {className: "mono muted", textContent: d.targets.join(", ")}),
+      el("td", {}, names),
+      el("td", {}, receiptStack(d.evidence_ids)));
+    rowOpensEvidence(tr, d.provider, d.category + " · via " + d.via.join(", "), d.evidence_ids, null);
+    body.append(tr);
+  }
+  const panel = el("div", {className: "panel"},
+    el("div", {className: "panel-pad"}, el("p", {className: "lede", textContent: "Which third parties stand behind the in-scope names, recognised from the knowledge packs."})),
+    el("div", {className: "tablewrap"}, el("table", {}, el("thead", {}, el("tr", {}, ...["Role", "Provider", "Network / targets", "Names", "Receipts"].map(t => el("th", {textContent: t})))), body)));
+  document.getElementById("risks").append(el("div", {className: "sec-head"}, el("h3", {textContent: "Provider dependencies"})), panel);
+}
+
+const STATE_LABEL = {live: "live", stale: "NXDOMAIN", wildcard: "wildcard-covered", unresolved: "no address"};
+const TIER_LABEL = {verified: "Verified", other: "Addresses & registrations", claimed: "Claimed", stale: "Stale", wildcard: "Wildcard-covered"};
+const TIER_NOTE = {
+  verified: "DNS resolves them, or a certificate or a scan dated inside the last 90 days names them and DNS does not contradict it.",
+  other: "Relations about an address, a network or a registration rather than about one name.",
+  claimed: "Only a list (an aggregator, an archive) names them, and DNS gives no sign of them. Kept as claims, with the reason.",
+  stale: "Evidenced once (a certificate or a scan), but DNS no longer agrees or the record is older than 90 days.",
+  wildcard: "Only the zone's wildcard record answers for them, so DNS does not prove they exist.",
+};
+const nameTier = (r) => r.tier || (r.state === "live" ? "verified" : r.state === "wildcard" ? "wildcard" : "claimed");
+const NAME_STATE = {};
+for (const row of D.names || []) NAME_STATE[row.name] = row.state;
+
+function tierGroups(items, tierOf, order, noun, makeTable) {
+  const host = el("div");
+  for (const tier of order) {
+    const rows = items.filter(item => tierOf(item) === tier);
+    if (!rows.length) continue;
+    const note = el("p", {className: "tier-note", textContent: TIER_NOTE[tier] || ""});
+    if (tier === "verified" || tier === "other") {
+      host.append(el("h3", {textContent: `${TIER_LABEL[tier]} (${rows.length} ${noun})`}), note, makeTable(rows));
+    } else {
+      const group = el("details", {className: "tier-group"}, el("summary", {textContent: `${TIER_LABEL[tier]}: ${rows.length} ${noun} (click to expand)`}), note);
+      let built = false;
+      group.addEventListener("toggle", () => { if (group.open && !built) { built = true; group.append(makeTable(rows)); } });
+      host.append(group);
+    }
+  }
+  return host;
+}
+
+/* The verified names are the main table: searchable, sortable, filterable, each row opening its evidence.
+   Claimed / stale / wildcard stay as counted disclosures so the long tail never floods the table. */
+function renderNames() {
+  const rows = D.names || [];
+  if (!rows.length) return;
+  const c = D.summary.names || {};
+  const host = document.getElementById("names");
+  host.append(el("div", {className: "sec-head"}, el("h2", {textContent: "Name states"})));
+  host.append(el("p", {className: "lede", textContent:
+    `${rows.length} in-scope name(s). By tier: ${D.summary.headline || ""}. By DNS state: ${c.live || 0} live, ${c.stale || 0} NXDOMAIN, ${c.wildcard || 0} wildcard-covered, ${c.unresolved || 0} with no address. A certificate or archive naming a host does not make it live — the tier says what the evidence supports.`}));
+
+  const verified = rows.filter(r => nameTier(r) === "verified");
+  const makeTable = (items, searchable) => {
+    const search = el("input", {type: "search", placeholder: "filter names…", "aria-label": "Filter names"});
+    const state = {sort: "name", dir: 1, q: ""};
+    const body = el("tbody");
+    const compare = (a, b) => {
+      let x, y;
+      if (state.sort === "state") { x = a.state; y = b.state; } else { x = a.name; y = b.name; }
+      return (x < y ? -1 : x > y ? 1 : 0) * state.dir;
+    };
+    const draw = () => {
+      body.replaceChildren();
+      const q = state.q.toLowerCase();
+      let shown = 0;
+      for (const r of items.slice().sort(compare)) {
+        if (q && !r.name.includes(q) && !(r.named_by || []).some(s => s.includes(q))) continue;
+        shown++;
+        const addrs = r.addresses || [];
+        const resolves = addrs.length ? el("td", {className: "mono muted"}, addrs[0] + (addrs.length > 1 ? "  +" + (addrs.length - 1) : "")) : el("td", {className: "faint", textContent: "—"});
+        const tr = el("tr", {},
+          el("td", {className: "cell-name"}, r.name),
+          el("td", {}, chip(nameTier(r), TIER_LABEL[nameTier(r)])),
+          el("td", {}, chip("state", STATE_LABEL[r.state] || r.state)),
+          resolves,
+          el("td", {className: "faint mono names-by", textContent: (r.named_by || []).join(", ")}),
+          el("td", {}, receiptStack(r.evidence_ids)));
+        rowOpensEvidence(tr, r.name, (TIER_LABEL[nameTier(r)]) + " · " + (r.tier_reason || r.reason), r.evidence_ids, null);
+        body.append(tr);
+      }
+      if (!shown) body.append(el("tr", {}, el("td", {colSpan: 6, className: "empty", textContent: "No name matches the filter."})));
+    };
+    const th = (key, label) => {
+      const h = el("th", {className: "sortable", textContent: label + " "}, el("span", {className: "arrow", textContent: "↕"}));
+      h.addEventListener("click", () => { state.dir = state.sort === key ? -state.dir : 1; state.sort = key; draw(); });
+      return h;
+    };
+    const headRow = el("tr", {}, th("name", "Name"), el("th", {textContent: "Tier"}), th("state", "DNS state"), el("th", {textContent: "Resolves to"}), el("th", {className: "names-by", textContent: "Named by"}), el("th", {textContent: "Receipts"}));
+    const table = el("div", {className: "tablewrap"}, el("table", {}, el("thead", {}, headRow), body));
+    draw();
+    if (searchable) {
+      search.addEventListener("input", () => { state.q = search.value; draw(); });
+      return el("div", {}, el("div", {className: "controls"}, el("label", {className: "ctl grow"}, "Search", search), el("span", {className: "count-hint", textContent: "Click a row for its evidence · sort by header"})), table);
+    }
+    return table;
+  };
+
+  const panel = el("div", {className: "panel"});
+  const groups = el("div", {className: "panel-pad"});
+  // verified first, as a searchable main table
+  if (verified.length) {
+    groups.append(el("h3", {textContent: `Verified names (${verified.length})`}), el("p", {className: "tier-note", textContent: TIER_NOTE.verified}), makeTable(verified, true));
+  }
+  // the rest as counted disclosures (one toggle group per non-empty tier)
+  const rest = tierGroups(rows.filter(r => nameTier(r) !== "verified"), nameTier, ["claimed", "stale", "wildcard"], "name(s)", (items) => makeTable(items, false));
+  groups.append(rest);
+  panel.append(groups);
+  host.append(panel);
+}
+
+function renderExposure() {
+  const rows = D.exposure || [];
+  if (!rows.length) return;
+  const body = el("tbody");
+  for (const r of rows) {
+    const ip = el("td", {className: "mono"}, r.ip, el("span", {textContent: " "}), chip("state", r.state));
+    if (r.inherited_from) ip.append(el("div", {className: "faint", textContent: "network of " + r.inherited_from}));
+    const tr = el("tr", {},
+      ip,
+      el("td", {className: "num", textContent: r.ports.join(", ")}),
+      el("td", {className: "muted", textContent: r.cpes.join(", ")}),
+      el("td", {className: "num" + (r.vulns.length ? " sev-medium" : ""), textContent: r.vulns.join(", ")}),
+      el("td", {className: "muted", textContent: [r.netname, r.country, r.description].filter(Boolean).join(" · ")}),
+      el("td", {className: "mono muted", textContent: r.abuse_contacts.join(", ")}),
+      el("td", {}, receiptStack(r.evidence_ids)));
+    rowOpensEvidence(tr, r.ip, "address exposure", r.evidence_ids, null);
+    body.append(tr);
+  }
+  const panel = el("div", {className: "panel"},
+    el("div", {className: "panel-pad"}, el("p", {className: "lede", textContent: "What Shodan saw open on the addresses the in-scope names resolve to — an earlier scan by Shodan, not a check made now; CVE ids are Shodan's guesses from product versions. Abuse contact and network name are from RIPEstat. Non-commercial data: see the README."})),
+    el("div", {className: "tablewrap"}, el("table", {}, el("thead", {}, el("tr", {}, ...["Address", "Ports", "Products", "CVEs", "Network", "Abuse contact", "Receipts"].map(t => el("th", {textContent: t})))), body)));
+  document.getElementById("risks").append(el("div", {className: "sec-head"}, el("h3", {textContent: "Address exposure (Shodan InternetDB, RIPEstat)"})), panel);
+}
+
+function renderBrand() {
+  const brand = D.brand;
+  if (!brand) return;
+  const host = el("div", {className: "panel"}, el("div", {className: "panel-pad"},
+    el("p", {className: "lede", textContent: "Run with --brand. The platform accounts the organisation links from its own home page (robots.txt honoured), and whether they and look-alikes of the brand name exist, read only from the HTTP status of the public profile page. Unverifiable means the page does not tell, or the platform is never asked; it never means absent. Ownership of a look-alike is unknown."})));
+  for (const site of brand.domains) {
+    host.append(el("h3", {textContent: `${site.domain} — brand "${site.brand}"`}));
+    const robots = site.robots.map(r => `${r.url}: ${r.status === null ? "no answer" : "HTTP " + r.status}${r.allows_home ? "" : " (home page not allowed)"}`);
+    const pages = site.pages.map(p => `${p.url}: ${p.status === null ? "not fetched" : "HTTP " + p.status}, ${p.links} platform link(s)`);
+    host.append(el("p", {className: "muted", textContent: [...robots, ...pages].join(" · ") || "nothing fetched"}));
+    const body = el("tbody");
+    const items = [
+      ...site.official.map(o => ({...o, kind: "official", how: "linked from the site", ids: o.evidence_ids})),
+      ...site.checks.filter(c => c.kind !== "official").map(c => ({...c, ids: [c.evidence_id]})),
+    ];
+    for (const r of items) {
+      const tr = el("tr", {},
+        el("td", {textContent: r.platform}),
+        el("td", {className: "mono", textContent: r.handle}),
+        el("td", {className: "muted", textContent: `${r.kind}: ${r.how}`}),
+        el("td", {}, chip(r.state === "exists" ? "verified" : r.state === "absent" ? "stale" : "state", r.state)),
+        el("td", {className: "muted", textContent: r.reason}),
+        el("td", {}, receiptStack(r.ids)));
+      rowOpensEvidence(tr, r.platform + " " + r.handle, r.state, r.ids, null);
+      body.append(tr);
+    }
+    host.append(items.length
+      ? el("div", {className: "tablewrap"}, el("table", {}, el("thead", {}, el("tr", {}, ...["Platform", "Handle", "Why asked", "Answer", "Reason", "Receipts"].map(t => el("th", {textContent: t})))), body))
+      : el("p", {className: "muted", textContent: "The home page links to no known platform account, so no platform was asked about."}));
+  }
+  document.getElementById("risks").append(el("div", {className: "sec-head"}, el("h3", {textContent: "Brand presence"})), host);
+}
+
+function renderOrgExposure() {
+  const org = D.org_exposure;
+  if (!org) return;
+  const e = D.engagement || {};
+  const by = e.authorised_by || {};
+  const a = org.addresses;
+  const host = el("div", {className: "panel"}, el("div", {className: "panel-pad"},
+    el("p", {className: "lede", textContent: `Authorised assessment (scrutator exposure): ${e.organisation || "?"} · domains ${(e.domains || []).join(", ")} · authorised by ${by.name || "?"} (${by.role || "?"}) · ${e.start} to ${e.end} · engagement file sha256 ${e.sha256}. Aggregate only: person-like addresses are counted by shape, never shown.`}),
+    el("p", {textContent: `${a.distinct} work address(es) found: ${a.role} role mailbox(es), ${a.person_like} person-like; ${a.outside_engagement_dropped} outside the engagement dropped.`})));
+  const pad = host.firstChild;
+  if (org.naming_patterns.length) pad.append(el("p", {textContent: "Naming patterns of person-like addresses: " + org.naming_patterns.map(p => `${p.shape} ${p.count} (${Math.round(p.share * 100)}%)`).join(", ")}));
+  const list = el("ul", {className: "plain"});
+  for (const item of org.inferences) list.append(el("li", {}, el("span", {textContent: item.text}), evidenceDetails(item.evidence_ids, null)));
+  pad.append(list);
+  if (org.role_mailboxes.length) {
+    const body = el("tbody");
+    for (const r of org.role_mailboxes) body.append(el("tr", {}, el("td", {className: "mono", textContent: r.address}), el("td", {textContent: r.function}), el("td", {}, receiptStack(r.evidence_ids))));
+    host.append(el("div", {className: "tablewrap"}, el("table", {}, el("thead", {}, el("tr", {}, ...["Role mailbox", "Function", "Receipts"].map(t => el("th", {textContent: t})))), body)));
+  }
+  document.getElementById("risks").append(el("div", {className: "sec-head"}, el("h3", {textContent: "Organisation exposure (authorised, aggregate)"})), host);
+}
+
+function renderFindings() {
+  const host = document.getElementById("findings");
+  const lede = document.getElementById("findings-lede");
+  const by = D.summary.findings_by_tier;
+  if (by) lede.textContent = `${D.summary.findings} finding(s), one per relation: ${by.verified} about verified names, ${by.other} about addresses and registrations, ${by.claimed} about claimed names, ${by.stale} about stale names, ${by.wildcard} about wildcard-covered names. All kept; the last groups open on demand.`;
+  const panel = el("div", {className: "panel"});
+  const pad = el("div", {className: "panel-pad"});
+  const table = (items) => {
+    const body = el("tbody");
+    for (const f of items) {
+      const claim = el("td", {}, el("span", {className: "cell-name", textContent: f.claim}));
+      for (const id of f.entity_ids) {
+        const state = NAME_STATE[id.replace(/^domain:/, "")];
+        if (state && state !== "live") claim.append(el("span", {textContent: " "}), chip("stale", STATE_LABEL[state]));
+      }
+      const tr = el("tr", {},
+        claim,
+        el("td", {}, chip(f.confidence === "high" ? "verified" : f.confidence === "medium" ? "band-probable" : "tag", f.confidence)),
+        el("td", {}, receiptStack(f.evidence_ids)));
+      rowOpensEvidence(tr, f.claim, "finding · " + f.confidence, f.evidence_ids, f.claim);
+      body.append(tr);
+    }
+    return el("div", {className: "tablewrap"}, el("table", {}, el("thead", {}, el("tr", {}, ...["Claim", "Confidence", "Receipts"].map(t => el("th", {textContent: t})))), body));
+  };
+  pad.append(tierGroups(D.findings, f => f.tier || "verified", ["verified", "other", "claimed", "stale", "wildcard"], "finding(s)", table));
+  panel.append(pad);
+  host.append(panel);
+}
+
+function renderEntities() {
+  const host = document.getElementById("entities");
+  const typeSelect = el("select", {}, el("option", {value: "", textContent: "all types"}));
+  for (const t of Object.keys(D.summary.by_type)) typeSelect.append(el("option", {value: t, textContent: t}));
+  const scopeSelect = el("select", {}, el("option", {value: "", textContent: "all scopes"}));
+  for (const s of ["in", "candidate", "linked", "out"]) scopeSelect.append(el("option", {value: s, textContent: s}));
+  const search = el("input", {type: "search", placeholder: "filter entities…", "aria-label": "Filter entities"});
+  const body = el("tbody");
+  const draw = () => {
+    body.replaceChildren();
+    let shown = 0;
+    for (const e of D.entities) {
+      if (typeSelect.value && e.type !== typeSelect.value) continue;
+      if (scopeSelect.value && e.state !== scopeSelect.value) continue;
+      if (search.value && !e.value.includes(search.value.toLowerCase())) continue;
+      shown++;
+      const resolution = e.type === "domain" && NAME_STATE[e.value] ? STATE_LABEL[NAME_STATE[e.value]] : "";
+      body.append(el("tr", {},
+        el("td", {className: "cell-name"}, e.value),
+        el("td", {}, chip("tag", e.type)),
+        el("td", {}, chip(e.state === "in" ? "verified" : e.state === "out" ? "stale" : "state", e.state), resolution ? frag(el("span", {textContent: " "}), chip("state", resolution)) : null)));
+    }
+    if (!shown) body.append(el("tr", {}, el("td", {colSpan: 3, className: "empty", textContent: "No entity matches the filter."})));
+  };
+  for (const control of [typeSelect, scopeSelect, search]) control.addEventListener("input", draw);
+  draw();
+  const panel = el("div", {className: "panel"},
+    el("div", {className: "controls"}, el("label", {className: "ctl"}, "Type", typeSelect), el("label", {className: "ctl"}, "Scope", scopeSelect), el("label", {className: "ctl grow"}, "Search", search)),
+    el("div", {className: "tablewrap"}, el("table", {}, el("thead", {}, el("tr", {}, ...["Value", "Type", "Scope & resolution"].map(t => el("th", {textContent: t})))), body)));
+  host.append(panel);
+}
+
+function renderProof() {
+  const host = document.getElementById("proof");
+  const evidenceCount = Object.keys(D.evidence || {}).length;
+  const panel = el("div", {className: "proof"});
+  panel.append(el("div", {className: "seal"}, receiptMark("2f6b43a1c0d9e8f7", false), "Every claim is content-addressed"));
+  panel.append(el("h2", {textContent: "Proof"}));
+  panel.append(el("p", {className: "lede", textContent:
+    `This report holds ${evidenceCount} evidence record(s). Each has an id that is the sha256 of (source, request, payload), so the bar marks beside every claim identify the exact bytes behind it; changing any byte changes the id. The full records are in the signed bundle's evidence.jsonl, chained in audit.jsonl.`}));
+  const ol = el("ol");
+  ol.append(el("li", {}, "Export the bundle during the scan with ", el("code", {textContent: "--bundle"}), " (written to proof.scrutator, signed with a local Ed25519 key)."));
+  ol.append(el("li", {}, "Offline check: ", el("code", {textContent: "scrutator verify proof.scrutator --pin <fingerprint>"}), " confirms the manifest hashes, the audit chain, the signature and the pinned signer."));
+  ol.append(el("li", {}, "Re-check against the live sources: ", el("code", {textContent: "scrutator verify proof.scrutator --replay"}), " re-issues each replayable request and reports every record unchanged, changed or unavailable."));
+  ol.append(el("li", {}, "The signer's fingerprint is printed by the scan and carried in the bundle manifest; obtain it out of band before you pin it."));
+  panel.append(ol);
+  host.append(panel);
+}
+
+const GRAPH_COLORS = {domain: "#3f7bd6", ip: "#2f9e6a", asn: "#c6861f", org: "#8a6ad0"};
+function drawGraph() {
+  const svg = document.getElementById("graph");
+  const W = 1000, H = 520;
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+  const rank = {in: 0, candidate: 1, linked: 2, out: 3};
+  // Collapse by default to what the scan investigated: in-scope, candidates and linked addresses. Out-of-scope
+  // entities (every third party a name touches) are the bulk of a large scan and turn the graph into a hairball;
+  // they stay in the Entities table. The cap keeps the layout legible past 500 investigated entities.
+  const investigated = D.entities.filter(e => e.state !== "out");
+  const pool = investigated.length ? investigated : D.entities;
+  const ents = [...pool].sort((a, b) => rank[a.state] - rank[b.state]).slice(0, 220);
+  const index = new Map(ents.map((e, i) => [e.id, i]));
+  const nodes = ents.map((e, i) => ({e, x: W / 2 + Math.cos(i) * 200 * (1 + i / ents.length), y: H / 2 + Math.sin(i) * 150 * (1 + i / ents.length), vx: 0, vy: 0}));
+  const links = D.edges.filter(l => index.has(l.src) && index.has(l.dst)).map(l => [index.get(l.src), index.get(l.dst)]);
+  for (let step = 0; step < 250; step++) {
+    for (let i = 0; i < nodes.length; i++) for (let j = i + 1; j < nodes.length; j++) {
+      const a = nodes[i], b = nodes[j];
+      let dx = a.x - b.x, dy = a.y - b.y;
+      const d2 = Math.max(dx * dx + dy * dy, 25), d = Math.sqrt(d2), f = 900 / d2;
+      dx /= d; dy /= d;
+      a.vx += dx * f; a.vy += dy * f; b.vx -= dx * f; b.vy -= dy * f;
+    }
+    for (const [i, j] of links) {
+      const a = nodes[i], b = nodes[j];
+      const dx = b.x - a.x, dy = b.y - a.y;
+      a.vx += dx * 0.01; a.vy += dy * 0.01; b.vx -= dx * 0.01; b.vy -= dy * 0.01;
+    }
+    for (const n of nodes) {
+      n.vx += (W / 2 - n.x) * 0.002; n.vy += (H / 2 - n.y) * 0.002;
+      n.x = Math.min(W - 10, Math.max(10, n.x + n.vx)); n.y = Math.min(H - 10, Math.max(10, n.y + n.vy));
+      n.vx *= 0.6; n.vy *= 0.6;
+    }
+  }
+  const mk = (tag, attrs) => { const node = document.createElementNS(NS, tag); for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v); return node; };
+  for (const [i, j] of links) svg.append(mk("line", {x1: nodes[i].x, y1: nodes[i].y, x2: nodes[j].x, y2: nodes[j].y, stroke: "currentColor", "stroke-opacity": 0.14, "stroke-width": 1}));
+  for (const n of nodes) {
+    const circle = mk("circle", {cx: n.x, cy: n.y, r: n.e.state === "in" ? 6 : 4, fill: GRAPH_COLORS[n.e.type] || "#888", "fill-opacity": n.e.state === "out" ? 0.4 : 0.95, stroke: "var(--paper)", "stroke-width": 1});
+    const title = mk("title", {}); title.textContent = `${n.e.type}: ${n.e.value} (${n.e.state})`;
+    circle.append(title); svg.append(circle);
+  }
+  const legend = document.getElementById("graph-legend");
+  for (const [type, color] of Object.entries(GRAPH_COLORS)) legend.append(el("span", {}, el("i", {style: "background:" + color}), type));
+  const hidden = D.entities.length - ents.length;
+  legend.append(el("span", {className: "faint", textContent: hidden > 0 ? `${ents.length} investigated entities shown · ${hidden} out-of-scope or capped, in the Entities table` : `${ents.length} entities`}));
+}
+
+/* ---- theme + keyboard ---- */
+function setupChrome() {
+  // Everything here is enhancement: a report rendered by a bare DOM (no documentElement, no localStorage, no
+  // document-level events — as the test harness does) must render fully without it, so each step is guarded.
+  const root = document.documentElement;
+  const btn = document.getElementById("theme");
+  const label = document.getElementById("theme-label");
+  if (root && root.setAttribute && root.getAttribute && btn && btn.addEventListener) {
+    const read = () => { try { return localStorage.getItem("scrutator-theme"); } catch (_) { return null; } };
+    const stored = read();
+    if (stored) root.setAttribute("data-theme", stored);
+    const reflect = () => { const t = root.getAttribute("data-theme"); if (label) label.textContent = t === "dark" ? "Dark" : t === "light" ? "Light" : "Theme"; };
+    reflect();
+    btn.addEventListener("click", () => {
+      const current = root.getAttribute("data-theme");
+      const next = current === "dark" ? "light" : current === "light" ? "dark" : "dark";
+      root.setAttribute("data-theme", next);
+      try { localStorage.setItem("scrutator-theme", next); } catch (_) {}
+      reflect();
+    });
+  }
+  const close = document.getElementById("drawer-close"), scrim = document.getElementById("drawer-scrim");
+  if (close && close.addEventListener) close.addEventListener("click", closeEvidence);
+  if (scrim && scrim.addEventListener) scrim.addEventListener("click", closeEvidence);
+  if (typeof document.addEventListener === "function") document.addEventListener("keydown", (e) => { if (e && e.key === "Escape") closeEvidence(); });
+}
+
+renderNarrative();
+renderSources();
+renderRisks();
+renderNames();
+renderDependencies();
+renderExposure();
+renderBrand();
+renderOrgExposure();
+renderAttribution();
+renderAnalystLeads();
+renderFindings();
+renderEntities();
+buildVerdict();
+buildToc();
+drawGraph();
+renderProof();
+renderLeads();
+setupChrome();
+</script>
+</body>
+</html>

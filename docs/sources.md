@@ -43,6 +43,16 @@ Sources that list names (`crtsh`, `certspotter`, `subdomaincenter`, `hackertarge
 **Source coverage**; a source that times out or answers 5xx/429 three times in a row (`--breaker 3`) is marked
 **down** for the rest of the scan.
 
+## Paid work
+
+Four keyless sources are free for **non-commercial use only** on their free tier (the "Non-commercial" column:
+InternetDB, RIPEstat (`asn`, `ripestat`), CertSpotter, Subdomain Center). A paid audit or a monitoring retainer is
+commercial use. Either run with `--no-noncommercial` (`scan`, `audit`, `watch` and `bounty watch` all take it; the
+audit lists the sources it did not use under *What was not tested*), or obtain those providers' commercial terms.
+HackerTarget's free tier is 50 calls a day per IP address: several clients a day from one address use it up. The
+crt.sh database fallback is the one connection that is not HTTPS: a fixed host and port (`crt.sh:5432`), checked by
+the egress policy before it connects ([security](security.md)).
+
 ## Choosing sources
 
 ```bash

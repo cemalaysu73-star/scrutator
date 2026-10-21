@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
+from scrutator import __version__
 from scrutator.audit.branding import Branding
 from scrutator.audit.content import AuditError, authorisation_from_log, build_audit, evidence_problems
 from scrutator.audit.pdf import print_pdf
@@ -171,8 +172,12 @@ def check_audit(page_path: Path, bundle_path: Path, *, pin: str | None = None) -
             client=facts["who"]["client"], generated_at=facts["generated_at"],
         )
         rebuilt["polish"] = facts.get("polish")
+        made_with, rebuilt["tool"] = facts.get("tool"), facts.get("tool")  # which version made it is information, not content
         same = rebuilt == facts
-        add("content derivable", same, "" if same else "a number, finding or sentence is not what the bundle implies")
+        why = "a number, finding or sentence is not what the bundle implies"
+        if not same and made_with != __version__:
+            why += f" (made with scrutator {made_with}, checked with {__version__}: check with the version that made it)"
+        add("content derivable", same, "" if same else why)
     except (AuditError, KeyError, TypeError, ValueError) as exc:
         add("content derivable", False, f"{type(exc).__name__}: {exc}")
         return checks

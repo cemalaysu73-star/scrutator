@@ -91,6 +91,15 @@ def main() -> int:
     done = run(exe, "verify", str(bundle), "--pin", str(work / "keys-protected" / "signing.pub"), cwd=work)
     check("verify --pin of the bench bundle", done.returncode == 0 and "Verification passed." in done.stdout, done.stdout.strip().splitlines()[-1] if done.stdout.strip() else done.stderr[-200:])
     mcp_session(exe, work, work / "bench-out" / "lab" / "scrutator.db", bundle)
+    # R7: the audit's text, renderer and compliance pack are package data too
+    done = run(exe, "audit", "--from-bundle", str(bundle), "--self", "--yes", "--no-pdf", "--lang", "tr", "--out", "audit-out", cwd=work)
+    check("audit --from-bundle (Turkish, packaged text and compliance pack)", done.returncode == 0 and (work / "audit-out" / "audit.html").exists(),
+          (done.stdout.strip().splitlines() or [done.stderr[-200:]])[0][:160])
+    done = run(exe, "audit-check", str(work / "audit-out" / "audit.html"), str(work / "audit-out" / "proof.scrutator"), cwd=work)
+    check("audit-check of that audit", done.returncode == 0 and "Audit check passed" in done.stdout, done.stdout.strip().splitlines()[-1] if done.stdout.strip() else done.stderr[-200:])
+    done = subprocess.run([exe, "bounty", "import", "-", "--out", "scope.yaml"], cwd=work, input="*.example.com\n*\n",
+                          capture_output=True, text=True, timeout=120)
+    check("bounty import refuses * and keeps *.example.com", done.returncode == 0 and "refused '*'" in done.stdout and (work / "scope.yaml").exists(), done.stdout.strip()[:160])
 
     if args.live:
         done = run(exe, "scan", "example.com", "--ai", "off", "--out", "live", "--bundle", "--key-dir", "keys", cwd=work, timeout=900)
