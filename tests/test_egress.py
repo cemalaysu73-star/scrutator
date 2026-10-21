@@ -223,12 +223,13 @@ async def test_a_referral_host_is_checked_once_not_before_every_request():
     egress = EgressGuard(resolve=counting_resolve)
     async with open_context(egress=egress) as ctx:
         with respx.mock(assert_all_called=False) as router:
+            # R6: the RIRs are source hosts now (never resolved by the guard); a TLD registry is a referral host
             router.get(url__regex=r"https://rdap\.org/.*").mock(
-                return_value=httpx.Response(302, headers={"Location": "https://rdap.arin.net/registry/ip/1"}))
-            router.get(url__regex=r"https://rdap\.arin\.net/.*").mock(return_value=httpx.Response(200, json={}))
+                return_value=httpx.Response(302, headers={"Location": "https://rdap.verisign.com/com/v1/domain/x.com"}))
+            router.get(url__regex=r"https://rdap\.verisign\.com/.*").mock(return_value=httpx.Response(200, json={}))
             for n in range(5):
-                assert (await ctx.http.get(f"https://rdap.org/ip/192.0.2.{n}")).status_code == 200
-    assert asked == ["rdap.arin.net"]
+                assert (await ctx.http.get(f"https://rdap.org/domain/x{n}.com")).status_code == 200
+    assert asked == ["rdap.verisign.com"]
 
 
 async def test_a_cached_host_is_still_refused_when_it_was_not_public():

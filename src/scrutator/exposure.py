@@ -11,6 +11,8 @@ import json
 import re
 from urllib.parse import parse_qs, urlsplit
 
+from scrutator.modules.ripestat import network_of
+
 _INTERNETDB = re.compile(r"GET https://internetdb\.shodan\.io/(\S+)")
 _RIPESTAT = re.compile(r"GET (https://stat\.ripe\.net/data/(abuse-contact-finder|whois)/data\.json\?\S+)")
 _LOOKED_AT = ("in", "linked")
@@ -30,6 +32,58 @@ def _blank(ip: str, state: str) -> dict:
         "ip": ip, "state": state, "ports": [], "cpes": [], "vulns": [], "hostnames": [],
         "abuse_contacts": [], "netname": "", "country": "", "description": "", "evidence_ids": [],
     }
+
+
+def _ripestat_records(report: dict) -> dict[str, dict[str, tuple[str, list[dict]]]]:
+    """address -> {call: (evidence id, rows)} for the RIPEstat records in the report."""
+    found: dict[str, dict[str, tuple[str, list[dict]]]] = {}
+    for evidence_id in sorted(report["evidence"]):
+        record = report["evidence"][evidence_id]
+        if record["source"] != "ripestat":
+            continue
+        match = _RIPESTAT.fullmatch(record["request"])
+        if not match:
+            continue
+        ip = (parse_qs(urlsplit(match.group(1)).query).get("resource") or [""])[0]
+        found.setdefault(ip, {}).setdefault(match.group(2), (evidence_id, _slices(record["payload"])))
+    return found
+
+
+def _inherit_networks(report: dict, allowed: dict, rows: dict, seen: dict, add, put) -> None:
+    """An address RIPEstat was not asked about takes the abuse contact and network name of the address that was asked,
+    when that address's whois record names a range containing it (the module asks once per network, R6). The row says
+    which address was asked (`inherited_from`) and cites both of its records. Bundles made before R6 hold no ranges, so
+    nothing is inherited from them."""
+    records = _ripestat_records(report)
+    networks = []
+    for asked_ip, calls in records.items():
+        if asked_ip not in allowed or "whois" not in calls or "abuse-contact-finder" not in calls:
+            continue
+        try:
+            address = ipaddress.ip_address(asked_ip)
+        except ValueError:
+            continue
+        known = network_of(calls["whois"][1], address)
+        if known is not None:
+            networks.append((int(known[1]) - int(known[0]), known, asked_ip, calls))
+    networks.sort(key=lambda n: (n[0], n[2]))  # the most specific network first
+    for ip in sorted(allowed):
+        if ip in records:
+            continue
+        address = ipaddress.ip_address(ip)
+        for _, (first, last), asked_ip, calls in networks:
+            if first.version == address.version and first <= address <= last:
+                abuse_id, abuse_rows = calls["abuse-contact-finder"]
+                whois_id, whois_rows = calls["whois"]
+                for item in abuse_rows:
+                    if isinstance(item.get("abuse_contacts"), list):
+                        add(ip, "abuse_contacts", item["abuse_contacts"], abuse_id)
+                for item in whois_rows:
+                    if item.get("key") in _WHOIS_FIELDS:
+                        put(ip, _WHOIS_FIELDS[item["key"]], item.get("value", ""), whois_id)
+                if ip in rows:
+                    rows[ip]["inherited_from"] = asked_ip
+                break
 
 
 def exposure(report: dict) -> list[dict]:
@@ -79,6 +133,7 @@ def exposure(report: dict) -> list[dict]:
                 elif match.group(2) == "whois" and item.get("key") in _WHOIS_FIELDS:
                     put(ip, _WHOIS_FIELDS[item["key"]], item.get("value", ""), evidence_id)
 
+    _inherit_networks(report, allowed, rows, seen, add, put)
     for (ip, key), values in seen.items():
         rows[ip][key] = sorted(values)
     for row in rows.values():

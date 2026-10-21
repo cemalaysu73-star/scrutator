@@ -23,6 +23,7 @@ class CertSpotter(Module):
     backed by two sources."""
 
     name = "certspotter"
+    name_weight = 3
     accepts = frozenset({EntityType.DOMAIN})
     concurrency = 1
     timeout = 60.0

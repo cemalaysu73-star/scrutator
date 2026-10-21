@@ -30,6 +30,7 @@ class Dns(Module):
     query leaves the scope."""
 
     name = "dns"
+    name_weight = 3
     accepts = frozenset({EntityType.DOMAIN})
     concurrency = 32  # names at once (six queries each); the resolver's own pool bounds what is on the wire
     priority = 10

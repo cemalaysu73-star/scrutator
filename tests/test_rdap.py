@@ -41,7 +41,8 @@ async def test_domain_registration(make_ctx):
 
 async def test_ip_network_owner(make_ctx):
     with respx.mock() as router:
-        router.get("https://rdap.org/ip/93.184.216.34").mock(return_value=httpx.Response(200, json=IP_RDAP))
+        # R6: a public address is asked of the registry that holds it (93/8 is RIPE NCC's), not through rdap.org
+        router.get("https://rdap.db.ripe.net/ip/93.184.216.34").mock(return_value=httpx.Response(200, json=IP_RDAP))
         obs = await Rdap().run(Entity(type=EntityType.IP, value="93.184.216.34"), make_ctx())
     assert pairs(obs) == {("netblock_owner", "org", "EDGECAST-NETBLK-03")}
 

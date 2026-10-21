@@ -74,6 +74,16 @@ class Router:
     def transport(self) -> httpx.MockTransport:
         return httpx.MockTransport(self)
 
+    def add_rdap_ip(self, answer) -> None:
+        """RDAP about an address, wherever the scan asks it: rdap.org, or (R6) the regional registry that holds a
+        public address. `answer` sees the request; the address is the last path segment either way."""
+        from scrutator.modules.rdap import RIR_SERVERS
+
+        self.add("rdap.org", r"/ip/.*", answer, regex=True)
+        for base in RIR_SERVERS:
+            host, _, prefix = base.removeprefix("https://").partition("/")
+            self.add(host, rf"/{re.escape(prefix)}ip/.*", answer, regex=True)
+
 
 def provider(entry_id="example-dns", **over):
     entry = {

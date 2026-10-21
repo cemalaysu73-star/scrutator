@@ -44,6 +44,8 @@ def test_allowlist_is_exactly_the_sources_the_modules_use():
     assert ALLOWED_HTTP_HOSTS == {
         "crt.sh", "rdap.org", "stat.ripe.net", "web.archive.org", "index.commoncrawl.org", "api.certspotter.com",
         "api.hackertarget.com", "api.subdomain.center", "urlscan.io", "api.mnemonic.no", "internetdb.shodan.io",
+        # R6: public addresses are asked of the regional registry's RDAP server directly
+        "rdap.arin.net", "rdap.db.ripe.net", "rdap.apnic.net", "rdap.lacnic.net", "rdap.afrinic.net",
     }
 
 

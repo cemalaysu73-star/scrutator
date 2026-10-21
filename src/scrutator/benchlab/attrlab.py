@@ -164,6 +164,6 @@ def source_router(log: list) -> Router:
     router = Router()
     router.add("crt.sh", "/", crt)
     router.add("rdap.org", r"/domain/.*", rdap_domain, regex=True)
-    router.add("rdap.org", r"/ip/.*", rdap_ip, regex=True)
+    router.add_rdap_ip(rdap_ip)
     router.add("stat.ripe.net", "/data/prefix-overview/data.json", ripe)
     return router

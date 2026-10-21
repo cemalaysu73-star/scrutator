@@ -15,6 +15,27 @@ from scrutator.sources import SourcePolicy
 from scrutator.store import Store
 
 
+def _offer_rdap_networks(store: Store, scan_id: int, ctx: ModuleContext) -> None:
+    """Hand the RDAP module the network registrations an earlier scan in this database fetched recently, so a repeat
+    scan does not ask the registries again about networks it already holds a record of. The audit log says how many
+    were offered and how old they may be; each one the scan cites keeps its own collection time."""
+    from datetime import datetime, timedelta, timezone
+
+    from scrutator.modules.rdap import REUSE_DAYS, network_entry
+
+    since = (datetime.now(timezone.utc) - timedelta(days=REUSE_DAYS)).isoformat(timespec="seconds")
+    offered = []
+    for prefix in ("GET https://rdap.", ):
+        for evidence in store.recent_evidence("rdap", prefix, since):
+            if "/ip/" in evidence.request:
+                entry = network_entry(evidence)
+                if entry is not None:
+                    offered.append(entry)
+    if offered:
+        ctx.cache.setdefault("rdap-networks", []).extend(offered)
+        store.append_audit(scan_id, {"event": "rdap_reuse_offered", "records": len(offered), "max_age_days": REUSE_DAYS})
+
+
 async def run_scan(
     seed: Entity,
     scope: ScopePolicy,
@@ -34,6 +55,8 @@ async def run_scan(
     deadline: Deadline | None = None,
     breaker_threshold: int = DEFAULT_BREAKER_THRESHOLD,
     source_policy: SourcePolicy | None = None,
+    listeners: list | None = None,
+    timeout_cap: float | None = None,
 ) -> tuple[int, AgentStats]:
     """Run a scan. With a deadline (seconds, or a `Deadline` shared with the caller) the scan
     always returns in time: lookups still running when it passes are cancelled, nothing new
@@ -56,8 +79,9 @@ async def run_scan(
         ai.bind(store, scan_id)
     engine = Engine(
         store, scope, ctx, allow_active=allow_active, deadline=deadline, breaker_threshold=breaker_threshold,
-        max_entities=max_entities,
+        max_entities=max_entities, timeout_cap=timeout_cap,
     )
+    engine.listeners.extend(listeners or [])
     chosen = load_builtin_modules() if modules is None else modules
     # which sources may run is the user's decision (and which have a key): recorded first, in the audit log too,
     # so a bundle can be checked against it
@@ -66,6 +90,8 @@ async def run_scan(
     chosen, _ = policy.select(chosen)
     store.set_meta(scan_id, "source_policy", json.dumps(record, sort_keys=True))
     store.append_audit(scan_id, {"event": "source_policy", **record})
+    if ctx is not None and any(m.name == "rdap" for m in chosen):
+        _offer_rdap_networks(store, scan_id, ctx)
 
     async def collect() -> AgentStats:
         warm = getattr(ctx.resolver, "warm_up", None) if ctx is not None else None

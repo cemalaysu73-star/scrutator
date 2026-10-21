@@ -126,7 +126,8 @@ async def test_ripestat_keeps_the_abuse_contact_and_network_name_with_sourceapp(
     assert json.loads(abuse.payload) == [{"abuse_contacts": ["abuse@example.net"]}]
     whois = next(i.evidence for i in out if "whois" in i.evidence.request)
     rows = json.loads(whois.payload)
-    assert {r["key"] for r in rows} == {"netname", "descr", "country"} and "remarks" not in whois.payload
+    # R6: the network's range is kept as well (it is what another address of the network is checked against)
+    assert {r["key"] for r in rows} == {"netname", "descr", "country", "inetnum"} and "remarks" not in whois.payload
     assert supports(abuse.payload, json.dumps(ABUSE_BODY)) and supports(whois.payload, json.dumps(WHOIS_BODY))
     assert abuse.source == "ripestat"
 

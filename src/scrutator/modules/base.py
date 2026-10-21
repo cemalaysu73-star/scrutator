@@ -106,6 +106,10 @@ class Module(ABC):
     opt_in: ClassVar[str | None] = None
     # False when a recorded request cannot be re-issued by `verify --replay` (None: replayable unless keyed).
     replayable: ClassVar[bool | None] = None
+    # How much this source naming a host says the host exists now, for the order in which names are resolved (never
+    # for what is recorded): 3 for a certificate or a DNS record pointing at it, 2 for a source that saw it serve or
+    # resolve, 1 for a list (an archive, a crawl, an aggregator that keeps names that no longer resolve).
+    name_weight: ClassVar[int] = 1
 
     @abstractmethod
     async def run(self, entity: Entity, ctx: ModuleContext) -> list[Observation | Fact]: ...

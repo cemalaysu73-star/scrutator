@@ -28,6 +28,12 @@ SOURCE_HOSTS = frozenset(
     {
         "crt.sh",
         "rdap.org",
+        # the regional registries' own RDAP servers: public addresses are asked of the one that holds them
+        "rdap.arin.net",
+        "rdap.db.ripe.net",
+        "rdap.apnic.net",
+        "rdap.lacnic.net",
+        "rdap.afrinic.net",
         "stat.ripe.net",
         "web.archive.org",
         "index.commoncrawl.org",

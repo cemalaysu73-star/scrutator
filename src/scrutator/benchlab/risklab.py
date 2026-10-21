@@ -188,7 +188,7 @@ def source_router(*, expiry_com, expiry_net=None, rdap_com_servers=("NS1.DNS.EXA
     router.add("internetdb.shodan.io", r"/.*", internetdb, regex=True)
     router.add("crt.sh", "/", crt)
     router.add("rdap.org", r"/domain/.*", rdap, regex=True)
-    router.add("rdap.org", r"/ip/.*", httpx.Response(404), regex=True)
+    router.add_rdap_ip(httpx.Response(404))
     router.add("stat.ripe.net", "/data/prefix-overview/data.json", ripe)
     router.add("web.archive.org", "/cdx/search/cdx", wayback)
     router.add("index.commoncrawl.org", "/collinfo.json", httpx.Response(200, json=[{"id": "CC-MAIN-LAB", "cdx-api": "https://index.commoncrawl.org/CC-MAIN-LAB-index"}]))

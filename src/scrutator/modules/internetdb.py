@@ -27,6 +27,7 @@ class InternetDb(Module):
     is rated low confidence."""
 
     name = "internetdb"
+    name_weight = 2
     accepts = frozenset({EntityType.IP})
     concurrency = 4
     timeout = 30.0

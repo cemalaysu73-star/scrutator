@@ -280,6 +280,17 @@ class Store:
         row = self._db.execute("SELECT * FROM evidence WHERE id = ?", (evidence_id,)).fetchone()
         return Evidence(**dict(row)) if row else None
 
+    def recent_evidence(self, source: str, request_prefix: str, since: str) -> list[Evidence]:
+        """Evidence of `source` from any scan in this database whose request starts with `request_prefix` and that was
+        collected at or after `since` (ISO 8601, UTC), oldest first. For answers worth reusing across scans (the
+        registration of a network): the record is content-addressed, so reusing it cites exactly what was received."""
+        rows = self._db.execute(
+            "SELECT * FROM evidence WHERE source = ? AND substr(request, 1, ?) = ? AND collected_at >= ?"
+            " ORDER BY collected_at, id",
+            (source, len(request_prefix), request_prefix, since),
+        ).fetchall()
+        return [Evidence(**dict(r)) for r in rows]
+
     def add_scan_evidence(self, scan_id: int, evidence_id: str) -> None:
         """Attach evidence to a scan without attaching it to a relation (see modules.base.Fact)."""
         with self._write():

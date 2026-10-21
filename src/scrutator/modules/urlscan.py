@@ -27,6 +27,7 @@ class UrlScan(Module):
     minute; the module makes one."""
 
     name = "urlscan"
+    name_weight = 2
     accepts = frozenset({EntityType.DOMAIN})
     concurrency = 1
     timeout = 45.0

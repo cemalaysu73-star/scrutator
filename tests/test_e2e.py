@@ -28,7 +28,7 @@ COLLINFO = [{"id": "CC-MAIN-2026-10", "cdx-api": "https://index.commoncrawl.org/
 def mock_internet(router):
     router.get("https://crt.sh/").mock(return_value=httpx.Response(200, json=CRT_ROWS))
     router.get(url__regex=r"https://rdap\.org/domain/.*").mock(return_value=httpx.Response(404))
-    router.get("https://rdap.org/ip/93.184.216.34").mock(
+    router.get("https://rdap.db.ripe.net/ip/93.184.216.34").mock(  # R6: straight to the RIR that holds it
         return_value=httpx.Response(200, json={"name": "EDGECAST-NETBLK-03"})
     )
     router.get("https://stat.ripe.net/data/prefix-overview/data.json").mock(

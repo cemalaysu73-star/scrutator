@@ -10,7 +10,7 @@ from scrutator.ai.prompt import wrap_data
 from scrutator.ai.runtime import AIRuntime
 from scrutator.ai.types import AIError
 from scrutator.engine import Engine
-from scrutator.model import Entity, ScopeState
+from scrutator.model import Entity, EntityType, ScopeState
 from scrutator.modules.base import Module
 from scrutator.packs.schema import PlaybookEntry
 from scrutator.store import Store
@@ -139,6 +139,8 @@ async def _run_pipelined(
     queued: set[tuple[str, str]] = set()  # (module, entity) pairs already waiting or started
     waiting: list[tuple[int, Candidate]] = []  # (depth, lookup) not started yet
     running: dict[asyncio.Task, int] = {}
+    about: dict[asyncio.Task, EntityType] = {}  # what each running lookup is about, for the names-settled signal
+    settled = False  # every lookup about a name has run (the live name list can say so); may happen once
 
     def queue(entity: Entity, depth: int) -> None:
         if depth > max_rounds:
@@ -168,6 +170,7 @@ async def _run_pipelined(
                     for depth, candidate in batch:
                         task = asyncio.ensure_future(engine.run_module(scan_id, candidate.module, candidate.entity))
                         running[task] = depth
+                        about[task] = candidate.entity.type
                         stats.modules_run += 1
                         stats.rounds = max(stats.rounds, depth)
             if not running:
@@ -175,8 +178,14 @@ async def _run_pipelined(
             finished, _ = await asyncio.wait(running, return_when=asyncio.FIRST_COMPLETED)
             for task in finished:
                 depth = running.pop(task)
+                about.pop(task, None)
                 for found in task.result():
                     queue(found, depth + 1)
+            if not settled and not any(t is EntityType.DOMAIN for t in about.values()) and not any(
+                c.entity.type is EntityType.DOMAIN for _, c in waiting
+            ):
+                settled = True
+                engine.names_settled()
             if not stopped and store.entity_count(scan_id) >= max_entities:
                 stopped = True
     finally:

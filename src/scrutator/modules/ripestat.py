@@ -1,11 +1,46 @@
+import ipaddress
 import json
 
 from scrutator.model import Entity, EntityType, Evidence
 from scrutator.modules.base import Fact, Module, ModuleContext, ModuleError, SourceUnavailable, http_failure
+from scrutator.modules._lanes import once_per_network
 from scrutator.modules.registry import register
 
 SOURCEAPP = "scrutator"  # RIPEstat asks heavy or regular users to identify their application
-_WHOIS_KEYS = ("netname", "descr", "country")
+# The network's range is kept too (R6): it is what lets another address of the scan inside the same network rest on
+# this record instead of asking again, and what lets anyone reading the bundle check that it does.
+_RANGE_KEYS = ("inetnum", "inet6num", "NetRange", "CIDR")
+_WHOIS_KEYS = ("netname", "descr", "country", *_RANGE_KEYS)
+
+
+def parse_range(value: object) -> tuple | None:
+    """(first, last) of a whois range: `a - b` or one CIDR prefix (ARIN's comma-separated CIDR lists are refused)."""
+    if not isinstance(value, str):
+        return None
+    text = value.strip()
+    try:
+        if " - " in text:
+            first, last = (ipaddress.ip_address(part.strip()) for part in text.split(" - ", 1))
+        elif "," not in text:
+            network = ipaddress.ip_network(text, strict=False)
+            first, last = network[0], network[-1]
+        else:
+            return None
+    except ValueError:
+        return None
+    return (first, last) if first.version == last.version and first <= last else None
+
+
+def network_of(rows: list[dict], address) -> tuple | None:
+    """The most specific range in a whois answer's rows that contains `address`."""
+    best = None
+    for row in rows:
+        if isinstance(row, dict) and row.get("key") in _RANGE_KEYS:
+            found = parse_range(row.get("value"))
+            if found and found[0].version == address.version and found[0] <= address <= found[1]:
+                if best is None or int(found[1]) - int(found[0]) < int(best[1]) - int(best[0]):
+                    best = found
+    return best
 
 
 @register
@@ -35,6 +70,21 @@ class RipeStat(Module):
         )
 
     async def run(self, entity: Entity, ctx: ModuleContext) -> list[Fact]:
+        """An address inside a network whose whois record this scan already holds is not asked again: the abuse contact
+        and the network's name belong to the network, and `scrutator.exposure` gives the address the facts of the
+        record whose range contains it (saying which address was asked)."""
+        address = ipaddress.ip_address(entity.value)
+        networks: list = ctx.cache.setdefault("ripestat-networks", [])
+
+        def covered():
+            for first, last in networks:
+                if first.version == address.version and first <= address <= last:
+                    return []
+            return None
+
+        return await once_per_network(ctx.cache, "ripestat", address, covered, lambda: self._ask(entity, address, ctx), lambda: len(networks))
+
+    async def _ask(self, entity: Entity, address, ctx: ModuleContext) -> list[Fact]:
         facts: list[Fact] = []
         failures: list[Exception] = []
 
@@ -65,6 +115,10 @@ class RipeStat(Module):
                         rows.append({"key": key, "value": item.get("value")})
             if rows:
                 facts.append(Fact(Evidence.create(self.name, f"GET {resp.request.url}", json.dumps(rows, sort_keys=True))))
+                known = network_of(rows, address)
+                if known is not None and any(isinstance(f, Fact) and "abuse-contact-finder" in f.evidence.request for f in facts):
+                    # only a network whose abuse contact was also read covers other addresses: both are inherited
+                    ctx.cache.setdefault("ripestat-networks", []).append(known)
         except (ValueError, KeyError, TypeError, AttributeError):
             failures.append(ModuleError("ripestat whois returned an unexpected payload"))
         except ModuleError as exc:

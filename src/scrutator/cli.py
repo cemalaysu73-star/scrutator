@@ -218,6 +218,7 @@ def scan(
     exclude_sources: Optional[str] = typer.Option(None, "--exclude-sources", help="Do not use these sources (comma-separated).", rich_help_panel="Source policy"),
     noncommercial: bool = typer.Option(True, "--noncommercial/--no-noncommercial", help="--no-noncommercial: leave out sources whose free tier is for non-commercial use only (InternetDB, RIPEstat, CertSpotter, Subdomain Center).", rich_help_panel="Source policy"),
     brand: bool = typer.Option(False, "--brand", help="Brand presence (off by default; contacts the organisation's site): read the platform links on its home page (robots.txt honoured), check whether those accounts and look-alikes of the brand name exist (profile page status only). For an organisation's domain.", rich_help_panel="Source policy"),
+    live: Optional[bool] = typer.Option(None, "--live/--no-live", help="Print each name the moment DNS confirms it is live, while the scan goes on (default: on when the output is a terminal). The report is the same either way."),
 ) -> None:
     """Run a passive scan and write evidence-backed reports."""
     policy = _source_policy(sources, exclude_sources, not noncommercial)
@@ -244,6 +245,7 @@ def scan(
     out.mkdir(parents=True, exist_ok=True)
     store = Store(db or out / "scrutator.db")
     deadline = Deadline(deadline_s) if deadline_s > 0 else None
+    watcher = _live_names(seed_entity, scope, policy, "The scan goes on with their addresses (registration, network, InternetDB); the report follows.") if _wants_live(live) else None
 
     async def within(awaitable):
         """What is left of the deadline, for the steps that come after collection."""
@@ -267,7 +269,10 @@ def scan(
                 max_steps=max_steps or config.max_steps, max_entities=max_entities, packs=packs,
                 attribution=attribute, max_candidates=max_candidates, playbooks=playbooks,
                 deadline=deadline, breaker_threshold=breaker, source_policy=policy,
+                listeners=[watcher] if watcher is not None else None,
             )
+            if watcher is not None:
+                watcher.on_names_settled()  # the planner's rounds do not signal it; said once either way
             verdict = await within(summarise(runtime, store, scan_id)) if runtime is not None and summary else None
             leads = await within(run_leads(runtime, store, scan_id)) if runtime is not None and attribute else None
             return scan_id, stats, runtime, used, verdict, leads
@@ -288,22 +293,7 @@ def scan(
 
     if runtime is not None:
         store.set_meta(scan_id, "ai", json.dumps({"mode": used.value, **runtime.describe()}, sort_keys=True))
-    report = build_report(store, scan_id)
-    written = []
-    if "json" in wanted:
-        (out / "report.json").write_text(render_json(report), encoding="utf-8")
-        written.append("report.json")
-    if "html" in wanted:
-        (out / "report.html").write_text(render_html(report), encoding="utf-8")
-        written.append("report.html")
-    bundle_path, bundle_problem = None, ""
-    if signing_key is not None:
-        try:
-            manifest = create_bundle(store, scan_id, signing_key, out / "proof.scrutator")
-            bundle_path = out / "proof.scrutator"
-        except BundleTooLarge as exc:
-            bundle_problem = str(exc)
-    store.close()
+    report, written, bundle_path, manifest, bundle_problem = _write_outputs(store, scan_id, out, wanted, signing_key)
 
     counts = report["summary"]
     _echo(f"Scan #{scan_id} of {seed_entity.value}: {counts['headline']}.")
@@ -373,6 +363,143 @@ def scan(
     if bundle_problem:
         _echo(f"error: no proof bundle was written: {bundle_problem}", err=True)
         raise typer.Exit(2)
+
+
+def _write_outputs(store: Store, scan_id: int, out: Path, wanted: set[str], signing_key):
+    """Build the report from the store, write the formats asked for and, with a key, the signed bundle; closes the
+    store. Returns (report, files written, bundle path or None, manifest or None, bundle problem or "")."""
+    report = build_report(store, scan_id)
+    written = []
+    if "json" in wanted:
+        (out / "report.json").write_text(render_json(report), encoding="utf-8")
+        written.append("report.json")
+    if "html" in wanted:
+        (out / "report.html").write_text(render_html(report), encoding="utf-8")
+        written.append("report.html")
+    bundle_path, manifest, bundle_problem = None, None, ""
+    if signing_key is not None:
+        try:
+            manifest = create_bundle(store, scan_id, signing_key, out / "proof.scrutator")
+            bundle_path = out / "proof.scrutator"
+        except BundleTooLarge as exc:
+            bundle_problem = str(exc)
+    store.close()
+    return report, written, bundle_path, manifest, bundle_problem
+
+
+# What `scrutator quick` asks: the sources that list names under a domain, and DNS (with the wildcard probe). Never the
+# address enrichment (registration, network, InternetDB), the DNS history of the apex or anything opt-in.
+QUICK_LEAVES_OUT = frozenset({"rdap", "asn", "ripestat", "internetdb", "mnemonic"})
+QUICK_BUDGET_S = 7.0
+QUICK_LOOKUP_CAP_S = 5.0
+
+
+def _quick_sources(exclude_sources: Optional[str], no_noncommercial: bool) -> SourcePolicy:
+    modules = load_builtin_modules()
+    names = sorted(
+        m.name for m in modules
+        if EntityType.DOMAIN in m.accepts and m.opt_in is None and m.name not in QUICK_LEAVES_OUT
+        and (m.needs_key is None or os.environ.get(m.needs_key))
+    )
+    try:
+        return SourcePolicy.parse(",".join(names), exclude_sources, no_noncommercial, modules)
+    except SourceError as exc:
+        raise _fail(str(exc)) from exc
+
+
+@app.command()
+def quick(
+    seed: str = typer.Argument(..., help="Domain to list names for."),
+    out: Path = typer.Option(Path("scrutator-out"), "--out", help="Output directory."),
+    db: Optional[Path] = typer.Option(None, "--db", help="SQLite database path (default: <out>/scrutator.db)."),
+    formats: str = typer.Option("json", "--format", help="Comma-separated: json, html."),
+    budget: float = typer.Option(QUICK_BUDGET_S, "--budget", min=1.0, help="Seconds the lookups may take in all (start-up and writing the report come on top)."),
+    bundle: bool = typer.Option(False, "--bundle/--no-bundle", help="Also write a signed proof bundle to <out>/proof.scrutator."),
+    key_dir: Optional[Path] = typer.Option(None, "--key-dir", help="Directory with signing.key (default: ~/.config/scrutator)."),
+    exclude_sources: Optional[str] = typer.Option(None, "--exclude-sources", help="Do not use these sources (comma-separated)."),
+    noncommercial: bool = typer.Option(True, "--noncommercial/--no-noncommercial", help="--no-noncommercial: leave out sources whose free tier is for non-commercial use only."),
+) -> None:
+    """Names only, in seconds: the name sources and DNS, nothing about the addresses. Prints live names as DNS confirms
+    them, then the verified list; the report (and with --bundle the signed bundle) is evidence-backed like a scan's."""
+    started = __import__("time").monotonic()
+    wanted = {f.strip() for f in formats.split(",") if f.strip()}
+    if not wanted or not wanted <= _FORMATS:
+        raise _fail(f"--format must be a comma-separated subset of {sorted(_FORMATS)}")
+    try:
+        seed_entity = _parse_seed(seed)
+    except ValueError as exc:
+        raise _fail(f"invalid seed {seed!r}: give a bare domain") from exc
+    if seed_entity.type is not EntityType.DOMAIN:
+        raise _fail("quick lists the names under a domain: give a domain, not an address")
+    policy = _quick_sources(exclude_sources, not noncommercial)
+    signing_key = _signing_key(key_dir) if bundle else None
+    scope = _default_scope(seed_entity)
+    out.mkdir(parents=True, exist_ok=True)
+    store = Store(db or out / "scrutator.db")
+    from scrutator.livenames import LiveNames
+
+    chosen, _ = policy.select(load_builtin_modules())
+    _echo(f"Quick: names under {seed_entity.value} from {', '.join(m.name for m in chosen)}; nothing about their addresses.")
+    watcher = LiveNames(
+        scope, {seed_entity.value}, lambda line: _echo(line), probes_expected=any(m.name == "wildcard" for m in chosen),
+        started=started,
+    )
+
+    async def go():
+        async with open_context() as ctx:
+            return await run_scan(
+                seed_entity, scope, store, ctx, ai=None, max_steps=2000, packs=load_packs(),
+                deadline=Deadline(budget), source_policy=policy, listeners=[watcher], timeout_cap=min(QUICK_LOOKUP_CAP_S, budget),
+            )
+
+    try:
+        scan_id, stats = asyncio.run(go())
+    except ValueError as exc:
+        raise _fail(str(exc)) from exc
+    watcher.on_names_settled()
+    report, written, bundle_path, manifest, bundle_problem = _write_outputs(store, scan_id, out, wanted, signing_key)
+    verified = [row for row in report["names"] if row["tier"] == "verified"]
+    late = [row for row in verified if row["name"] not in watcher.printed]
+    for row in late:
+        _echo(f"  verified  {row['name']:<36} {row['tier_reason']}")
+    _echo(f"Quick scan #{scan_id} of {seed_entity.value}: {report['summary']['headline']}.")
+    failed = sorted(m for m, h in report["sources"].items() if h["error"] or h.get("down"))
+    if failed:
+        _echo(f"Sources that did not answer in time or failed: {', '.join(failed)} (see Source coverage in the report).")
+    if stats.deadline_hit:
+        _echo(f"Budget of {budget:g} s reached: lookups still running were cut and are listed as gaps in the report.")
+    _echo(f"Wrote {', '.join(written)} to {out} in {__import__('time').monotonic() - started:.1f} s. "
+          "For registration, network and exposure data run `scrutator scan`.")
+    if bundle_path is not None:
+        _echo(f"Proof bundle: {bundle_path} (signing key {manifest['key_fingerprint']})")
+    if bundle_problem:
+        _echo(f"error: no proof bundle was written: {bundle_problem}", err=True)
+        raise typer.Exit(2)
+
+
+def _wants_live(flag: Optional[bool]) -> bool:
+    """--live / --no-live, or by default: on when the output is a terminal (a pipe gets the summary only)."""
+    if flag is not None:
+        return flag
+    try:
+        return sys.stdout.isatty()
+    except (AttributeError, ValueError):
+        return False
+
+
+def _live_names(seed: Entity, scope: ScopePolicy, policy: SourcePolicy, note: str):
+    """The live name list (scrutator.livenames) for a scan of `seed`, or None for an address seed."""
+    from scrutator.livenames import LiveNames
+
+    if seed.type is not EntityType.DOMAIN:
+        return None
+    chosen, _ = policy.select(load_builtin_modules())
+    roots = {seed.value, *scope.to_dict()["domains"]}
+    _echo(f"Live names under {seed.value} as DNS confirms them:")
+    return LiveNames(
+        scope, roots, lambda line: _echo(line), probes_expected=any(m.name == "wildcard" for m in chosen),
+        settled_note=note,
+    )
 
 
 def _web_client(wanted: bool, scope: ScopePolicy, packs):

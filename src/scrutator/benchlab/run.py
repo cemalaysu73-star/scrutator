@@ -43,6 +43,7 @@ from scrutator.bundle.writer import create_bundle
 from scrutator.egress import SOURCE_HOSTS
 from scrutator.model import Entity, EntityType
 from scrutator.modules import rdap as rdap_module
+from scrutator.modules.rdap import RIR_HOSTS
 from scrutator.modules.base import ModuleContext
 from scrutator.modules.registry import load_builtin_modules
 from scrutator.packs import load_packs
@@ -303,7 +304,7 @@ async def scope_safety(work: Path, state: dict) -> dict:
                 value = re.sub(r"(^|[\s:])[%*]\.", r"", request.url.params[key])  # %.example.com, *.example.com
                 found += name_in.findall(value)
         path = request.url.path
-        if request.url.host in ("rdap.org", "internetdb.shodan.io") or path.startswith("/pdns/"):
+        if request.url.host in ("rdap.org", "internetdb.shodan.io", *RIR_HOSTS) or path.startswith("/pdns/"):
             found.append(path.rstrip("/").rsplit("/", 1)[-1])
         return found
 

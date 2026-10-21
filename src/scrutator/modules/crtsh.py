@@ -13,6 +13,7 @@ class CrtSh(Module):
     """Certificate Transparency names via crt.sh (no key)."""
 
     name = "crtsh"
+    name_weight = 3
     accepts = frozenset({EntityType.DOMAIN})
     concurrency = 1
     timeout = 90.0
