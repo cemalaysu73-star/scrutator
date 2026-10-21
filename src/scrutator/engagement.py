@@ -15,6 +15,7 @@ refused, whatever the file says.
 """
 
 import hashlib
+import json
 import re
 from dataclasses import dataclass
 from datetime import date
@@ -58,6 +59,7 @@ class Engagement(BaseModel):
     end: date
     purpose: str = Field(min_length=10, max_length=500)
     github_orgs: tuple[str, ...] = Field(default=(), max_length=5)
+    reference: str = Field(default="", max_length=80)  # the engagement's reference, shown on an audit's cover
 
     @field_validator("domains")
     @classmethod
@@ -127,6 +129,9 @@ def load_engagement(path: str | Path, *, today: date | None = None) -> LoadedEng
         raise EngagementError(f"the engagement file is not readable YAML: {exc}") from exc
     if not isinstance(document, dict):
         raise EngagementError("the engagement file must be a mapping")
+    if "<fill in" in json.dumps(document, default=str):
+        # a template from `scrutator audit-letter` that was never filled in from the signed letter
+        raise EngagementError("the engagement file still holds a <fill in: ...> placeholder: fill it in from the signed letter")
     try:
         engagement = Engagement.model_validate(document)
     except ValidationError as exc:

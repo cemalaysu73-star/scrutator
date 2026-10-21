@@ -57,6 +57,7 @@ async def run_scan(
     source_policy: SourcePolicy | None = None,
     listeners: list | None = None,
     timeout_cap: float | None = None,
+    pre_audit: list[dict] | None = None,
 ) -> tuple[int, AgentStats]:
     """Run a scan. With a deadline (seconds, or a `Deadline` shared with the caller) the scan
     always returns in time: lookups still running when it passes are cancelled, nothing new
@@ -90,6 +91,9 @@ async def run_scan(
     chosen, _ = policy.select(chosen)
     store.set_meta(scan_id, "source_policy", json.dumps(record, sort_keys=True))
     store.append_audit(scan_id, {"event": "source_policy", **record})
+    for event in pre_audit or ():
+        # what authorises the scan (an engagement, a self-attestation: scrutator audit), in the signed log before any lookup
+        store.append_audit(scan_id, dict(event))
     if allow_active:
         # the user confirmed active-ish lookups (--active): said in the signed log before any lookup runs
         active = sorted(m.name for m in chosen if m.mode.value == "active")

@@ -19,3 +19,5 @@ bench/results/*-run[0-9]*/
 demo-out/
 !docs/examples/**/*.scrutator
 scrutator-bench/
+audit-out/
+authorisation/

@@ -9,6 +9,7 @@
 | [Sources and terms](sources.md) | every data source, what it gives, its terms, keyed sources, the source policy |
 | [AI modes and privacy](ai-and-privacy.md) | local-first AI, what leaves your machine, the verifier and its deterministic floor |
 | [MCP](mcp.md) | drive Scrutator from Claude Desktop or any MCP client |
+| [Client audits](audit.md) | `scrutator audit`: a branded, print-ready deliverable from a signed scan, the authorisation letter, and how the client checks it offline |
 | [Writing a knowledge pack](knowledge-packs.md) | add a provider, a takeover fingerprint or a playbook |
 | [Writing a module](writing-a-module.md) | add a data source |
 | [Security model and known limits](security.md) | the guarantees, how they are tested, what is not guaranteed |

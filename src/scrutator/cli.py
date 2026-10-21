@@ -1126,6 +1126,261 @@ def exposure_cmd(
         _echo(f"Proof bundle: {out / 'proof.scrutator'} (signing key {manifest['key_fingerprint']})")
 
 
+# ------------------------------------------------------------------------------------------- audit (R7)
+
+
+def _authorise_audit(engagement_file: Optional[Path], self_mode: bool, yes: bool, *, today=None):
+    """The loaded engagement (client mode) or None (self mode), confirmed on the terminal or with --yes."""
+    from scrutator.engagement import EngagementError, load_engagement
+
+    if bool(engagement_file) == bool(self_mode):
+        raise _fail("an audit needs exactly one of --engagement FILE (a client's signed authorisation) or --self (your own domains)")
+    if self_mode:
+        question = "I confirm I own or control the domains in scope (self-assessment)"
+        loaded = None
+    else:
+        try:
+            loaded = load_engagement(engagement_file, today=today)
+        except EngagementError as exc:
+            raise _fail(f"refused: {exc}") from exc
+        record = loaded.engagement.record()
+        _echo("Engagement:")
+        _echo(f"  organisation: {record['organisation']}")
+        _echo(f"  domains: {', '.join(record['domains'])}")
+        _echo(f"  authorised by: {record['authorised_by']['name']} ({record['authorised_by']['role']})")
+        _echo(f"  in force: {record['start']} to {record['end']}")
+        _echo(f"  file sha256: {loaded.sha256}")
+        question = "I confirm this engagement authorises a passive review of these domains"
+    if yes:
+        return loaded, "--yes"
+    if sys.stdin is not None and sys.stdin.isatty():
+        if not typer.confirm(question, default=False):
+            raise _fail("not confirmed: nothing was looked up")
+        return loaded, "prompt"
+    raise _fail("the authorisation must be confirmed: run in a terminal, or pass --yes")
+
+
+@app.command("audit")
+def audit_cmd(
+    seed: Optional[str] = typer.Argument(None, help="The domain to review (a new passive scan). Leave out with --from-bundle."),
+    from_bundle: Optional[Path] = typer.Option(None, "--from-bundle", help="Make the audit from an existing signed bundle instead of scanning."),
+    engagement_file: Optional[Path] = typer.Option(None, "--engagement", help="Client mode: the engagement file of the signed authorisation (see `scrutator audit-letter`)."),
+    self_mode: bool = typer.Option(False, "--self", help="Self mode: a review of domains you own or control (attested, recorded in the audit log)."),
+    branding: Optional[Path] = typer.Option(None, "--branding", help="audit.yaml: auditor name, contact, logo, colours, language."),
+    lang: Optional[str] = typer.Option(None, "--lang", help="en or tr (default: the branding file's, else en)."),
+    out: Path = typer.Option(Path("audit-out"), "--out", help="Output directory."),
+    key_dir: Optional[Path] = typer.Option(None, "--key-dir", help="Directory with signing.key (a new scan's bundle is signed with it)."),
+    pin: Optional[str] = typer.Option(None, "--pin", help="With --from-bundle: require this signer (fingerprint or signing.pub)."),
+    pdf: bool = typer.Option(True, "--pdf/--no-pdf", help="Also print audit.pdf with an installed Chromium-based browser (Edge, Chrome, Chromium, Brave), if one is found."),
+    ai: str = typer.Option("off", "--ai", help="off (default: deterministic text), or local, cloud, hybrid: offer the English executive sentences to a writer model for plainer wording, kept only when the verifier passes them."),
+    model: Optional[str] = typer.Option(None, "--model", help="Model name for every AI role."),
+    yes_cloud: bool = typer.Option(False, "--yes-cloud", help="Consent to cloud AI without a prompt."),
+    config_path: Optional[Path] = typer.Option(None, "--config", help="AI config file."),
+    yes: bool = typer.Option(False, "--yes", help="Confirm the authorisation without a prompt (recorded as such)."),
+    deadline_s: float = typer.Option(DEFAULT_DEADLINE_S, "--deadline", min=0, help="Seconds the scan may take (0: no limit)."),
+    max_entities: int = typer.Option(5000, "--max-entities", min=1, help="Cap on the entities the scan records."),
+    exclude_sources: Optional[str] = typer.Option(None, "--exclude-sources", help="Do not use these sources (comma-separated)."),
+    noncommercial: bool = typer.Option(True, "--noncommercial/--no-noncommercial", help="--no-noncommercial: leave out sources whose free tier is for non-commercial use only (advisable for paid work; see docs/sources.md)."),
+) -> None:
+    """Turn a passive scan (or an existing signed bundle) into a client deliverable: audit.html (print-ready), audit.pdf
+    when a browser is installed, the interactive report as technical-annex.html, and the signed bundle. Refuses to run
+    without an authorisation: --engagement (client) or --self (your own domains)."""
+    import time
+
+    from scrutator.audit.branding import BrandingError, load_branding
+    from scrutator.audit.content import AuditError, authorisation_from_log, authorisation_late, build_audit, engagement_event, self_event
+    from scrutator.audit.make import append_log, load_bundle, now, polish_facts, write_audit
+
+    started = time.monotonic()
+    if (seed is None) == (from_bundle is None):
+        raise _fail("give a domain to scan, or --from-bundle FILE, not both")
+    try:
+        brand = load_branding(branding, language=lang)
+    except BrandingError as exc:
+        raise _fail(str(exc)) from exc
+    mode = _mode(ai)
+    out.mkdir(parents=True, exist_ok=True)
+    timing: dict = {}
+
+    if from_bundle is not None:
+        try:
+            loaded_bundle = load_bundle(from_bundle, pin=_pinned(pin))
+        except AuditError as exc:
+            raise _fail(str(exc)) from exc
+        report = loaded_bundle.report
+        from datetime import date as _date
+
+        scan_day = _date.fromisoformat(str(report["scan"]["started_at"])[:10])
+        loaded, confirmed = _authorise_audit(engagement_file, self_mode, yes, today=scan_day)
+        signed = authorisation_from_log(loaded_bundle.audit_records)
+        if loaded is not None and signed is not None and signed["mode"] == "client" and signed["sha256"] != loaded.sha256:
+            raise _fail("the bundle's signed log records another engagement than this file (sha256 differs)")
+        wanted_mode = "self" if loaded is None else "client"
+        if signed is not None and signed["mode"] == wanted_mode:
+            authorisation = signed
+        elif loaded is not None:
+            authorisation = authorisation_late(loaded)
+        else:
+            authorisation = authorisation_late(domains=list((report.get("scope") or {}).get("domains") or [report["scan"]["seed"]]), organisation=brand.client)
+        target = out / "proof.scrutator"
+        if from_bundle.resolve() != target.resolve():
+            import shutil
+
+            shutil.copyfile(from_bundle, target)
+    else:
+        loaded, confirmed = _authorise_audit(engagement_file, self_mode, yes)
+        try:
+            seed_entity = _parse_seed(seed)
+        except ValueError as exc:
+            raise _fail(f"invalid seed {seed!r}: give a bare domain") from exc
+        if seed_entity.type is not EntityType.DOMAIN:
+            raise _fail("an audit is of an organisation's domain: give a domain")
+        if loaded is not None and not loaded.engagement.covers(seed_entity.value):
+            raise _fail(f"{seed_entity.value} is not one of the engagement's domains ({', '.join(loaded.engagement.domains)})")
+        event = engagement_event(loaded, confirmed) if loaded is not None else self_event([seed_entity.value], brand.client, confirmed)
+        policy = _source_policy(None, exclude_sources, not noncommercial)
+        signing_key = _signing_key(key_dir)
+        scope = _default_scope(seed_entity)
+        store = Store(out / "scrutator.db")
+        _echo(f"Scanning {seed_entity.value} (passive); the authorisation is written to the audit log before any lookup ...")
+
+        async def go():
+            async with open_context() as ctx:
+                return await run_scan(
+                    seed_entity, scope, store, ctx, max_steps=1000, max_entities=max_entities,
+                    deadline=Deadline(deadline_s) if deadline_s > 0 else None, source_policy=policy, pre_audit=[event],
+                )
+
+        try:
+            scan_id, _stats = asyncio.run(go())
+        except ValueError as exc:
+            raise _fail(str(exc)) from exc
+        timing["scan_s"] = round(time.monotonic() - started, 1)
+        _report, _written, bundle_path, _manifest, problem = _write_outputs(store, scan_id, out, set(), signing_key)
+        if problem or bundle_path is None:
+            raise _fail(f"no proof bundle was written: {problem}")
+        pub = public_key_path(key_dir or private_key_path().parent)
+        if pub.exists():
+            (out / "signing.pub").write_bytes(pub.read_bytes())
+        loaded_bundle = load_bundle(bundle_path)
+        report = loaded_bundle.report
+        authorisation = authorisation_from_log(loaded_bundle.audit_records)
+        if authorisation is None:
+            raise _fail("the scan's audit log does not hold the authorisation before its first lookup")
+
+    build_started = time.monotonic()
+    try:
+        facts = build_audit(report, authorisation=authorisation, bundle=loaded_bundle.info, lang=brand.language,
+                            auditor=brand.auditor, client=brand.client, generated_at=now())
+    except AuditError as exc:
+        raise _fail(f"refused: {exc}") from exc
+    (out / "technical-annex.html").write_text(render_html(report), encoding="utf-8")
+    if mode is not AIMode.OFF:
+        config = _config(config_path)
+        _consent(config, mode, yes_cloud)
+
+        async def polish():
+            async with ai_client() as ai_http:
+                runtime, _used = await build_runtime(config, cli_mode=mode, model=model, consent_cloud=True, redact=None,
+                                                     client=ai_http, apex_domains=list(authorisation["domains"]))
+                return await polish_facts(runtime, facts, loaded_bundle.payloads)
+
+        try:
+            facts["polish"] = asyncio.run(polish())
+        except AIError as exc:
+            _echo(f"AI rewording skipped ({exc}); the deterministic text is used.")
+    written = write_audit(out, facts, brand, pdf=pdf)
+    timing["audit_s"] = round(time.monotonic() - build_started, 1)
+    timing["total_s"] = round(time.monotonic() - started, 1)
+    info = loaded_bundle.info
+    append_log(out, {"event": "audit", "at": facts["generated_at"], "mode": authorisation["mode"], "recorded": authorisation["recorded"],
+                     "authorisation_sha256": authorisation.get("sha256", ""), "bundle_sha256": info["sha256"],
+                     "lang": facts["lang"], "pdf": written.pdf is not None, "ai": facts["polish"] is not None, "timing": timing})
+    summary = facts["summary"]
+    _echo(f"Audit of {facts['who']['client']} ({', '.join(authorisation['domains'])}): {summary['verified']} verified name(s), "
+          f"{summary['claimed']} unconfirmed, {summary['risks']} finding(s).")
+    _echo(f"Authorisation: {authorisation['mode']}, " + ("in the signed audit log before the first lookup." if authorisation["recorded"] == "signed"
+                                                       else "recorded now in audit-log.jsonl (the scan predates it)."))
+    if facts["polish"] is not None:
+        kept = sum(1 for s in facts["polish"]["statements"] if s["verdict"] == "verified")
+        _echo(f"AI: {kept} of {len(facts['polish']['statements'])} executive sentence(s) reworded and verified; the rest kept as written.")
+    _echo(f"Wrote {', '.join(written.files)}, technical-annex.html and proof.scrutator to {out}")
+    if written.pdf is None:
+        _echo(f"No PDF: {written.pdf_problem}.")
+    _echo(f"Bundle sha256 {info['sha256']}, signing key {info['key_fingerprint']}.")
+    _echo(f"Time: {timing.get('scan_s', 0):g} s scan, {timing['audit_s']:g} s audit, {timing['total_s']:g} s in all.")
+    _echo(f"Check it as the client will: scrutator audit-check {out / 'audit.html'} {out / 'proof.scrutator'}")
+
+
+@app.command("audit-check")
+def audit_check_cmd(
+    page: Path = typer.Argument(..., help="audit.html"),
+    bundle: Path = typer.Argument(..., help="The proof bundle the audit names (proof.scrutator)."),
+    pin: Optional[str] = typer.Option(None, "--pin", help="Require this signer (fingerprint or signing.pub)."),
+) -> None:
+    """Check an audit against its signed bundle, offline: the bundle verifies and is the one the audit names, every
+    number, finding and sentence follows from it, and the page was not edited. Exit status 1 on any failure."""
+    from scrutator.audit.make import check_audit
+
+    checks = check_audit(page, bundle, pin=_pinned(pin))
+    for check in checks:
+        _echo(f"{'PASS' if check.ok else 'FAIL'}  {check.name}" + (f"  ({check.detail})" if check.detail else ""))
+    if not all(c.ok for c in checks):
+        _echo("Audit check FAILED: do not rely on this report.")
+        raise typer.Exit(1)
+    _echo("Audit check passed: the report is what the signed evidence implies.")
+
+
+@app.command("audit-letter")
+def audit_letter_cmd(
+    out: Path = typer.Option(Path("authorisation"), "--out", help="Directory for the letter and the engagement file."),
+    lang: str = typer.Option("en", "--lang", help="en or tr."),
+    client: Optional[str] = typer.Option(None, "--client", help="The client's legal name."),
+    domains: Optional[str] = typer.Option(None, "--domains", help="Comma-separated domains in scope."),
+    start: Optional[str] = typer.Option(None, "--start", help="First day, YYYY-MM-DD."),
+    end: Optional[str] = typer.Option(None, "--end", help="Last day, YYYY-MM-DD."),
+    auditor: Optional[str] = typer.Option(None, "--auditor", help="Your name or company."),
+    auditor_contact: Optional[str] = typer.Option(None, "--auditor-contact", help="Your contact."),
+    client_contact: Optional[str] = typer.Option(None, "--client-contact", help="The client's contact for the review."),
+    signatory: Optional[str] = typer.Option(None, "--signatory", help="Who signs for the client."),
+    signatory_role: Optional[str] = typer.Option(None, "--signatory-role", help="Their role (must be entitled to authorise testing)."),
+    reference: Optional[str] = typer.Option(None, "--reference", help="Engagement reference."),
+    retention: Optional[str] = typer.Option(None, "--retention", help="How long you keep the data after delivery, e.g. '90 days'."),
+) -> None:
+    """Write a fill-in authorisation letter (passive review only) and the engagement file `scrutator audit --engagement`
+    reads. A template, not legal advice. Unfilled fields stay as <fill in: ...>, which `audit` refuses."""
+    from datetime import date as _date
+
+    from scrutator.audit.letter import make_letter
+    from scrutator.engagement import refuse_person
+
+    try:
+        start_day = _date.fromisoformat(start) if start else None
+        end_day = _date.fromisoformat(end) if end else None
+    except ValueError as exc:
+        raise _fail("--start and --end are YYYY-MM-DD") from exc
+    if start_day and end_day and start_day > end_day:
+        raise _fail("--start is after --end")
+    listed = [d.strip().lower() for d in (domains or "").split(",") if d.strip()]
+    for domain in listed:
+        problem = refuse_person(domain)
+        if problem:
+            raise _fail(f"{domain!r}: {problem}")
+    try:
+        letter, engagement = make_letter(lang=lang, client=client, domains=listed, start=start_day, end=end_day, auditor=auditor,
+                                         auditor_contact=auditor_contact, client_contact=client_contact, signatory=signatory,
+                                         signatory_role=signatory_role, reference=reference, retention=retention)
+    except ValueError as exc:
+        raise _fail(str(exc)) from exc
+    out.mkdir(parents=True, exist_ok=True)
+    name = "yetki-belgesi.txt" if lang == "tr" else "authorisation-letter.txt"
+    (out / name).write_text(letter, encoding="utf-8")
+    (out / "engagement.yaml").write_text(engagement, encoding="utf-8")
+    _echo(f"Wrote {out / name} and {out / 'engagement.yaml'}.")
+    _echo("This is a template, not legal advice: have it reviewed by counsel before use. Get it signed by someone entitled "
+          "to authorise testing, then copy the signed values into engagement.yaml (scrutator refuses any <fill in: ...> left).")
+
+
 @app.command("mcp")
 def mcp_cmd(
     db: Path = typer.Option(Path("scrutator-out/scrutator.db"), "--db", help="SQLite database the tools read (and, with --allow-scan, write)."),
