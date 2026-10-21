@@ -5,7 +5,7 @@ from scrutator.modules._names import name_observations
 from scrutator.modules.base import Module, ModuleContext, ModuleError, Observation, SourceUnavailable, http_failure
 from scrutator.modules.registry import register
 
-LIMIT = 5000  # names per answer; the service allows up to 50,000 per request
+LIMIT = 500  # names per answer (the service allows 50,000): at 5,000, example.com alone filled the scan's entity cap with list noise and starved DNS (R6 benchmark)
 
 
 @register

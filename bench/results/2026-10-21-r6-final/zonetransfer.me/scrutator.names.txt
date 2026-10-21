@@ -1,0 +1,6 @@
+office.zonetransfer.me
+staging.zonetransfer.me
+testing.zonetransfer.me
+www.staging.zonetransfer.me
+www.zonetransfer.me
+wwwc.zonetransfer.me

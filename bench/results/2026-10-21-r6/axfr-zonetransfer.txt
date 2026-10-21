@@ -1,0 +1,5 @@
+scrutator scan zonetransfer.me --axfr --active (1.0.0rc2 working tree), 2026-10-21; audit and axfr evidence:
+audit: {"by": "--active", "event": "active_authorised", "modules": ["axfr"]}
+evidence: 2026-10-21T00:49:38+00:00 AXFR zonetransfer.me @nsztm1.digi.ninja (81.4.108.41) -> TIMEOUT: no transfer within 10 s
+evidence: 2026-10-21T00:49:48+00:00 AXFR zonetransfer.me @nsztm2.digi.ninja (5.196.105.10) -> TIMEOUT: no transfer within 10 s
+headline: 5 verified, 2 claimed (0 stale, 0 wildcard-covered)

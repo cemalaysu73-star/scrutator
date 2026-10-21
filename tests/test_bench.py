@@ -9,7 +9,7 @@ from typer.testing import CliRunner
 from scrutator import cli
 from scrutator.benchlab.run import SCHEMA, run_bench
 
-SECTIONS = ["attribution", "brand", "bundles", "hallucination", "name_tiers", "org_exposure", "risk_rules", "scope_safety"]
+SECTIONS = ["attribution", "brand", "bundles", "hallucination", "name_tiers", "org_exposure", "recall_speed", "risk_rules", "scope_safety"]
 
 
 @pytest.fixture(scope="module")
@@ -24,7 +24,7 @@ def test_the_bench_passes_and_writes_a_stable_json_and_a_table(bench):
     out, result = bench
     assert result["pass"] is True, {k: [n for n in v["notes"]] for k, v in result["sections"].items() if not v["pass"]}
     stored = json.loads((out / "bench.json").read_text(encoding="utf-8"))
-    assert stored["schema"] == SCHEMA == "scrutator-bench/2"
+    assert stored["schema"] == SCHEMA == "scrutator-bench/3"
     assert sorted(stored) == ["created_at", "hallucination_detail", "pass", "schema", "seconds", "sections", "signing_key", "tool"]
     assert sorted(stored["sections"]) == SECTIONS
     for section in stored["sections"].values():

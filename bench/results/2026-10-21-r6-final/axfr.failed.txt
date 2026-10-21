@@ -1,0 +1,1 @@
+AXFR against nsztm1.digi.ninja did not complete: Timeout The DNS operation timed out.

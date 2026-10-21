@@ -19,7 +19,7 @@ scrutator bench --json                       # the JSON on stdout
 scrutator bench --verifier-model qwen3:8b    # also: a model on this machine as the verifier in the Hallucination Test
 ```
 
-Eight sections, each a set of metrics with thresholds. The labs are fixtures: fake DNS, recorded answers of the public
+Nine sections, each a set of metrics with thresholds. The labs are fixtures: fake DNS, recorded answers of the public
 sources, reserved names (`example.com`, `*.test`, documentation address ranges). The labs and the scoring live in
 `src/scrutator/benchlab/`; the same labs back the test suite.
 
@@ -33,9 +33,10 @@ sources, reserved names (`example.com`, `*.test`, documentation address ranges).
 | `hallucination` | see below | unsupported statements published by the gated row = 0; supported statements kept >= 0.8 |
 | `brand` | `scan --brand` on a planted site that links five platform accounts (one missing, two on platforms that are never asked, one on a platform that answers every unknown handle with a sign-in redirect) and planted look-alike handles; a second site whose robots.txt forbids everything | the five official accounts in the right state; the five planted risks found and no other (= 0); an answer the rules do not read reported as absent = 0; requests to platforms that must not be asked = 0; requests outside the scope and the allowed platforms = 0; requests robots.txt forbade = 0; the bundle re-derives the section; a changed section is caught |
 | `org_exposure` | `scrutator exposure` on a planted organisation that publishes six role mailboxes and five people's work addresses in its security.txt, pages, DMARC, SOA, RDAP and commits, plus names, phone numbers, a street address, a private address and a handle that must never come out; eight refusal cases | refused = 8 of 8 (no file, expired, a public mail provider, a domain outside the engagement, a name, an e-mail address, a phone number, a handle as the seed); the aggregate right (5 of 5); personal data in the report, HTML, bundle and database = 0; detail in its own file and in the audit log; requests and DNS names outside the engagement = 0; the engagement recorded before the first lookup; the bundle re-derives the aggregate; a changed aggregate is caught |
+| `recall_speed` | (R6) an archived payload that mentions three in-scope hosts and one partner host; a planted zone of five names served by a one-shot AXFR responder on 127.0.0.1, and one that refuses; a zone with a wildcard address for the live name list | mentioned in-scope hosts found (3 of 3); mentioned hosts outside the scope = 0; zone-transfer names found (5 of 5); the refusal recorded as evidence; names printed live that the report does not call live, or live names not printed = 0 |
 
-Output: a table, `bench.md`, and `bench.json` with `"schema": "scrutator-bench/2"` (2 added the sections `brand`
-and `org_exposure`):
+Output: a table, `bench.md`, and `bench.json` with `"schema": "scrutator-bench/3"` (2 added the sections `brand`
+and `org_exposure`, 3 added `recall_speed`):
 
 ```
 {"schema", "tool", "created_at", "seconds", "signing_key", "pass",

@@ -9,6 +9,14 @@ Passive by default: it never port-scans, never probes the target, never brute-fo
 (The one opt-in exception, `scan --brand`, reads the organisation's own home page with robots.txt honoured: see
 [brand presence](#brand-presence).)
 
+The report is a single self-contained HTML file that works offline: a verdict strip, a searchable, sortable table of
+names with their evidence tier, risks grouped by severity, and an **evidence drawer** — click any name, risk or
+finding and the exact records that back it appear, each with its sha256 and the command to re-verify it.
+
+![The Scrutator report: a verdict strip and the verified-name table](docs/screenshots/report-hero.jpg)
+
+![Clicking a risk opens its evidence: the two DNS records behind a dangling CNAME, each with its hash](docs/screenshots/report-evidence-drawer.jpg)
+
 ## Why it is different
 
 Most recon tools print a list of names. The list is hard to use for three reasons, and Scrutator is built around them.
@@ -66,9 +74,16 @@ Read these before you rely on it. They are also in [docs/security.md](docs/secur
 
 - **Passive recall is limited by what passive sources have seen.** On the one benchmark target with a real truth set
   (`zonetransfer.me`, 31 names in its published zone) Scrutator and every competitor we could run reach a small part
-  of it. Names that no certificate, archive or aggregator holds are not found.
-- **It is not fast.** A scan takes tens of seconds to minutes (rate-limited sources, DNS, RDAP); `knockpy` finishes
-  the same targets in seconds because it asks fewer things.
+  of it (Scrutator 4 of 31). Names that no certificate, archive or aggregator holds are not found. The opt-in zone
+  transfer (`--axfr --active`) would reach them, but it times out from the network the benchmark runs on.
+- **A full scan still takes tens of seconds** (rate-limited sources, DNS, RDAP, and crt.sh's database when its web
+  search is down); `knockpy` finishes in seconds because it asks fewer things. What changed in R6 is that you no longer
+  wait blind: `scrutator scan` prints each name the moment DNS confirms it is live, and `scrutator quick <domain>`
+  returns the verified names without the address enrichment. Measured with three interleaved runs per version
+  (`bench/ttfn.py`, [docs/benchmarks/r6.md](docs/benchmarks/r6.md)): on `owasp.org` the first verified name went from
+  29.2 s (only in the final report) to 7.0 s, and `quick` took 7.0 s; on `nmap.org` the first name went from 11.6 s to
+  4.7 s, but `quick` took 12.7 s and the full scan got *slower* (11.6 to 18.0 s median), so speed is better felt than
+  measured end to end.
 - **Attribution is a lead, not a finding.** Its weights are chosen by hand and calibrated on nothing but a synthetic
   lab written by the author of the scoring.
 - **A signed bundle proves integrity, not truth and not time.** There is no trusted timestamp (RFC 3161), and without
@@ -91,6 +106,7 @@ pip install -e .                  # Python 3.11 or newer; Windows, macOS and Lin
 pip install -e ".[mcp]"           # with the MCP server
 scrutator --version
 scrutator scan example.com        # passive; writes scrutator-out/report.html, report.json, scrutator.db
+scrutator quick example.com       # names only, in seconds: name sources and DNS, prints live names as they resolve
 scrutator bench                   # the offline benchmark: no network, exits non-zero if a threshold fails
 ```
 
@@ -115,9 +131,11 @@ scrutator scan example.com
 ```
 
 This writes `scrutator-out/report.html` (open it in a browser), `report.json` and
-`scrutator.db`. Sources: certificate transparency (crt.sh and CertSpotter), DNS, RDAP, ASN
-(RIPEstat), Internet Archive, Common Crawl, passive DNS (mnemonic) and three name aggregators
-(Subdomain Center, HackerTarget, urlscan.io); see [Sources and their terms](#sources-and-their-terms).
+`scrutator.db`. Sources: certificate transparency (crt.sh — its web search, falling back to its public database when
+the web search is down — and CertSpotter), DNS, RDAP, ASN (RIPEstat), Internet Archive, Common Crawl, passive DNS
+(mnemonic) and four name aggregators (Subdomain Center, HackerTarget, urlscan.io, IP.THC.ORG); see
+[Sources and their terms](#sources-and-their-terms). Scrutator also mines the records it already holds for in-scope
+names written inside them (a host in an archived URL, a mail server in a TXT record), without any new request.
 No API keys needed. Transient source failures are retried with backoff; any that still fail are
 listed under **Source coverage** in the report, so a missing result is never mistaken for a negative one.
 
@@ -129,21 +147,33 @@ scan and not asked again; Source coverage shows it as down, so it is never mista
 nothing to say. Sources that list every name under a domain are asked once, about the apex, not once
 per discovered name. Ctrl-C also writes a (partial) report.
 
-**Speed.** Without a planner model a lookup starts the moment the thing it is about is known (a name a fast source
-lists is resolved while a slow source is still waiting), a lookup's results are written in one transaction, DNS goes
-through a bounded pool that starts with the fastest of your name servers, a name that does not exist costs two
-queries instead of six, RDAP is asked once per network (neighbouring addresses cite that record; `rdap.org` refuses
-more than about ten requests in ten seconds, so they are paced), and a source that answers 429 or 5xx with a
-`Retry-After` above 12 s is not waited for. Measured on owasp.org with the benchmark's command, three runs of each
-version taking turns five minutes apart on a day when crt.sh, Common Crawl, CertSpotter and HackerTarget were all
-failing: v0.6 75.8, 86.1 and 117.5 s (median 86.1), v0.7 36.9, 36.1 and 21.7 s (median 36.1), the same 48 live
-names. What is left is mostly the RDAP rate limit; `--exclude-sources rdap` leaves it out, at the price of no
-network owners. `python bench/profile_scan.py owasp.org` shows where the seconds of a scan go. With a planner model
-the agent keeps its round structure, because the planner ranks the lookups of a round.
+**Speed.** `scan` prints each name the moment DNS confirms it is live (`--live`, on by default when the output is a
+terminal; the report is identical either way). Without a planner model a lookup starts the moment the thing it is
+about is known (a name a fast source lists is resolved while a slow source is still waiting, and a name more sources
+vouch for is resolved first), a lookup's results are written in one transaction, DNS goes through a bounded pool that
+starts with the fastest of your name servers, a name that does not exist costs two queries instead of six,
+registration and routing are asked **once per network** (neighbouring addresses cite that record), and a **public
+address is asked of the regional registry that holds it** instead of through the rate-limited `rdap.org` redirector.
+Measured numbers, including where it did not get faster, are in [docs/benchmarks/r6.md](docs/benchmarks/r6.md);
+`python bench/profile_scan.py owasp.org` shows where the seconds of a scan go. For names in seconds, without the
+registration and network enrichment, use `scrutator quick`.
 
 ```bash
+scrutator quick example.com                             # names only, in seconds; --bundle still signs
 scrutator scan example.com --deadline 300 --breaker 5   # five minutes at most; mark a source down after five failures in a row
+scrutator scan example.com --no-live                    # do not stream live names (e.g. to a log)
 scrutator scan example.com --deadline 0                 # no time limit
+```
+
+**Zone transfer (opt-in, active-ish).** `scan --axfr --active` asks each of the in-scope zone's own name servers once
+for the whole zone (AXFR, TCP 53). Most refuse; a few publish their zone this way on purpose. Unlike every other
+lookup this is a direct question to the target's own name servers, so it runs only with both flags, and `--active` is
+recorded in the signed audit log before any lookup. Every outcome — the zone, a refusal, a timeout — is kept as
+evidence, and a name only a transfer lists is `verified` (the zone's own server is authoritative). Use it only where
+you are authorised to.
+
+```bash
+scrutator scan zonetransfer.me --axfr --active          # a zone that publishes its transfer on purpose
 ```
 
 ### Sources and their terms

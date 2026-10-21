@@ -1,6 +1,6 @@
 """`scrutator bench`: OSINT-Bench v0, offline, one command.
 
-Eight sections, each a set of metrics with thresholds:
+Nine sections, each a set of metrics with thresholds:
 
 - risk_rules: the planted risk lab (every rule planted at least once) and a clean zone (no risk expected).
 - attribution: the planted attribution lab, precision and recall by band.
@@ -14,8 +14,10 @@ Eight sections, each a set of metrics with thresholds:
 - brand: brand presence (`scan --brand`) on a planted site and planted platform answers (benchlab/brandlab.py).
 - org_exposure: organisation exposure (`scrutator exposure`) on a planted organisation (benchlab/exposurelab.py):
   refusals, aggregate, personal data in outputs, detail logged, scope, the signed engagement.
+- recall_speed (R6): mined mentions, the opt-in zone transfer against a local AXFR responder, and the live name list
+  agreeing with the report (benchlab/r6lab.py).
 
-The JSON written has a stable shape (`schema: "scrutator-bench/2"`); the exit status is 1 if any threshold fails.
+The JSON written has a stable shape (`schema: "scrutator-bench/3"`); the exit status is 1 if any threshold fails.
 Nothing here touches the network, except `--verifier-model`, which asks a model server on this machine (loopback
 only)."""
 
@@ -52,7 +54,7 @@ from scrutator.scan import run_scan
 from scrutator.scope import ScopePolicy
 from scrutator.store import Store
 
-SCHEMA = "scrutator-bench/2"  # 2: sections brand and org_exposure (R5)
+SCHEMA = "scrutator-bench/3"  # 2: sections brand and org_exposure (R5); 3: recall_speed (R6)
 SEED = Entity(type=EntityType.DOMAIN, value="example.com")
 KEYLESS = {m.name for m in load_builtin_modules() if not m.needs_key}
 
@@ -623,6 +625,15 @@ async def run_bench(out: Path, *, key=None, model: str | None = None, ollama_url
     return result
 
 
+async def recall_speed() -> dict:
+    """R6: mined mentions, the opt-in zone transfer and the live name list, on offline fixtures (benchlab/r6lab.py)."""
+    from scrutator.benchlab.r6lab import recall_speed_metrics
+
+    started = time.perf_counter()
+    metrics, notes = await recall_speed_metrics()
+    return _section(metrics, notes, started)
+
+
 async def _sections(out: Path, state: dict, key, model, ollama_url) -> dict:
     return {
         "risk_rules": await risk_rules(out, state),
@@ -633,6 +644,7 @@ async def _sections(out: Path, state: dict, key, model, ollama_url) -> dict:
         "hallucination": await hallucination(out, state, model, ollama_url),
         "brand": await brand(out, state, key),
         "org_exposure": await org_exposure_section(out, state, key),
+        "recall_speed": await recall_speed(),
     }
 
 

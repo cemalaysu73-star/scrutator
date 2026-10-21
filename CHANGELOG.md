@@ -4,6 +4,34 @@ Built from the git history (`git log`), newest first. Dates are commit dates. Ve
 tagged or published; the numbers are the ones in `pyproject.toml` at the time. Nothing here has been released on
 PyPI.
 
+## 1.0.0rc2 (2026-10-21, a release candidate; not published)
+
+Round R6: speed you feel, recall that does not depend on a lucky quota day, and a report worth showing.
+
+- **Speed**
+  - `scrutator scan` prints each name the moment DNS confirms it is live (`--live`, on by default on a terminal);
+    the report is unchanged. On owasp.org the first verified name appears at a 7.0 s median instead of 29.2 s.
+  - New `scrutator quick <domain>`: the name sources and DNS only (no RDAP/ASN/InternetDB enrichment), a verified-name
+    list in about 7 s on owasp.org (12.7 s on nmap.org), with the same evidence and an optional signed bundle.
+  - A public address is asked of the regional registry that holds it (IANA's RDAP bootstrap, bundled) instead of the
+    rate-limited `rdap.org` redirector; registration, the announcing prefix and the abuse contact are asked once per
+    network; a recent network record from the same database is reused. Measured (three interleaved runs): the first
+    verified name on owasp.org at 7.0 s instead of 29.2 s; the full scan 29.2 to 25.5 s on owasp.org but 11.6 to 18.0 s
+    on nmap.org (slower); `quick` 7.0 s on owasp.org, 12.7 s on nmap.org. Details: docs/benchmarks/r6.md.
+- **Recall**
+  - The crt.sh module falls back to crt.sh's public database when its web search is down (502 in every benchmark run
+    since R4), with the same data and a fixed query, replayable.
+  - New keyless source IP.THC.ORG (subdomain finder); the scan also mines the records it already holds for in-scope
+    names written inside them (a host in an archived URL, a mail server in a TXT record), without any new request.
+  - Opt-in `scan --axfr --active`: one zone transfer per in-scope name server, every outcome kept as evidence;
+    `--active` is recorded in the signed audit log first. A name only a transfer lists is verified.
+- **Report**
+  - The HTML report was rewritten: a verdict strip, a searchable/sortable/filterable name table with evidence-tier
+    chips, risks grouped by severity, an evidence drawer (click any name, risk or finding to see the exact records
+    behind it, each with its sha256 and the verify command), a dependency/infrastructure graph collapsed to the
+    investigated entities, a coverage panel and a proof panel. Light and dark, keyboard-navigable, WCAG AA contrast,
+    print stylesheet. Still one JSON data block and one script, so the integrity guarantees are unchanged.
+
 ## 1.0.0rc1 (2026-10-21, a release candidate; not published)
 
 Rounds R4 (security and robustness audit, the v1.0 pieces) and R5 (two opt-in modules). The v1.0 gate, the benchmark
