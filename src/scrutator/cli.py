@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 from typing import Optional
 
+import httpx
 import typer
 import yaml
 
@@ -1379,6 +1380,179 @@ def audit_letter_cmd(
     _echo(f"Wrote {out / name} and {out / 'engagement.yaml'}.")
     _echo("This is a template, not legal advice: have it reviewed by counsel before use. Get it signed by someone entitled "
           "to authorise testing, then copy the signed values into engagement.yaml (scrutator refuses any <fill in: ...> left).")
+
+
+# ------------------------------------------------------------------------------------------- bug bounty (R7)
+
+bounty_app = typer.Typer(no_args_is_help=True, help="Bug-bounty mode: import a programme's scope, watch it for new assets and takeover candidates (passive).")
+app.add_typer(bounty_app, name="bounty")
+BOUNTY_KINDS = ("new_name", "new_takeover", "new_cert", "new_service", "resolved_risk")
+
+
+@bounty_app.command("import")
+def bounty_import(
+    source: str = typer.Argument(..., help="The scope export: a HackerOne scope CSV, Bugcrowd or bounty-targets JSON, or a plain list; - reads standard input."),
+    program: str = typer.Option("", "--program", help="Programme name (shown in alerts and finding drafts)."),
+    out: Path = typer.Option(Path("bounty-scope.yaml"), "--out", help="The scope file to write."),
+) -> None:
+    """Parse a programme's scope into a deny-by-default scope file. Wildcards that are too broad, odd schemes, user-info
+    URLs, private ranges and hidden characters are refused and listed, never guessed."""
+    from scrutator.bounty import BountyScope, ScopeError, parse_scope
+
+    try:
+        data = sys.stdin.buffer.read(10 * 1024 * 1024) if source == "-" else Path(source).read_bytes()
+        parsed = parse_scope(data, source)
+    except (OSError, ScopeError) as exc:
+        raise _fail(str(exc)) from exc
+    scope = BountyScope.from_parsed(parsed, program=program, data=data, name=source)
+    if not scope.roots() and not scope.include["cidr"]:
+        for item in parsed.refused[:10]:
+            _echo(f"  refused {item['input']!r}: {item['reason']}")
+        raise _fail("nothing in scope could be used: no scope file written")
+    out.write_text(yaml.safe_dump(scope.to_dict(), sort_keys=False, allow_unicode=False), encoding="utf-8")
+    inc, exc_ = scope.include, scope.exclude
+    _echo(f"In scope: {len(inc['host'])} host(s), {len(inc['wildcard'])} wildcard(s), {len(inc['cidr'])} range(s). "
+          f"Out of scope: {len(exc_['host'])} host(s), {len(exc_['wildcard'])} wildcard(s), {len(exc_['cidr'])} range(s).")
+    for item in parsed.refused[:20]:
+        _echo(f"  refused {item['input']!r}: {item['reason']}")
+    if len(parsed.refused) > 20:
+        _echo(f"  ... and {len(parsed.refused) - 20} more refused (all listed in {out})")
+    for item in parsed.notes[:10]:
+        _echo(f"  note {item['input']!r}: {item['reason']}")
+    _echo(f"Wrote {out}. Anything not listed in it is out of scope. Scan roots: {', '.join(scope.roots()) or 'none'}.")
+
+
+def _bounty_policy(noncommercial: bool) -> SourcePolicy:
+    modules = load_builtin_modules()
+    names = sorted(
+        m.name for m in modules
+        if m.opt_in is None and m.name not in (QUICK_LEAVES_OUT - {"internetdb"}) and (m.needs_key is None or os.environ.get(m.needs_key))
+    )
+    try:
+        return SourcePolicy.parse(",".join(names), None, not noncommercial, modules)
+    except SourceError as exc:
+        raise _fail(str(exc)) from exc
+
+
+@bounty_app.command("watch")
+def bounty_watch(
+    scope_file: Path = typer.Option(..., "--scope", help="The scope file `scrutator bounty import` wrote."),
+    out: Path = typer.Option(Path("bounty-watch"), "--out", help="Baseline, alerts and finding drafts go here."),
+    every: str = typer.Option("6h", "--every", help="Interval: 30m, 6h, 1d."),
+    max_runs: int = typer.Option(0, "--max-runs", help="Stop after N rounds (0 = until interrupted)."),
+    budget: float = typer.Option(30.0, "--budget", min=1.0, help="Seconds each scan root may take."),
+    webhook: Optional[str] = typer.Option(None, "--webhook", help="POST the new alerts as JSON (https only, or localhost)."),
+    as_json: bool = typer.Option(False, "--json", help="Print the alerts of each round as JSON."),
+    key_dir: Optional[Path] = typer.Option(None, "--key-dir", help="Sign each round's scans into bundles (cited by the finding drafts)."),
+    noncommercial: bool = typer.Option(True, "--noncommercial/--no-noncommercial", help="--no-noncommercial: leave out sources whose free tier is for non-commercial use only."),
+) -> None:
+    """Scheduled passive scans of a programme's scope. The first round is the baseline; after it only what is new and in
+    scope is announced, once: verified names, takeover candidates (and their resolution), certificates and open
+    services Shodan's InternetDB lists. No active probing. Each takeover candidate gets a ready-to-paste Markdown draft."""
+    from scrutator.bounty import BountyScope, ScopeError, finding_snippet
+    from scrutator.monitor import TAKEOVER_RULES, current_keys, dedupe, diff_snapshots, load_state, save_state, snapshot
+
+    try:
+        scope = BountyScope.load(scope_file)
+        interval = parse_interval(every)
+        if webhook is not None:
+            validate_webhook(webhook)
+    except (OSError, ValueError, ScopeError) as exc:
+        raise _fail(str(exc)) from exc
+    policy = _bounty_policy(noncommercial)
+    signing_key = _signing_key(key_dir) if key_dir is not None else None
+    out.mkdir(parents=True, exist_ok=True)
+    (out / "findings").mkdir(exist_ok=True)
+    try:
+        state = load_state(out)
+    except ValueError as exc:
+        raise _fail(str(exc)) from exc
+    roots = scope.roots()
+    if not roots:
+        raise _fail("the scope has no domain to start from (ranges alone are not watched)")
+    _echo(f"Watching {scope.program or scope_file.name}: {len(roots)} root(s), every {every}; first round is the baseline." if state["snapshot"] is None
+          else f"Watching {scope.program or scope_file.name}: {len(roots)} root(s), every {every}; baseline from an earlier run.")
+
+    async def one_round(number: int) -> None:
+        stamp = datetime_now()
+        merged = {"names": {}, "risks": {}, "certs": {}, "services": {}}
+        evidence: dict = {}
+        bundles: dict[str, tuple[str, str]] = {}
+        store = Store(out / "bounty.db")
+        try:
+            for root in roots:
+                seed_entity = Entity(type=EntityType.DOMAIN, value=root)
+                async with open_context() as ctx:
+                    scan_id, _ = await run_scan(seed_entity, ScopePolicy(domains=[root]), store, ctx, ai=None, max_steps=2000,
+                                                deadline=Deadline(budget), source_policy=policy, timeout_cap=min(15.0, budget))
+                report = build_report(store, scan_id)
+                part = snapshot(report, scope.contains)
+                for key in merged:
+                    merged[key].update(part[key])
+                evidence.update(report["evidence"])
+                if signing_key is not None:
+                    (out / "bundles").mkdir(exist_ok=True)
+                    path = out / "bundles" / f"{root}-{stamp[:19].replace(':', '')}.scrutator"
+                    manifest = create_bundle(store, scan_id, signing_key, path)
+                    bundles[root] = (str(path), manifest["key_fingerprint"])
+        finally:
+            store.close()
+        alerts = [a for a in diff_snapshots(state["snapshot"], merged, kinds=BOUNTY_KINDS)
+                  if a.kind != "resolved_risk" or a.rule_id in TAKEOVER_RULES]
+        fresh, remembered = dedupe(alerts, set(state["alerted"]), current_keys(merged))
+        first = state["snapshot"] is None
+        state.update(snapshot=merged, alerted=sorted(remembered))
+        state["runs"] = (state.get("runs") or [])[-200:] + [{"at": stamp, "names": len(merged["names"]), "alerts": len(fresh)}]
+        save_state(out, state)
+        if first:
+            _echo(f"Round {number} ({stamp}): baseline of {len(merged['names'])} in-scope verified name(s), "
+                  f"{sum(1 for r in merged['risks'].values() if r['rule_id'] in TAKEOVER_RULES)} takeover candidate(s), "
+                  f"{len(merged['certs'])} certificate(s), {len(merged['services'])} open service(s). Nothing announced on a baseline.")
+            return
+        payload = [{**a.to_dict(), "at": stamp} for a in fresh]
+        for alert in payload:
+            if alert["kind"] == "new_takeover":
+                root = next((r for r in roots if any(e == r or e.endswith("." + r) for e in alert["entities"])), "")
+                bundle, fingerprint_ = bundles.get(root, ("", ""))
+                draft = finding_snippet(alert, evidence, program=scope.program, bundle=bundle, key_fingerprint=fingerprint_)
+                target = out / "findings" / f"{alert['key'].replace(':', '-')}.md"
+                target.write_text(draft, encoding="utf-8")
+                alert["draft"] = str(target)
+        if payload:
+            (out / f"alerts-{stamp[:19].replace(':', '')}.json").write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+        if as_json:
+            _echo(json.dumps(payload, indent=2, sort_keys=True))
+        else:
+            _echo(f"Round {number} ({stamp}): {len(payload)} new alert(s).")
+            for alert in payload:
+                _echo(f"  [{alert['severity'].upper():<6}] {alert['title']}  (evidence {', '.join(i[:12] for i in alert['evidence_ids'][:3])})"
+                      + (f"\n           draft: {alert['draft']}" if alert.get("draft") else ""))
+        if payload and webhook:
+            async with make_webhook_client() as client:
+                try:
+                    await client.post(webhook, json={"tool": "scrutator", "program": scope.program, "generated_at": stamp, "alerts": payload}, timeout=15.0)
+                except httpx.HTTPError:
+                    _echo("Webhook did not answer; the alerts are on disk.")
+
+    async def go():
+        runs = 0
+        while True:
+            runs += 1
+            await one_round(runs)
+            if max_runs and runs >= max_runs:
+                return
+            await _sleep(interval)
+
+    try:
+        asyncio.run(go())
+    except KeyboardInterrupt:
+        _echo("Stopped.")
+
+
+def datetime_now() -> str:
+    from datetime import datetime, timezone
+
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
 @app.command("mcp")

@@ -21,3 +21,5 @@ demo-out/
 scrutator-bench/
 audit-out/
 authorisation/
+bounty-watch/
+bounty-scope.yaml
