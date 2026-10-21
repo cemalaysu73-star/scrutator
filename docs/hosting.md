@@ -24,7 +24,7 @@ scrutator watch client-a.com --out clients/client-a --max-runs 1 --email-to it@c
 - **AI** (`--ai local`): the English "why this matters" line may be reworded by a local model; the rewording is kept
   only when the deterministic floor and the verifier pass it, and is marked "(AI, verified)". Default: off.
 - **Data:** the folder holds public records about the client's infrastructure. Keep it on an encrypted disk, back it
-  up, and delete it when the retainer ends.
+  up, and delete it when the retainer ends ([business/legal-and-risk.md](business/legal-and-risk.md)).
 
 Nothing below has been deployed by the author of this page: these are configurations to start from, tested only as far
 as their syntax goes. Adjust paths and users.
