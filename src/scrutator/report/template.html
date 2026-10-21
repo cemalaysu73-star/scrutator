@@ -5,139 +5,505 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Scrutator report</title>
 <style>
-:root{--bg:#fff;--fg:#14181f;--muted:#5b6472;--line:#dfe3ea;--card:#f6f8fb;--low:#b45309;--medium:#1d4ed8;--high:#047857;--bad:#b42318;--sev-info:#5b6472;--sev-low:#b45309;--sev-medium:#c2410c;--sev-high:#b42318}
-@media (prefers-color-scheme:dark){:root{--bg:#0e1116;--fg:#e6e9ef;--muted:#9aa3b2;--line:#252b36;--card:#161b22;--low:#fbbf24;--medium:#7aa2ff;--high:#34d399;--bad:#f97066;--sev-info:#9aa3b2;--sev-low:#fbbf24;--sev-medium:#fb923c;--sev-high:#f97066}}
+:root{
+  color-scheme: light dark;
+  --paper:#f4f1ea; --surface:#fbfaf6; --sunk:#ece7dc; --ink:#1c1b18; --ink-2:#514d46; --ink-3:#635d52;
+  --line:#ddd6c8; --line-2:#cbc3b2; --field:#fffefb;
+  --proof:#2f6b43; --proof-ink:#1f4f30; --proof-wash:#e3ecdf;
+  --claim:#8a6d1f; --claim-wash:#f0e8d2;
+  --sev-info:#6b6559; --sev-low:#8a6d1f; --sev-medium:#b4531a; --sev-high:#a62a21;
+  --sev-info-wash:#eceadf; --sev-low-wash:#f0e8d2; --sev-medium-wash:#f3e0d0; --sev-high-wash:#f2d9d4;
+  --accent:#395c86; --bad:#a62a21;
+  --radius:7px; --gap:clamp(16px,2.2vw,28px);
+  --mono:ui-monospace,"SF Mono","Cascadia Mono","JetBrains Mono",Menlo,Consolas,monospace;
+  --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --shadow:0 1px 1px rgba(28,27,24,.04),0 6px 20px -8px rgba(28,27,24,.18);
+  --shadow-lift:0 2px 4px rgba(28,27,24,.06),0 22px 48px -16px rgba(28,27,24,.34);
+}
+:root:not([data-theme="light"]){@media (prefers-color-scheme:dark){
+  --paper:#15140f; --surface:#1b1a15; --sunk:#100f0b; --ink:#ece7da; --ink-2:#b8b19d; --ink-3:#978f7c;
+  --line:#2c2a22; --line-2:#3a382e; --field:#201e18;
+  --proof:#7bc08b; --proof-ink:#9fd4ab; --proof-wash:#1c2a1f;
+  --claim:#d8b65a; --claim-wash:#2a2415;
+  --sev-info:#a39b88; --sev-low:#d8b65a; --sev-medium:#e8975a; --sev-high:#ef8178;
+  --sev-info-wash:#242218; --sev-low-wash:#2a2415; --sev-medium-wash:#2c1f16; --sev-high-wash:#2d1a17;
+  --accent:#8fb3df; --bad:#ef8178;
+  --shadow:0 1px 1px rgba(0,0,0,.3),0 8px 24px -10px rgba(0,0,0,.6);
+  --shadow-lift:0 2px 6px rgba(0,0,0,.4),0 26px 52px -16px rgba(0,0,0,.72);
+}}
+:root[data-theme="dark"]{
+  --paper:#15140f; --surface:#1b1a15; --sunk:#100f0b; --ink:#ece7da; --ink-2:#b8b19d; --ink-3:#978f7c;
+  --line:#2c2a22; --line-2:#3a382e; --field:#201e18;
+  --proof:#7bc08b; --proof-ink:#9fd4ab; --proof-wash:#1c2a1f;
+  --claim:#d8b65a; --claim-wash:#2a2415;
+  --sev-info:#a39b88; --sev-low:#d8b65a; --sev-medium:#e8975a; --sev-high:#ef8178;
+  --sev-info-wash:#242218; --sev-low-wash:#2a2415; --sev-medium-wash:#2c1f16; --sev-high-wash:#2d1a17;
+  --accent:#8fb3df; --bad:#ef8178;
+  --shadow:0 1px 1px rgba(0,0,0,.3),0 8px 24px -10px rgba(0,0,0,.6);
+  --shadow-lift:0 2px 6px rgba(0,0,0,.4),0 26px 52px -16px rgba(0,0,0,.72);
+}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,sans-serif}
-main{max-width:1100px;margin:0 auto;padding:24px 16px 64px}
-h1{font-size:22px;margin:0 0 4px}
-h2{font-size:16px;margin:32px 0 8px}
-.muted{color:var(--muted)}
-.cards{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0}
-.card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:10px 14px;min-width:110px}
-.card b{display:block;font-size:20px}
-table{width:100%;border-collapse:collapse}
-th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:top;word-break:break-word}
-.badge{font-size:12px;font-weight:600;text-transform:uppercase}
-.sev-info{color:var(--sev-info)}.sev-low{color:var(--sev-low)}.sev-medium{color:var(--sev-medium)}.sev-high{color:var(--sev-high)}
-.low{color:var(--low)}.medium{color:var(--medium)}.high{color:var(--high)}.bad{color:var(--bad)}
-details{margin:2px 0}
-pre{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:8px;overflow:auto;max-height:240px;white-space:pre-wrap}
-svg{width:100%;height:520px;background:var(--card);border:1px solid var(--line);border-radius:8px;color:var(--fg)}
-select,input{background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:4px 8px;margin:0 8px 8px 0}
-ul.statements{padding-left:20px}
-.remedy{margin-top:4px}
-.headline{font-size:17px;font-weight:600;margin:8px 0}
-.tier-group{margin:12px 0}
-.tier-group>summary{cursor:pointer;font-weight:600;padding:6px 0}
-.tier-note{margin:2px 0 8px}
-td.sev{white-space:nowrap;word-break:normal;width:1%}
-.tag{font-size:12px;border:1px solid var(--line);border-radius:4px;padding:0 4px;margin-left:6px}
-.band-confirmed{color:var(--high)}.band-probable{color:var(--medium)}.band-possible{color:var(--low)}.band-unlikely{color:var(--muted)}
-ul.signals{margin:4px 0;padding-left:18px}
-ul.statements li{margin:6px 0}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--paper);color:var(--ink);font:400 16px/1.58 var(--sans);
+  font-feature-settings:"ss01","cv05";-webkit-font-smoothing:antialiased;letter-spacing:-.003em}
+.wrap{max-width:1180px;margin:0 auto;padding:0 clamp(16px,4vw,48px)}
+a{color:var(--accent)}
+h1,h2,h3{letter-spacing:-.02em;font-weight:600;margin:0}
+h2{font-size:clamp(19px,2.1vw,23px);margin:calc(var(--gap)*1.3) 0 2px}
+h3{font-size:16px;margin:22px 0 2px;font-weight:600}
+.num{font-variant-numeric:tabular-nums}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums;letter-spacing:0}
+.muted{color:var(--ink-2)}
+.faint{color:var(--ink-3)}
+.lede{color:var(--ink-2);max-width:72ch;margin:4px 0 0;font-size:15px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* masthead */
+.mast{border-bottom:1px solid var(--line);background:linear-gradient(var(--surface),var(--paper));position:relative}
+.mast .wrap{padding-top:clamp(22px,4vw,40px);padding-bottom:4px}
+.brandline{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.brandline h1{font-size:clamp(23px,3vw,31px)}
+.brandline .glyph{font-family:var(--mono);color:var(--proof);font-weight:600;font-size:15px;
+  border:1px solid var(--line-2);border-radius:5px;padding:1px 7px;letter-spacing:.02em}
+#meta{font-family:var(--mono);font-size:12.5px;color:var(--ink-3);margin-top:7px;word-break:break-word;letter-spacing:0}
+.toprow{display:flex;justify-content:space-between;align-items:flex-start;gap:16px}
+.theme-btn{flex:none;font:inherit;font-size:13px;color:var(--ink-2);background:var(--field);border:1px solid var(--line-2);
+  border-radius:6px;padding:6px 12px;cursor:pointer;display:inline-flex;gap:7px;align-items:center;transition:border-color .15s,color .15s}
+.theme-btn:hover{color:var(--ink);border-color:var(--ink-3)}
+.theme-btn:focus-visible,a:focus-visible,button:focus-visible,summary:focus-visible,select:focus-visible,input:focus-visible,[tabindex]:focus-visible{
+  outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+
+/* verdict strip */
+.verdict{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:1px;background:var(--line);
+  border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;margin:var(--gap) 0 2px;box-shadow:var(--shadow)}
+.vcell{background:var(--surface);padding:13px 16px 12px}
+.vcell .n{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:clamp(22px,3vw,27px);font-weight:600;line-height:1.05;display:block}
+.vcell .k{font-size:12px;color:var(--ink-2);margin-top:3px;letter-spacing:.01em}
+.vcell.lead{background:var(--proof-wash)} .vcell.lead .n{color:var(--proof-ink)}
+.vcell.warn .n{color:var(--claim)}
+.vcell.sev-high .n{color:var(--sev-high)} .vcell.sev-medium .n{color:var(--sev-medium)}
+
+/* nav */
+nav.toc{position:sticky;top:0;z-index:30;background:var(--surface);
+  border-bottom:1px solid var(--line);margin-top:var(--gap)}
+nav.toc .wrap{display:flex;gap:4px;overflow-x:auto;padding-top:7px;padding-bottom:7px;scrollbar-width:none}
+nav.toc .wrap::-webkit-scrollbar{display:none}
+nav.toc a{flex:none;font-size:13px;color:var(--ink);text-decoration:none;padding:5px 11px;border-radius:999px;
+  white-space:nowrap;transition:background .15s,color .15s}
+nav.toc a:hover{color:var(--ink);background:var(--sunk)}
+nav.toc a .c{font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--ink-3);margin-left:5px;font-size:12px}
+
+section{padding:6px 0 10px;scroll-margin-top:52px}
+.sec-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+
+/* panels & tables */
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);
+  margin-top:14px;overflow:hidden}
+.panel-pad{padding:clamp(14px,2vw,20px)}
+.controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center;padding:12px clamp(14px,2vw,20px);
+  border-bottom:1px solid var(--line);background:var(--sunk)}
+.controls .grow{flex:1 1 200px}
+label.ctl{font-size:12px;color:var(--ink-2);display:flex;flex-direction:column;gap:3px}
+select,input[type=search]{font:inherit;font-size:14px;background:var(--field);color:var(--ink);
+  border:1px solid var(--line-2);border-radius:6px;padding:7px 10px;width:100%}
+input[type=search]::placeholder{color:var(--ink-3)}
+.tablewrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{text-align:left;padding:10px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+thead th{position:sticky;top:0;background:var(--surface);font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;
+  color:var(--ink-2);font-weight:600;white-space:nowrap;z-index:1}
+th.sortable{cursor:pointer;user-select:none}
+th.sortable:hover{color:var(--ink)}
+th.sortable .arrow{opacity:.5;font-size:10px}
+tbody tr{transition:background .12s}
+tbody tr.clickable{cursor:pointer}
+tbody tr.clickable:hover{background:var(--sunk)}
+tbody tr:last-child td{border-bottom:0}
+td.mono,.cell-name{font-family:var(--mono);font-variant-numeric:tabular-nums;letter-spacing:0;overflow-wrap:anywhere;word-break:normal}
+.cell-name{font-size:13px}
+#names td:first-child,#entities td:first-child{min-width:150px}
+@media (max-width:760px){.names-by{display:none}}
+td.right{text-align:right}
+.empty{padding:26px clamp(14px,2vw,20px);color:var(--ink-2);font-size:14.5px}
+.count-hint{font-family:var(--mono);color:var(--ink-3);font-size:12.5px}
+
+/* chips */
+.chip{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;line-height:1;
+  padding:3px 8px;border-radius:999px;border:1px solid var(--line-2);white-space:nowrap;letter-spacing:.01em}
+.chip .dot{width:7px;height:7px;border-radius:50%;background:currentColor;flex:none}
+.chip.verified{color:var(--proof-ink);background:var(--proof-wash);border-color:transparent}
+.chip.claimed{color:var(--claim);background:var(--claim-wash);border-color:transparent}
+.chip.stale{color:var(--sev-medium);background:var(--sev-medium-wash);border-color:transparent}
+.chip.wildcard{color:var(--sev-info);background:var(--sev-info-wash);border-color:transparent}
+.chip.state{color:var(--ink-2);background:var(--sunk);font-weight:500}
+.chip.band-confirmed{color:var(--proof-ink);background:var(--proof-wash);border-color:transparent}
+.chip.band-probable{color:var(--accent);background:var(--sunk);border-color:transparent}
+.chip.band-possible{color:var(--claim);background:var(--claim-wash);border-color:transparent}
+.chip.band-unlikely{color:var(--ink-3);background:var(--sunk);border-color:transparent}
+.chip.tag{color:var(--ink-3);background:var(--sunk);font-weight:500}
+.sev-badge{display:inline-flex;align-items:center;gap:6px;font-weight:600;font-size:12px}
+.sev-badge .bar{width:3px;height:14px;border-radius:2px;background:currentColor}
+.sev-high{color:var(--sev-high)} .sev-medium{color:var(--sev-medium)} .sev-low{color:var(--sev-low)} .sev-info{color:var(--sev-info)}
+
+/* receipt mark (the hash, drawn) */
+.receipt{display:inline-flex;align-items:center;gap:8px}
+.mark{display:inline-block;height:18px;width:40px;vertical-align:middle;color:var(--proof)}
+.mark.hollow{color:var(--ink-3);opacity:.6}
+.markbtn{font:inherit;cursor:pointer;background:none;border:1px solid var(--line);border-radius:6px;padding:3px 7px;
+  display:inline-flex;align-items:center;gap:7px;color:var(--ink-2);transition:border-color .15s,background .15s}
+.markbtn:hover{border-color:var(--ink-3);background:var(--sunk)}
+.markbtn .short{font-family:var(--mono);font-size:11.5px;letter-spacing:0}
+
+/* evidence — inline disclosure (the reliable trace) */
+details.ev{border:1px solid var(--line);border-radius:6px;margin:6px 0;background:var(--field);overflow:hidden}
+details.ev>summary{list-style:none;cursor:pointer;padding:8px 11px;display:flex;align-items:center;gap:10px;font-size:13px}
+details.ev>summary::-webkit-details-marker{display:none}
+details.ev>summary:hover{background:var(--sunk)}
+details.ev .src{font-weight:600;color:var(--ink);flex:none}
+details.ev .req{font-family:var(--mono);font-size:12px;color:var(--ink-2);word-break:break-all;letter-spacing:0}
+.ev-body{padding:4px 11px 11px;border-top:1px solid var(--line)}
+.ev-meta{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;margin:8px 0;font-size:12px;color:var(--ink-3)}
+.ev-id{font-family:var(--mono);font-size:11.5px;color:var(--ink-2);letter-spacing:0}
+.copybtn{font:inherit;font-size:11.5px;cursor:pointer;background:var(--sunk);border:1px solid var(--line-2);
+  border-radius:5px;padding:2px 8px;color:var(--ink-2)}
+.copybtn:hover{color:var(--ink);border-color:var(--ink-3)}
+.verify-hint{font-family:var(--mono);font-size:11.5px;color:var(--ink-3);letter-spacing:0;
+  background:var(--sunk);border-radius:5px;padding:4px 8px;word-break:break-all}
+pre{background:var(--sunk);border:1px solid var(--line);border-radius:6px;padding:10px 12px;overflow:auto;
+  max-height:260px;white-space:pre-wrap;word-break:break-word;font-family:var(--mono);font-size:12px;line-height:1.5;margin:4px 0 0;letter-spacing:0}
+pre mark{background:var(--proof-wash);color:var(--proof-ink);padding:0 2px;border-radius:2px}
+ul.signals,ul.plain{margin:4px 0 0;padding-left:0;list-style:none}
+ul.signals li,ul.plain li{padding:6px 0;border-top:1px solid var(--line)}
+ul.signals li:first-child,ul.plain li:first-child{border-top:0}
+
+/* tier groups */
+.tier-group{border-top:1px solid var(--line)}
+.tier-group>summary{list-style:none;cursor:pointer;padding:12px 2px;font-weight:600;font-size:14.5px;
+  display:flex;align-items:center;gap:10px}
+.tier-group>summary::-webkit-details-marker{display:none}
+.tier-group>summary::before{content:"";width:0;height:0;border-left:6px solid var(--ink-3);
+  border-top:4px solid transparent;border-bottom:4px solid transparent;transition:transform .18s ease}
+.tier-group[open]>summary::before{transform:rotate(90deg)}
+.tier-note{margin:0 0 8px;color:var(--ink-2);font-size:13.5px;max-width:74ch}
+
+/* graph */
+.graphwrap{position:relative}
+svg#graph{display:block;width:100%;height:clamp(360px,52vh,560px);background:
+  radial-gradient(circle at 30% 20%,color-mix(in srgb,var(--surface) 70%,var(--paper)),var(--paper));
+  color:var(--ink)}
+.legend{display:flex;gap:14px;flex-wrap:wrap;padding:11px clamp(14px,2vw,20px);border-top:1px solid var(--line);
+  font-size:12.5px;color:var(--ink-2)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{width:10px;height:10px;border-radius:50%;display:inline-block}
+
+/* proof panel */
+.proof{background:var(--proof-wash);border:1px solid color-mix(in srgb,var(--proof) 40%,var(--line));
+  border-radius:var(--radius);padding:clamp(16px,2.2vw,24px);margin-top:14px}
+.proof h2{margin-top:0}
+.proof .seal{color:var(--proof-ink);display:inline-flex;gap:9px;align-items:center;font-weight:600;font-size:15px}
+.proof ol{margin:12px 0 0;padding-left:20px;max-width:76ch}
+.proof ol li{margin:7px 0;color:var(--ink-2)}
+.proof code{font-family:var(--mono);font-size:12.5px;background:var(--field);border:1px solid var(--line);
+  border-radius:5px;padding:2px 6px;color:var(--ink);letter-spacing:0;word-break:break-all}
+
+/* drawer */
+.drawer-scrim{position:fixed;inset:0;background:rgba(20,18,12,.44);opacity:0;pointer-events:none;
+  transition:opacity .2s ease;z-index:40}
+.drawer-scrim.open{opacity:1;pointer-events:auto}
+aside.drawer{position:fixed;top:0;right:0;height:100%;width:min(560px,94vw);background:var(--surface);
+  border-left:1px solid var(--line-2);box-shadow:var(--shadow-lift);z-index:50;display:flex;flex-direction:column;
+  transform:translateX(100%);transition:transform .24s cubic-bezier(.22,1,.36,1)}
+aside.drawer.open{transform:none}
+.drawer-head{padding:18px 20px 14px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.drawer-head h3{font-size:16px}
+.drawer-head .sub{font-size:12.5px;color:var(--ink-2);margin-top:3px}
+.drawer-close{font:inherit;font-size:20px;line-height:1;background:none;border:0;color:var(--ink-2);cursor:pointer;padding:2px 6px}
+.drawer-close:hover{color:var(--ink)}
+.drawer-body{overflow-y:auto;padding:14px 20px 40px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+@media (max-width:640px){
+  th,td{padding:9px 11px}
+  .verdict{grid-template-columns:repeat(auto-fit,minmax(104px,1fr))}
+  h2{margin-top:calc(var(--gap)*1.1)}
+}
+@media print{
+  nav.toc,.theme-btn,.controls,.drawer-scrim,aside.drawer,.markbtn{display:none!important}
+  body{background:#fff;color:#000;font-size:11pt}
+  .panel,.proof,.verdict{box-shadow:none;break-inside:avoid}
+  details.ev,.tier-group{break-inside:avoid}
+  details[open] .tier-group{display:block}
+  a{color:#000;text-decoration:underline}
+  svg#graph{height:300px}
+}
 </style>
 </head>
 <body>
-<main>
-<h1>Scrutator report</h1>
-<div class="muted" id="meta"></div>
-<div id="headline"></div>
-<div class="cards" id="cards"></div>
-<div id="extra"></div>
-<div id="risks"></div>
-<div id="attribution"></div>
-<h2>Findings</h2>
-<div id="findings"></div>
-<h2>Graph</h2>
-<svg id="graph" role="img" aria-label="Entity graph"></svg>
-<h2>Entities</h2>
-<div id="entities"></div>
-<div id="extra-after"></div>
+<div class="drawer-scrim" id="drawer-scrim"></div>
+<aside class="drawer" id="drawer" role="dialog" aria-modal="true" aria-labelledby="drawer-title" aria-hidden="true" tabindex="-1">
+  <div class="drawer-head">
+    <div><h3 id="drawer-title">Evidence</h3><div class="sub" id="drawer-sub"></div></div>
+    <button class="drawer-close" id="drawer-close" aria-label="Close evidence">&times;</button>
+  </div>
+  <div class="drawer-body" id="drawer-body"></div>
+</aside>
+
+<header class="mast">
+  <div class="wrap">
+    <div class="toprow">
+      <div>
+        <div class="brandline"><span class="glyph">[ ]</span><h1>Scrutator report</h1></div>
+        <div id="meta"></div>
+      </div>
+      <button class="theme-btn" id="theme" type="button" aria-label="Switch colour theme"><span id="theme-icon">◑</span><span id="theme-label">Theme</span></button>
+    </div>
+    <div id="headline"></div>
+    <div class="verdict" id="cards"></div>
+  </div>
+</header>
+
+<nav class="toc" aria-label="Report sections"><div class="wrap" id="toc"></div></nav>
+
+<main class="wrap">
+  <section id="sec-names" tabindex="-1"><div id="names"></div></section>
+  <section id="sec-risks" tabindex="-1"><div id="risks"></div></section>
+  <section id="sec-attribution" tabindex="-1"><div id="attribution"></div></section>
+  <section id="sec-findings" tabindex="-1"><h2>Findings</h2><div class="lede" id="findings-lede"></div><div id="findings"></div></section>
+  <section id="sec-graph" tabindex="-1"><h2>Infrastructure</h2><div class="lede">Entities and the relations between them, laid out by scope. Hover a node for its value; the graph collapses the largest scans by scope so it stays legible.</div><div class="panel"><div class="graphwrap"><svg id="graph" role="img" aria-label="Entity and relation graph"></svg></div><div class="legend" id="graph-legend"></div></div></section>
+  <section id="sec-entities" tabindex="-1"><h2>Entities</h2><div class="lede">Every entity the scan recorded. Filter by type, scope and text.</div><div id="entities"></div></section>
+  <section id="sec-coverage" tabindex="-1"><div id="extra"></div></section>
+  <section id="sec-proof" tabindex="-1"><div id="proof"></div></section>
+  <div id="extra-after"></div>
 </main>
+
 <script type="application/json" id="data">__DATA__</script>
 <script>
 const D = JSON.parse(document.getElementById("data").textContent);
 const el = (tag, props = {}, ...kids) => {
   const node = document.createElement(tag);
   for (const [key, value] of Object.entries(props)) node[key] = value;
-  for (const kid of kids) node.append(kid);
+  for (const kid of kids) if (kid !== null && kid !== undefined) node.append(kid);
   return node;
 };
-const section = (hostId, title, node) => {
-  document.getElementById(hostId).append(el("h2", {textContent: title}), node);
-};
+const chip = (cls, text) => el("span", {className: "chip " + cls}, el("span", {className: "dot"}), text);
+const frag = (...kids) => el("span", {}, ...kids);
 
+/* ---- the receipt: a sha256 drawn as 16 bars, same hash → same mark ---- */
+const NS = "http://www.w3.org/2000/svg";
+function receiptMark(id, hollow) {
+  const svg = document.createElementNS(NS, "svg");
+  svg.setAttribute("class", "mark" + (hollow ? " hollow" : ""));
+  svg.setAttribute("viewBox", "0 0 40 18");
+  svg.setAttribute("aria-hidden", "true");
+  const hex = (id || "").slice(0, 16);
+  for (let i = 0; i < 16; i++) {
+    const v = parseInt(hex[i] || "0", 16);
+    const h = 3 + (v / 15) * 14;
+    const bar = document.createElementNS(NS, "rect");
+    bar.setAttribute("x", String(i * 2.5 + 0.4));
+    bar.setAttribute("y", String(18 - h));
+    bar.setAttribute("width", "1.7");
+    bar.setAttribute("height", String(h));
+    bar.setAttribute("rx", "0.6");
+    bar.setAttribute("fill", "currentColor");
+    bar.setAttribute("fill-opacity", hollow ? "0.5" : "0.9");
+    svg.append(bar);
+  }
+  return svg;
+}
+const shortId = (id) => (id || "").slice(0, 10);
+
+function copyButton(text, label) {
+  const btn = el("button", {className: "copybtn", type: "button", textContent: label || "copy id"});
+  btn.addEventListener("click", (e) => {
+    if (e && e.stopPropagation) e.stopPropagation();
+    try { navigator.clipboard.writeText(text); btn.textContent = "copied"; setTimeout(() => (btn.textContent = label || "copy id"), 1200); }
+    catch (_) { btn.textContent = text; }
+  });
+  return btn;
+}
+
+/* One evidence record as an inline, keyboard-reachable, printable disclosure that carries the full trace:
+   source, request, collection time, sha256 id (copyable), the command to re-verify it, and the payload with
+   the claimed text highlighted. The drawer shows the same records; this stays in the page without any click. */
+function evidenceRecord(id, highlight) {
+  const ev = D.evidence[id];
+  if (!ev) return null;
+  const det = el("details", {className: "ev"});
+  det.append(el("summary", {},
+    receiptMark(id, false),
+    el("span", {className: "src", textContent: ev.source}),
+    el("span", {className: "req", textContent: ev.request})));
+  const body = el("div", {className: "ev-body"});
+  const meta = el("div", {className: "ev-meta"},
+    el("span", {textContent: "collected " + ev.collected_at}),
+    el("span", {className: "ev-id", textContent: "sha256 " + id}),
+    copyButton(id, "copy id"));
+  body.append(meta,
+    el("div", {className: "verify-hint", textContent: "scrutator verify proof.scrutator --replay  ·  record " + shortId(id)}),
+    payloadPre(ev.payload, highlight));
+  det.append(body);
+  return det;
+}
+function payloadPre(payload, highlight) {
+  const pre = el("pre");
+  const text = (payload || "").slice(0, 20000);
+  const needle = highlight && highlight.length > 2 ? text.indexOf(highlight) : -1;
+  if (needle >= 0) {
+    pre.append(text.slice(0, needle), el("mark", {textContent: highlight}), text.slice(needle + highlight.length));
+  } else {
+    pre.append(text);
+  }
+  return pre;
+}
+function evidenceDetails(ids, highlight) {
+  const cell = el("div");
+  for (const id of ids) { const r = evidenceRecord(id, highlight); if (r) cell.append(r); }
+  if (!ids.length) cell.append(el("span", {className: "faint", textContent: "no evidence record"}));
+  return cell;
+}
+
+/* The drawer: the same records, opened on demand for one subject. */
+let lastFocus = null;
+function openEvidence(title, sub, ids, highlight) {
+  const body = document.getElementById("drawer-body");
+  body.replaceChildren();
+  document.getElementById("drawer-title").textContent = title;
+  document.getElementById("drawer-sub").textContent = sub || (ids.length + " evidence record(s)");
+  for (const id of ids) { const r = evidenceRecord(id, highlight); if (r) { r.open = true; body.append(r); } }
+  if (!ids.length) body.append(el("p", {className: "muted", textContent: "No evidence record backs this directly."}));
+  const d = document.getElementById("drawer"), s = document.getElementById("drawer-scrim");
+  d.className = "drawer open"; s.className = "drawer-scrim open"; d.setAttribute("aria-hidden", "false");
+  lastFocus = (typeof document.activeElement !== "undefined") ? document.activeElement : null;
+  if (d.focus) d.focus();
+}
+function closeEvidence() {
+  const d = document.getElementById("drawer"), s = document.getElementById("drawer-scrim");
+  d.className = "drawer"; s.className = "drawer-scrim"; d.setAttribute("aria-hidden", "true");
+  if (lastFocus && lastFocus.focus) lastFocus.focus();
+}
+function rowOpensEvidence(tr, title, sub, ids, highlight) {
+  if (!ids || !ids.length) return tr;
+  tr.className = (tr.className ? tr.className + " " : "") + "clickable";
+  tr.setAttribute("tabindex", "0");
+  tr.setAttribute("role", "button");
+  tr.setAttribute("aria-label", "Show evidence for " + title);
+  const open = () => openEvidence(title, sub, ids, highlight);
+  tr.addEventListener("click", open);
+  tr.addEventListener("keydown", (e) => { if (e && (e.key === "Enter" || e.key === " ")) { if (e.preventDefault) e.preventDefault(); open(); } });
+  return tr;
+}
+
+/* ---- masthead ---- */
 const aiLine = D.ai
-  ? " · AI: " + Object.entries(D.ai.providers || {}).map(([role, p]) => `${role} ${p.provider}/${p.model} (${p.local ? "local" : "cloud"})`).join(", ")
-  : " · AI: off";
+  ? " · AI " + Object.entries(D.ai.providers || {}).map(([role, p]) => `${role} ${p.provider}/${p.model} (${p.local ? "local" : "cloud"})`).join(", ")
+  : " · AI off (deterministic)";
 document.getElementById("meta").textContent =
-  `${D.scan.seed} · scan #${D.scan.id} · generated ${D.generated_at} · scrutator ${D.tool.version}${aiLine}`;
+  `${D.scan.seed} · scan #${D.scan.id} · started ${D.scan.started_at || "?"} · generated ${D.generated_at} · scrutator ${D.tool.version}${aiLine}`;
 
 if (D.summary.headline) {
-  document.getElementById("headline").append(el("p", {className: "headline", textContent: "Names: " + D.summary.headline + ". Verified names come first; the rest are counted below and open on demand."}));
+  document.getElementById("headline").append(el("p", {className: "lede", id: "headline-text",
+    textContent: "Names: " + D.summary.headline + ". Verified names are backed by evidence shown in place; claimed names are kept with the reason they are only claims."}));
 }
-const cards = document.getElementById("cards");
-const counts = {
-  "Entities": D.summary.entities,
-  "In scope": D.summary.by_scope.in || 0,
-  "Linked": D.summary.by_scope.linked || 0,
-  "Candidates": D.summary.by_scope.candidate || 0,
-  "Out of scope": D.summary.by_scope.out || 0,
-  "Edges": D.summary.edges,
-  "Findings": D.summary.findings,
-};
-const tierCounts = D.summary.tiers || {};
-if (D.names && D.names.length) {
-  counts["Verified names"] = tierCounts.verified || 0;
-  counts["Claimed names"] = tierCounts.claimed || 0;
-  counts["Stale names"] = tierCounts.stale || 0;
-  counts["Wildcard-covered"] = tierCounts.wildcard || 0;
+
+function buildVerdict() {
+  const host = document.getElementById("cards");
+  const t = D.summary.tiers || {};
+  const by = D.summary.by_scope || {};
+  const sev = {high: 0, medium: 0, low: 0, info: 0};
+  for (const r of D.risks || []) sev[r.severity] = (sev[r.severity] || 0) + 1;
+  const evidenceCount = Object.keys(D.evidence || {}).length;
+  const cells = [];
+  if (D.names && D.names.length) {
+    cells.push(["lead", t.verified || 0, "Verified names"]);
+    cells.push([(t.claimed || 0) ? "warn" : "", t.claimed || 0, "Claimed names"]);
+  }
+  const topSev = sev.high ? "sev-high" : sev.medium ? "sev-medium" : "";
+  cells.push([topSev, (D.risks || []).length, "Risks"]);
+  if (sev.high || sev.medium) cells.push(["", `${sev.high} / ${sev.medium}`, "High / medium"]);
+  cells.push(["", by.in || 0, "In scope"]);
+  if (by.linked) cells.push(["", by.linked, "Linked"]);
+  if (D.summary.candidates) cells.push(["", D.summary.candidates, "Candidates"]);
+  cells.push(["lead", evidenceCount, "Evidence records"]);
+  for (const [cls, n, k] of cells) {
+    host.append(el("div", {className: "vcell " + cls}, el("span", {className: "n", textContent: String(n)}), el("span", {className: "k", textContent: k})));
+  }
 }
-for (const [label, value] of Object.entries(counts)) {
-  cards.append(el("div", {className: "card"}, el("b", {textContent: String(value)}), label));
+
+/* ---- table of contents ---- */
+function buildToc() {
+  const host = document.getElementById("toc");
+  const items = [
+    ["sec-names", "Names", (D.names || []).length],
+    ["sec-risks", "Risks", (D.risks || []).length],
+    ["sec-attribution", "Attribution", D.summary.candidates || 0],
+    ["sec-findings", "Findings", D.summary.findings || 0],
+    ["sec-graph", "Infrastructure", null],
+    ["sec-entities", "Entities", D.summary.entities || 0],
+    ["sec-coverage", "Coverage", null],
+    ["sec-proof", "Proof", null],
+  ];
+  for (const [id, label, count] of items) {
+    if ((id === "sec-names") && !(D.names || []).length) continue;
+    if ((id === "sec-attribution") && !D.attribution) continue;
+    const a = el("a", {href: "#" + id, textContent: label});
+    if (count !== null) a.append(el("span", {className: "c", textContent: String(count)}));
+    host.append(a);
+  }
+}
+
+function section(hostId, title, lede, node) {
+  const host = document.getElementById(hostId);
+  host.append(el("div", {className: "sec-head"}, el("h2", {textContent: title})));
+  if (lede) host.append(el("p", {className: "lede", textContent: lede}));
+  host.append(node);
 }
 
 function renderNarrative() {
   const statements = D.summary_statements || [];
   if (!statements.length) return;
-  const list = el("ul", {className: "statements"});
+  const list = el("ul", {className: "plain"});
   for (const s of statements) {
-    const refs = el("details", {}, el("summary", {textContent: `${s.evidence_ids.length} evidence record(s)`}));
-    for (const id of s.evidence_ids) {
-      const ev = D.evidence[id];
-      if (ev) refs.append(el("div", {className: "muted", textContent: `${ev.source}: ${ev.request}`}));
-    }
-    list.append(el("li", {}, el("span", {textContent: s.text + " "}), el("span", {className: `badge ${s.confidence}`, textContent: s.confidence}), refs));
+    const li = el("li", {},
+      el("span", {textContent: s.text + " "}),
+      chip(s.confidence === "high" ? "verified" : s.confidence === "medium" ? "band-probable" : "tag", s.confidence),
+      evidenceDetails(s.evidence_ids, s.text));
+    list.append(li);
   }
-  section("extra", "AI summary (every statement checked against the cited evidence)", list);
+  const panel = el("div", {className: "panel"}, el("div", {className: "panel-pad"}, list));
+  section("extra", "AI summary", "Every statement was checked against the evidence it cites before it was published.", panel);
 }
 
 function renderSources() {
   const rows = Object.entries(D.sources || {}).sort(([a], [b]) => a.localeCompare(b));
   if (!rows.length) return;
-  const table = el("table", {}, el("tr", {}, ...["Source", "OK", "Failed", "Denied", "Skipped", "Cancelled", "Status", "Errors"].map(t => el("th", {textContent: t}))));
+  const head = el("tr", {}, ...["Source", "OK", "Failed", "Denied", "Skipped", "Cancelled", "State", "First errors"].map((t, i) => el("th", {className: i >= 1 && i <= 5 ? "right" : "", textContent: t})));
+  const body = el("tbody");
   let gaps = 0;
   for (const [name, h] of rows) {
     gaps += h.error + (h.cancelled || 0);
-    table.append(el("tr", {},
-      el("td", {textContent: name}),
-      el("td", {textContent: String(h.ok)}),
-      el("td", {className: h.error ? "bad" : "", textContent: String(h.error)}),
-      el("td", {textContent: String(h.denied)}),
-      el("td", {textContent: String(h.skipped)}),
-      el("td", {className: h.cancelled ? "bad" : "", textContent: String(h.cancelled || 0)}),
-      el("td", {className: h.down ? "bad" : "", textContent: h.down ? "down" : "answered"}),
-      el("td", {textContent: h.errors.join("; ")})));
+    const stateCell = h.down ? chip("stale", "down") : (h.error && !h.ok) ? chip("stale", "failing") : h.ok ? chip("verified", "answered") : chip("state", "idle");
+    body.append(el("tr", {},
+      el("td", {className: "mono", textContent: name}),
+      el("td", {className: "right num", textContent: String(h.ok)}),
+      el("td", {className: "right num" + (h.error ? " sev-high" : ""), textContent: String(h.error)}),
+      el("td", {className: "right num", textContent: String(h.denied)}),
+      el("td", {className: "right num", textContent: String(h.skipped)}),
+      el("td", {className: "right num" + (h.cancelled ? " sev-high" : ""), textContent: String(h.cancelled || 0)}),
+      el("td", {}, stateCell),
+      el("td", {className: "muted", textContent: (h.errors || []).join("; ")})));
   }
   const cov = D.coverage || {};
   const down = cov.sources_down || [];
-  const notes = [el("p", {className: "muted", textContent: gaps
-    ? `${gaps} source run(s) failed or were cancelled. Coverage has gaps: a missing result may only mean a source did not answer.`
+  const notes = [el("p", {className: "lede", textContent: gaps
+    ? `${gaps} source run(s) failed or were cut. Coverage has gaps: a missing name may only mean a source did not answer, not that the name is absent.`
     : "Every source run answered."})];
-  if (down.length) notes.push(el("p", {className: "bad", textContent: `Marked down after repeated failures, not asked again in this scan: ${down.join(", ")}.`}));
-  if (cov.deadline_hit) notes.push(el("p", {className: "bad", textContent: `The scan hit its ${cov.deadline_s} s deadline: lookups still running were cancelled and the rest did not start. This report is partial.`}));
-  section("extra", "Source coverage", el("div", {}, ...notes, table));
+  if (down.length) notes.push(el("p", {className: "sev-high", textContent: `Marked down after repeated failures, not asked again this scan: ${down.join(", ")}.`}));
+  if (cov.deadline_hit) notes.push(el("p", {className: "sev-high", textContent: `The scan hit its ${cov.deadline_s} s deadline: lookups still running were cancelled. This report is partial.`}));
+  const panel = el("div", {className: "panel"},
+    el("div", {className: "panel-pad"}, ...notes),
+    el("div", {className: "tablewrap"}, el("table", {}, el("thead", {}, head), body)));
+  section("extra", "Source coverage", "What answered, what failed, what was off, and why — so a thin result is never read as a clean one.", panel);
 }
 
 function renderAttribution() {
@@ -145,233 +511,305 @@ function renderAttribution() {
   if (!att) return;
   const all = att.candidates || [];
   const promoted = new Set((D.promotions || []).map(p => p.entity));
-  const host = el("div");
   const bands = att.bands || {};
-  host.append(el("p", {className: "muted", textContent: all.length
-    ? `Names outside the scope with evidence tying them to the organisation: ${bands.confirmed || 0} confirmed, ${bands.probable || 0} probable, ${bands.possible || 0} possible, ${bands.unlikely || 0} unlikely` + (att.omitted_unlikely ? ` (${att.omitted_unlikely} more unlikely not listed)` : "") + ". Scores are heuristic and each signal cites its evidence. A candidate is only looked at passively until you promote it with scrutator promote."
+  const host = document.getElementById("attribution");
+  host.append(el("div", {className: "sec-head"}, el("h2", {textContent: "Attribution (candidates for the scope)"})));
+  host.append(el("p", {className: "lede", textContent: all.length
+    ? `Names outside the scope with evidence tying them to the organisation: ${bands.confirmed || 0} confirmed, ${bands.probable || 0} probable, ${bands.possible || 0} possible, ${bands.unlikely || 0} unlikely` + (att.omitted_unlikely ? ` (${att.omitted_unlikely} more unlikely not listed)` : "") + ". Scores are heuristic and every signal cites its evidence. A candidate is only looked at passively until you promote it with scrutator promote."
     : "No name outside the scope has evidence tying it to the organisation. That is not proof that none exists: a name no certificate, record or registration links to the scope cannot be found this way."}));
-  if (all.length) {
-    const filter = el("select", {}, ...[["", "possible or better"], ["all", "all bands"], ["confirmed", "confirmed"], ["probable", "probable"], ["possible", "possible"], ["unlikely", "unlikely"]].map(([value, label]) => el("option", {value, textContent: label})));
-    const body = el("tbody");
-    const wanted = (band) => filter.value === "all" || (filter.value === "" ? band !== "unlikely" : band === filter.value);
-    const draw = () => {
-      body.replaceChildren();
-      for (const c of all) {
-        if (!wanted(c.band)) continue;
-        const signals = el("ul", {className: "signals"});
-        for (const s of c.signals) {
-          const item = el("li", {}, el("b", {textContent: `${s.kind} ${s.weight.toFixed(2)}`}), el("span", {textContent: " " + s.detail}));
-          if (s.note) item.append(el("div", {className: "muted", textContent: s.note}));
-          item.append(evidenceDetails(s.evidence_ids));
-          signals.append(item);
-        }
-        const name = el("td", {}, el("b", {textContent: c.value}), el("span", {className: "tag", textContent: c.state}));
-        if (promoted.has(c.entity_id)) name.append(el("span", {className: "tag", textContent: "promoted"}));
-        name.append(el("div", {className: "muted", textContent: c.explanation}));
-        const doubts = el("td");
-        if (!c.premortem.length) doubts.append(el("span", {className: "muted", textContent: "none found by the rules"}));
-        for (const note of c.premortem) doubts.append(el("div", {}, el("span", {textContent: note.text}), evidenceDetails(note.evidence_ids)));
-        body.append(el("tr", {},
-          name,
-          el("td", {className: "sev"}, el("span", {className: `badge band-${c.band}`, textContent: c.band}), el("div", {className: "muted", textContent: `score ${c.score.toFixed(2)}`})),
-          el("td", {}, signals),
-          doubts));
+  if (!all.length) return;
+  const panel = el("div", {className: "panel"});
+  const filter = el("select", {}, ...[["", "possible or better"], ["all", "all bands"], ["confirmed", "confirmed"], ["probable", "probable"], ["possible", "possible"], ["unlikely", "unlikely"]].map(([value, label]) => el("option", {value, textContent: label})));
+  const controls = el("div", {className: "controls"}, el("label", {className: "ctl"}, "Band", filter));
+  const body = el("tbody");
+  const wanted = (band) => filter.value === "all" || (filter.value === "" ? band !== "unlikely" : band === filter.value);
+  const draw = () => {
+    body.replaceChildren();
+    for (const c of all) {
+      if (!wanted(c.band)) continue;
+      const signals = el("ul", {className: "signals"});
+      for (const s of c.signals) {
+        const item = el("li", {}, el("b", {className: "mono", textContent: `${s.kind} ${s.weight.toFixed(2)}`}), el("span", {textContent: " " + s.detail}));
+        if (s.note) item.append(el("div", {className: "muted", textContent: s.note}));
+        item.append(evidenceDetails(s.evidence_ids, c.value));
+        signals.append(item);
       }
-    };
-    filter.addEventListener("input", draw);
-    host.append(filter, el("table", {}, el("thead", {}, el("tr", {}, ...["Name", "Band", "Why it may be ours", "What could make it wrong"].map(t => el("th", {textContent: t})))), body));
-    draw();
-  }
-  section("attribution", "Attribution (candidates for the scope)", host);
+      const name = el("td", {}, el("b", {className: "cell-name", textContent: c.value}), el("span", {textContent: " "}), chip("state", c.state));
+      if (promoted.has(c.entity_id)) name.append(el("span", {textContent: " "}), chip("verified", "promoted"));
+      name.append(el("div", {className: "muted", textContent: c.explanation}));
+      const doubts = el("td");
+      if (!c.premortem.length) doubts.append(el("span", {className: "faint", textContent: "none found by the rules"}));
+      for (const note of c.premortem) doubts.append(el("div", {}, el("span", {textContent: note.text}), evidenceDetails(note.evidence_ids, null)));
+      body.append(el("tr", {},
+        name,
+        el("td", {}, chip("band-" + c.band, c.band), el("div", {className: "muted num", textContent: `score ${c.score.toFixed(2)}`})),
+        el("td", {}, signals),
+        doubts));
+    }
+  };
+  filter.addEventListener("input", draw);
+  draw();
+  panel.append(controls, el("div", {className: "tablewrap"}, el("table", {}, el("thead", {}, el("tr", {}, ...["Name", "Band", "Why it may be ours", "What could make it wrong"].map(t => el("th", {textContent: t})))), body)));
+  host.append(panel);
 }
 
 function renderAnalystLeads() {
   const verified = (D.leads || {}).verified || [];
   if (!verified.length) return;
-  const list = el("ul", {className: "statements"});
+  const list = el("ul", {className: "plain"});
   for (const lead of verified) {
-    const item = el("li", {}, el("span", {className: "tag", textContent: lead.kind === "premortem" ? "pre-mortem" : "lead"}), el("span", {textContent: " " + lead.claim}));
-    if (lead.check) item.append(el("div", {className: "muted", textContent: "Suggested check (not run): " + lead.check}));
-    item.append(evidenceDetails(lead.evidence_ids));
-    list.append(item);
+    const li = el("li", {},
+      chip("tag", lead.kind === "premortem" ? "pre-mortem" : "lead"),
+      el("span", {textContent: " " + lead.claim}));
+    if (lead.check) li.append(el("div", {className: "muted", textContent: "Suggested check (not run): " + lead.check}));
+    li.append(evidenceDetails(lead.evidence_ids, lead.claim));
+    list.append(li);
   }
-  section("attribution", "Analyst leads (written by the AI, each checked against the evidence it cites)", list);
+  const host = document.getElementById("attribution");
+  host.append(el("div", {className: "sec-head"}, el("h3", {textContent: "Analyst leads"})));
+  host.append(el("p", {className: "lede", textContent: "Written by the AI, each checked against the evidence it cites."}));
+  host.append(el("div", {className: "panel"}, el("div", {className: "panel-pad"}, list)));
 }
 
 function renderLeads() {
   const rejected = ((D.leads || {}).rejected || []).map(l => ({text: l.claim, reason: l.reason}));
   const leads = [...(D.unverified_leads || []), ...rejected];
   if (!leads.length) return;
-  const list = el("ul", {className: "statements"});
-  for (const l of leads) list.append(el("li", {}, el("span", {textContent: l.text + " "}), el("span", {className: "muted", textContent: `(rejected: ${l.reason})`})));
-  section("extra-after", "Unverified leads (not part of the report)", list);
+  const list = el("ul", {className: "plain"});
+  for (const l of leads) list.append(el("li", {}, el("span", {textContent: l.text + " "}), el("span", {className: "faint", textContent: `(rejected: ${l.reason})`})));
+  section("extra-after", "Unverified leads (not part of the report)", "Kept for the record; none reached the report.", el("div", {className: "panel"}, el("div", {className: "panel-pad"}, list)));
 }
 
-function evidenceDetails(ids) {
-  const cell = el("div");
-  for (const id of ids) {
-    const ev = D.evidence[id];
-    if (!ev) continue;
-    cell.append(el("details", {},
-      el("summary", {textContent: `${ev.source}: ${ev.request}`}),
-      el("div", {className: "muted", textContent: `collected ${ev.collected_at} · id ${id}`}),
-      el("pre", {textContent: ev.payload.slice(0, 20000)})));
-  }
-  return cell;
-}
+const SEV_RANK = {high: 0, medium: 1, low: 2, info: 3};
+function sevBadge(sev) { return el("span", {className: "sev-badge sev-" + sev}, el("span", {className: "bar"}), sev); }
 
 function renderRisks() {
-  const risks = D.risks || [];
-  const host = el("div");
+  const risks = (D.risks || []).slice().sort((a, b) => (SEV_RANK[a.severity] - SEV_RANK[b.severity]) || a.rule_id.localeCompare(b.rule_id));
   const counts = {high: 0, medium: 0, low: 0, info: 0};
   for (const r of risks) counts[r.severity] = (counts[r.severity] || 0) + 1;
-  host.append(el("p", {className: "muted", textContent: risks.length
-    ? `${risks.length} risk(s): ${counts.high} high, ${counts.medium} medium, ${counts.low} low, ${counts.info} info. Each one cites the evidence it rests on; the analyst category marks oddities a reviewer could miss.`
+  const host = document.getElementById("risks");
+  host.append(el("div", {className: "sec-head"}, el("h2", {textContent: "Risks"})));
+  host.append(el("p", {className: "lede", textContent: risks.length
+    ? `${risks.length} risk(s): ${counts.high} high, ${counts.medium} medium, ${counts.low} low, ${counts.info} info. Each cites the evidence it rests on; the analyst category marks oddities a reviewer could miss. Grouped by severity, highest first.`
     : "No risks were derived from the evidence this scan collected. That is not a clean bill of health: a source that failed or a lookup that did not run produces no finding."}));
-  if (risks.length) {
-    const filter = el("select", {}, el("option", {value: "", textContent: "all categories"}), el("option", {value: "risk", textContent: "risk"}), el("option", {value: "analyst", textContent: "analyst"}));
-    const body = el("tbody");
-    const draw = () => {
-      body.replaceChildren();
-      for (const r of risks) {
-        if (filter.value && r.category !== filter.value) continue;
-        const what = el("td", {}, el("b", {textContent: r.title}), el("span", {className: "tag", textContent: r.rule_id}));
-        if (r.category === "analyst") what.append(el("span", {className: "tag", textContent: "analyst"}));
-        what.append(el("div", {textContent: r.explanation}), el("div", {className: "muted remedy", textContent: "Remediation: " + r.remediation}));
-        what.append(el("div", {className: "muted", textContent: "Entities: " + r.entity_ids.join(", ")}));
-        body.append(el("tr", {},
-          el("td", {className: "sev"}, el("span", {className: `badge sev-${r.severity}`, textContent: r.severity}), el("div", {className: "muted", textContent: `confidence ${r.confidence}`})),
-          what,
-          el("td", {}, evidenceDetails(r.evidence_ids))));
-      }
-    };
-    filter.addEventListener("input", draw);
-    host.append(filter, el("table", {}, el("thead", {}, el("tr", {}, ...["Severity", "Risk", "Evidence"].map(t => el("th", {textContent: t})))), body));
-    draw();
-  }
-  section("risks", "Risks", host);
+  if (!risks.length) return;
+  const panel = el("div", {className: "panel"});
+  const filter = el("select", {}, el("option", {value: "", textContent: "all categories"}), el("option", {value: "risk", textContent: "risk"}), el("option", {value: "analyst", textContent: "analyst"}));
+  const body = el("tbody");
+  const draw = () => {
+    body.replaceChildren();
+    for (const r of risks) {
+      if (filter.value && r.category !== filter.value) continue;
+      const what = el("td", {}, el("b", {textContent: r.title}), el("span", {textContent: " "}), chip("tag", r.rule_id));
+      if (r.category === "analyst") what.append(el("span", {textContent: " "}), chip("band-probable", "analyst"));
+      what.append(el("div", {textContent: r.explanation}),
+        el("div", {className: "muted", textContent: "Remediation: " + r.remediation}),
+        el("div", {className: "faint mono", textContent: r.entity_ids.join(", ")}));
+      const tr = el("tr", {},
+        el("td", {}, sevBadge(r.severity), el("div", {className: "faint num", textContent: "confidence " + r.confidence})),
+        what,
+        el("td", {}, receiptStack(r.evidence_ids)));
+      rowOpensEvidence(tr, r.title, r.rule_id + " · " + r.severity, r.evidence_ids, r.explanation);
+      body.append(tr);
+    }
+  };
+  filter.addEventListener("input", draw);
+  draw();
+  panel.append(el("div", {className: "controls"}, el("label", {className: "ctl"}, "Category", filter), el("span", {className: "count-hint grow", textContent: "Click a row for its evidence"})),
+    el("div", {className: "tablewrap"}, el("table", {}, el("thead", {}, el("tr", {}, ...["Severity", "Risk & remediation", "Receipts"].map(t => el("th", {textContent: t})))), body)));
+  host.append(panel);
+}
+
+function receiptStack(ids) {
+  const wrap = el("div", {className: "receipt"});
+  const shown = ids.slice(0, 3);
+  for (const id of shown) wrap.append(receiptMark(id, false));
+  if (ids.length > shown.length) wrap.append(el("span", {className: "faint num", textContent: "+" + (ids.length - shown.length)}));
+  if (!ids.length) wrap.append(receiptMark("", true), el("span", {className: "faint", textContent: "no record"}));
+  return wrap;
 }
 
 function renderDependencies() {
-  const deps = D.dependencies || [];
+  const deps = (D.dependencies || []).slice().sort((a, b) => (b.hostnames.length - a.hostnames.length));
   if (!deps.length) return;
-  const table = el("table", {}, el("thead", {}, el("tr", {}, ...["Role", "Provider", "Seen through", "Names", "Evidence"].map(t => el("th", {textContent: t})))));
   const body = el("tbody");
   for (const d of deps) {
-    const names = el("details", {}, el("summary", {textContent: `${d.hostnames.length} name(s)`}), el("div", {className: "muted", textContent: d.hostnames.join(", ")}));
-    const provider = el("td", {textContent: d.provider});
-    if (!d.verified) provider.append(el("span", {className: "tag", textContent: "pattern not yet verified"}));
-    body.append(el("tr", {}, el("td", {textContent: d.category}), provider, el("td", {textContent: d.via.join(", ")}), el("td", {}, names), el("td", {}, evidenceDetails(d.evidence_ids))));
+    const names = el("details", {className: "ev"},
+      el("summary", {}, el("span", {className: "src", textContent: d.hostnames.length + " name(s)"})),
+      el("div", {className: "ev-body"}, el("div", {className: "mono muted", textContent: d.hostnames.join(", ")})));
+    const provider = el("td", {}, el("b", {textContent: d.provider}));
+    if (!d.verified) provider.append(el("span", {textContent: " "}), chip("stale", "pattern not verified"));
+    const tr = el("tr", {},
+      el("td", {}, chip("tag", d.category)),
+      provider,
+      el("td", {className: "mono muted", textContent: d.targets.join(", ")}),
+      el("td", {}, names),
+      el("td", {}, receiptStack(d.evidence_ids)));
+    rowOpensEvidence(tr, d.provider, d.category + " · via " + d.via.join(", "), d.evidence_ids, null);
+    body.append(tr);
   }
-  table.append(body);
-  section("risks", "Provider dependencies", el("div", {}, el("p", {className: "muted", textContent: "Which third parties stand behind the in-scope names, recognised from the knowledge packs."}), table));
+  const panel = el("div", {className: "panel"},
+    el("div", {className: "panel-pad"}, el("p", {className: "lede", textContent: "Which third parties stand behind the in-scope names, recognised from the knowledge packs."})),
+    el("div", {className: "tablewrap"}, el("table", {}, el("thead", {}, el("tr", {}, ...["Role", "Provider", "Network / targets", "Names", "Receipts"].map(t => el("th", {textContent: t})))), body)));
+  document.getElementById("risks").append(el("div", {className: "sec-head"}, el("h3", {textContent: "Provider dependencies"})), panel);
 }
 
-const NAME_STATE = {};
-for (const row of D.names || []) NAME_STATE[row.name] = row.state;
-const STATE_LABEL = {live: "live", stale: "stale (NXDOMAIN)", wildcard: "wildcard-covered", unresolved: "unresolved"};
-const TIER_LABEL = {verified: "Verified", other: "Addresses and registrations", claimed: "Claimed", stale: "Stale", wildcard: "Wildcard-covered"};
+const STATE_LABEL = {live: "live", stale: "NXDOMAIN", wildcard: "wildcard-covered", unresolved: "no address"};
+const TIER_LABEL = {verified: "Verified", other: "Addresses & registrations", claimed: "Claimed", stale: "Stale", wildcard: "Wildcard-covered"};
 const TIER_NOTE = {
   verified: "DNS resolves them, or a certificate or a scan dated inside the last 90 days names them and DNS does not contradict it.",
-  other: "Relations that are about an address, a network or a registration rather than about one name.",
+  other: "Relations about an address, a network or a registration rather than about one name.",
   claimed: "Only a list (an aggregator, an archive) names them, and DNS gives no sign of them. Kept as claims, with the reason.",
   stale: "Evidenced once (a certificate or a scan), but DNS no longer agrees or the record is older than 90 days.",
   wildcard: "Only the zone's wildcard record answers for them, so DNS does not prove they exist.",
 };
 const nameTier = (r) => r.tier || (r.state === "live" ? "verified" : r.state === "wildcard" ? "wildcard" : "claimed");
+const NAME_STATE = {};
+for (const row of D.names || []) NAME_STATE[row.name] = row.state;
 
-// Verified groups are shown; every other group is a counted disclosure whose table is built when it is first opened.
 function tierGroups(items, tierOf, order, noun, makeTable) {
   const host = el("div");
   for (const tier of order) {
     const rows = items.filter(item => tierOf(item) === tier);
     if (!rows.length) continue;
-    const note = el("p", {className: "muted tier-note", textContent: TIER_NOTE[tier] || ""});
+    const note = el("p", {className: "tier-note", textContent: TIER_NOTE[tier] || ""});
     if (tier === "verified" || tier === "other") {
       host.append(el("h3", {textContent: `${TIER_LABEL[tier]} (${rows.length} ${noun})`}), note, makeTable(rows));
     } else {
       const group = el("details", {className: "tier-group"}, el("summary", {textContent: `${TIER_LABEL[tier]}: ${rows.length} ${noun} (click to expand)`}), note);
       let built = false;
-      group.addEventListener("toggle", () => {
-        if (group.open && !built) { built = true; group.append(makeTable(rows)); }
-      });
+      group.addEventListener("toggle", () => { if (group.open && !built) { built = true; group.append(makeTable(rows)); } });
       host.append(group);
     }
   }
   return host;
 }
 
+/* The verified names are the main table: searchable, sortable, filterable, each row opening its evidence.
+   Claimed / stale / wildcard stay as counted disclosures so the long tail never floods the table. */
 function renderNames() {
   const rows = D.names || [];
   if (!rows.length) return;
-  const host = el("div");
   const c = D.summary.names || {};
-  host.append(el("p", {className: "muted", textContent:
-    `${rows.length} in-scope name(s) (the apex included). By tier: ${D.summary.headline || ""}. By DNS state: ${c.live || 0} live, ${c.stale || 0} stale (the address lookup returned NXDOMAIN), ${c.wildcard || 0} wildcard-covered, ${c.unresolved || 0} unresolved (no address recorded). A certificate or archive naming a host does not make it live.`}));
-  const table = (items) => {
+  const host = document.getElementById("names");
+  host.append(el("div", {className: "sec-head"}, el("h2", {textContent: "Name states"})));
+  host.append(el("p", {className: "lede", textContent:
+    `${rows.length} in-scope name(s). By tier: ${D.summary.headline || ""}. By DNS state: ${c.live || 0} live, ${c.stale || 0} NXDOMAIN, ${c.wildcard || 0} wildcard-covered, ${c.unresolved || 0} with no address. A certificate or archive naming a host does not make it live — the tier says what the evidence supports.`}));
+
+  const verified = rows.filter(r => nameTier(r) === "verified");
+  const makeTable = (items, searchable) => {
+    const search = el("input", {type: "search", placeholder: "filter names…", "aria-label": "Filter names"});
+    const state = {sort: "name", dir: 1, q: ""};
     const body = el("tbody");
-    for (const r of items) {
-      body.append(el("tr", {},
-        el("td", {textContent: r.name}),
-        el("td", {className: nameTier(r) === "verified" ? "" : "bad", textContent: (TIER_LABEL[nameTier(r)] || nameTier(r)) + (r.basis ? ` (${r.basis})` : "")}),
-        el("td", {textContent: STATE_LABEL[r.state] || r.state}),
-        el("td", {textContent: r.tier_reason || r.reason}),
-        el("td", {textContent: r.named_by.join(", ")}),
-        el("td", {}, evidenceDetails(r.evidence_ids))));
+    const compare = (a, b) => {
+      let x, y;
+      if (state.sort === "state") { x = a.state; y = b.state; } else { x = a.name; y = b.name; }
+      return (x < y ? -1 : x > y ? 1 : 0) * state.dir;
+    };
+    const draw = () => {
+      body.replaceChildren();
+      const q = state.q.toLowerCase();
+      let shown = 0;
+      for (const r of items.slice().sort(compare)) {
+        if (q && !r.name.includes(q) && !(r.named_by || []).some(s => s.includes(q))) continue;
+        shown++;
+        const addrs = r.addresses || [];
+        const resolves = addrs.length ? el("td", {className: "mono muted"}, addrs[0] + (addrs.length > 1 ? "  +" + (addrs.length - 1) : "")) : el("td", {className: "faint", textContent: "—"});
+        const tr = el("tr", {},
+          el("td", {className: "cell-name"}, r.name),
+          el("td", {}, chip(nameTier(r), TIER_LABEL[nameTier(r)])),
+          el("td", {}, chip("state", STATE_LABEL[r.state] || r.state)),
+          resolves,
+          el("td", {className: "faint mono names-by", textContent: (r.named_by || []).join(", ")}),
+          el("td", {}, receiptStack(r.evidence_ids)));
+        rowOpensEvidence(tr, r.name, (TIER_LABEL[nameTier(r)]) + " · " + (r.tier_reason || r.reason), r.evidence_ids, null);
+        body.append(tr);
+      }
+      if (!shown) body.append(el("tr", {}, el("td", {colSpan: 6, className: "empty", textContent: "No name matches the filter."})));
+    };
+    const th = (key, label) => {
+      const h = el("th", {className: "sortable", textContent: label + " "}, el("span", {className: "arrow", textContent: "↕"}));
+      h.addEventListener("click", () => { state.dir = state.sort === key ? -state.dir : 1; state.sort = key; draw(); });
+      return h;
+    };
+    const headRow = el("tr", {}, th("name", "Name"), el("th", {textContent: "Tier"}), th("state", "DNS state"), el("th", {textContent: "Resolves to"}), el("th", {className: "names-by", textContent: "Named by"}), el("th", {textContent: "Receipts"}));
+    const table = el("div", {className: "tablewrap"}, el("table", {}, el("thead", {}, headRow), body));
+    draw();
+    if (searchable) {
+      search.addEventListener("input", () => { state.q = search.value; draw(); });
+      return el("div", {}, el("div", {className: "controls"}, el("label", {className: "ctl grow"}, "Search", search), el("span", {className: "count-hint", textContent: "Click a row for its evidence · sort by header"})), table);
     }
-    return el("table", {}, el("thead", {}, el("tr", {}, ...["Name", "Tier", "DNS state", "Why", "Named by", "Evidence"].map(t => el("th", {textContent: t})))), body);
+    return table;
   };
-  host.append(tierGroups(rows, nameTier, ["verified", "claimed", "stale", "wildcard"], "name(s)", table));
-  section("risks", "Name states (what the evidence says about each in-scope name)", host);
+
+  const panel = el("div", {className: "panel"});
+  const groups = el("div", {className: "panel-pad"});
+  // verified first, as a searchable main table
+  if (verified.length) {
+    groups.append(el("h3", {textContent: `Verified names (${verified.length})`}), el("p", {className: "tier-note", textContent: TIER_NOTE.verified}), makeTable(verified, true));
+  }
+  // the rest as counted disclosures (one toggle group per non-empty tier)
+  const rest = tierGroups(rows.filter(r => nameTier(r) !== "verified"), nameTier, ["claimed", "stale", "wildcard"], "name(s)", (items) => makeTable(items, false));
+  groups.append(rest);
+  panel.append(groups);
+  host.append(panel);
 }
 
 function renderExposure() {
   const rows = D.exposure || [];
   if (!rows.length) return;
-  const table = el("table", {}, el("thead", {}, el("tr", {}, ...["Address", "Open ports (Shodan)", "Products", "CVEs listed", "Network", "Abuse contact", "Evidence"].map(t => el("th", {textContent: t})))));
   const body = el("tbody");
   for (const r of rows) {
-    body.append(el("tr", {},
-      el("td", {textContent: `${r.ip} (${r.state})`}),
-      el("td", {textContent: r.ports.join(", ")}),
-      el("td", {textContent: r.cpes.join(", ")}),
-      el("td", {textContent: r.vulns.join(", ")}),
-      el("td", {textContent: [r.netname, r.country, r.description].filter(Boolean).join(" · ")}),
-      el("td", {textContent: r.abuse_contacts.join(", ")}),
-      el("td", {}, evidenceDetails(r.evidence_ids))));
+    const ip = el("td", {className: "mono"}, r.ip, el("span", {textContent: " "}), chip("state", r.state));
+    if (r.inherited_from) ip.append(el("div", {className: "faint", textContent: "network of " + r.inherited_from}));
+    const tr = el("tr", {},
+      ip,
+      el("td", {className: "num", textContent: r.ports.join(", ")}),
+      el("td", {className: "muted", textContent: r.cpes.join(", ")}),
+      el("td", {className: "num" + (r.vulns.length ? " sev-medium" : ""), textContent: r.vulns.join(", ")}),
+      el("td", {className: "muted", textContent: [r.netname, r.country, r.description].filter(Boolean).join(" · ")}),
+      el("td", {className: "mono muted", textContent: r.abuse_contacts.join(", ")}),
+      el("td", {}, receiptStack(r.evidence_ids)));
+    rowOpensEvidence(tr, r.ip, "address exposure", r.evidence_ids, null);
+    body.append(tr);
   }
-  table.append(body);
-  section("risks", "Exposure of the addresses (Shodan InternetDB and RIPEstat)", el("div", {}, el("p", {className: "muted", textContent: "What Shodan saw open on the addresses the in-scope names resolve to, an earlier scan by Shodan and not a check made now; CVE ids are Shodan's guesses from product versions. Abuse contact and network name are from RIPEstat. Non-commercial data: see the README."}), table));
+  const panel = el("div", {className: "panel"},
+    el("div", {className: "panel-pad"}, el("p", {className: "lede", textContent: "What Shodan saw open on the addresses the in-scope names resolve to — an earlier scan by Shodan, not a check made now; CVE ids are Shodan's guesses from product versions. Abuse contact and network name are from RIPEstat. Non-commercial data: see the README."})),
+    el("div", {className: "tablewrap"}, el("table", {}, el("thead", {}, el("tr", {}, ...["Address", "Ports", "Products", "CVEs", "Network", "Abuse contact", "Receipts"].map(t => el("th", {textContent: t})))), body)));
+  document.getElementById("risks").append(el("div", {className: "sec-head"}, el("h3", {textContent: "Address exposure (Shodan InternetDB, RIPEstat)"})), panel);
 }
 
 function renderBrand() {
   const brand = D.brand;
   if (!brand) return;
-  const host = el("div", {}, el("p", {className: "muted", textContent: "Run with --brand. The platform accounts the organisation links from its own home page (robots.txt honoured), and whether they and look-alikes of the brand name exist, read only from the HTTP status of the public profile page. Unverifiable means the page does not tell, or the platform is never asked (its terms or a login wall); it never means absent. Ownership of a look-alike is unknown."}));
+  const host = el("div", {className: "panel"}, el("div", {className: "panel-pad"},
+    el("p", {className: "lede", textContent: "Run with --brand. The platform accounts the organisation links from its own home page (robots.txt honoured), and whether they and look-alikes of the brand name exist, read only from the HTTP status of the public profile page. Unverifiable means the page does not tell, or the platform is never asked; it never means absent. Ownership of a look-alike is unknown."})));
   for (const site of brand.domains) {
-    host.append(el("h3", {textContent: `${site.domain} (brand name "${site.brand}")`}));
-    const robots = site.robots.map(r => `${r.url}: ${r.status === null ? "no answer" : "HTTP " + r.status}${r.allows_home ? "" : " (does not allow the home page)"}`);
+    host.append(el("h3", {textContent: `${site.domain} — brand "${site.brand}"`}));
+    const robots = site.robots.map(r => `${r.url}: ${r.status === null ? "no answer" : "HTTP " + r.status}${r.allows_home ? "" : " (home page not allowed)"}`);
     const pages = site.pages.map(p => `${p.url}: ${p.status === null ? "not fetched" : "HTTP " + p.status}, ${p.links} platform link(s)`);
-    host.append(el("p", {textContent: [...robots, ...pages].join(" · ") || "nothing fetched"}));
-    const table = el("table", {}, el("thead", {}, el("tr", {}, ...["Platform", "Handle", "Why asked", "Answer", "Reason", "Evidence"].map(t => el("th", {textContent: t})))));
+    host.append(el("p", {className: "muted", textContent: [...robots, ...pages].join(" · ") || "nothing fetched"}));
     const body = el("tbody");
-    const rows = [
+    const items = [
       ...site.official.map(o => ({...o, kind: "official", how: "linked from the site", ids: o.evidence_ids})),
       ...site.checks.filter(c => c.kind !== "official").map(c => ({...c, ids: [c.evidence_id]})),
     ];
-    for (const r of rows) {
-      body.append(el("tr", {},
+    for (const r of items) {
+      const tr = el("tr", {},
         el("td", {textContent: r.platform}),
-        el("td", {textContent: r.handle}),
-        el("td", {textContent: `${r.kind}: ${r.how}`}),
-        el("td", {textContent: r.state}),
-        el("td", {textContent: r.reason}),
-        el("td", {}, evidenceDetails(r.ids))));
+        el("td", {className: "mono", textContent: r.handle}),
+        el("td", {className: "muted", textContent: `${r.kind}: ${r.how}`}),
+        el("td", {}, chip(r.state === "exists" ? "verified" : r.state === "absent" ? "stale" : "state", r.state)),
+        el("td", {className: "muted", textContent: r.reason}),
+        el("td", {}, receiptStack(r.ids)));
+      rowOpensEvidence(tr, r.platform + " " + r.handle, r.state, r.ids, null);
+      body.append(tr);
     }
-    table.append(body);
-    host.append(rows.length ? table : el("p", {className: "muted", textContent: "The home page links to no known platform account, so no platform was asked about."}));
+    host.append(items.length
+      ? el("div", {className: "tablewrap"}, el("table", {}, el("thead", {}, el("tr", {}, ...["Platform", "Handle", "Why asked", "Answer", "Reason", "Receipts"].map(t => el("th", {textContent: t})))), body))
+      : el("p", {className: "muted", textContent: "The home page links to no known platform account, so no platform was asked about."}));
   }
-  section("risks", "Brand presence", host);
+  document.getElementById("risks").append(el("div", {className: "sec-head"}, el("h3", {textContent: "Brand presence"})), host);
 }
 
 function renderOrgExposure() {
@@ -380,56 +818,49 @@ function renderOrgExposure() {
   const e = D.engagement || {};
   const by = e.authorised_by || {};
   const a = org.addresses;
-  const host = el("div", {},
-    el("p", {className: "muted", textContent: `Authorised assessment (scrutator exposure): ${e.organisation || "?"} · domains ${(e.domains || []).join(", ")} · authorised by ${by.name || "?"} (${by.role || "?"}) · ${e.start} to ${e.end} · engagement file sha256 ${e.sha256}. Aggregate only: person-like addresses are counted by shape and never shown here.`}),
-    el("p", {textContent: `${a.distinct} work address(es) found: ${a.role} role mailbox(es), ${a.person_like} person-like; ${a.outside_engagement_dropped} outside the engagement dropped.`}));
-  if (org.naming_patterns.length) {
-    host.append(el("p", {textContent: "Naming patterns of person-like addresses: " + org.naming_patterns.map(p => `${p.shape} ${p.count} (${Math.round(p.share * 100)}%)`).join(", ")}));
-  }
-  const list = el("ul");
-  for (const item of org.inferences) list.append(el("li", {}, el("span", {textContent: item.text}), evidenceDetails(item.evidence_ids)));
-  host.append(list);
+  const host = el("div", {className: "panel"}, el("div", {className: "panel-pad"},
+    el("p", {className: "lede", textContent: `Authorised assessment (scrutator exposure): ${e.organisation || "?"} · domains ${(e.domains || []).join(", ")} · authorised by ${by.name || "?"} (${by.role || "?"}) · ${e.start} to ${e.end} · engagement file sha256 ${e.sha256}. Aggregate only: person-like addresses are counted by shape, never shown.`}),
+    el("p", {textContent: `${a.distinct} work address(es) found: ${a.role} role mailbox(es), ${a.person_like} person-like; ${a.outside_engagement_dropped} outside the engagement dropped.`})));
+  const pad = host.firstChild;
+  if (org.naming_patterns.length) pad.append(el("p", {textContent: "Naming patterns of person-like addresses: " + org.naming_patterns.map(p => `${p.shape} ${p.count} (${Math.round(p.share * 100)}%)`).join(", ")}));
+  const list = el("ul", {className: "plain"});
+  for (const item of org.inferences) list.append(el("li", {}, el("span", {textContent: item.text}), evidenceDetails(item.evidence_ids, null)));
+  pad.append(list);
   if (org.role_mailboxes.length) {
-    const table = el("table", {}, el("thead", {}, el("tr", {}, ...["Role mailbox", "Function", "Evidence"].map(t => el("th", {textContent: t})))));
     const body = el("tbody");
-    for (const r of org.role_mailboxes) body.append(el("tr", {}, el("td", {textContent: r.address}), el("td", {textContent: r.function}), el("td", {}, evidenceDetails(r.evidence_ids))));
-    table.append(body);
-    host.append(table);
+    for (const r of org.role_mailboxes) body.append(el("tr", {}, el("td", {className: "mono", textContent: r.address}), el("td", {textContent: r.function}), el("td", {}, receiptStack(r.evidence_ids))));
+    host.append(el("div", {className: "tablewrap"}, el("table", {}, el("thead", {}, el("tr", {}, ...["Role mailbox", "Function", "Receipts"].map(t => el("th", {textContent: t})))), body)));
   }
-  section("risks", "Organisation exposure (authorised, aggregate)", host);
+  document.getElementById("risks").append(el("div", {className: "sec-head"}, el("h3", {textContent: "Organisation exposure (authorised, aggregate)"})), host);
 }
 
 function renderFindings() {
   const host = document.getElementById("findings");
+  const lede = document.getElementById("findings-lede");
   const by = D.summary.findings_by_tier;
-  if (by) {
-    host.append(el("p", {className: "muted", textContent:
-      `${D.summary.findings} finding(s), one per relation: ${by.verified} about verified names, ${by.other} about addresses and registrations, ${by.claimed} about claimed names, ${by.stale} about stale names, ${by.wildcard} about wildcard-covered names. All are kept; the last three groups open on demand.`}));
-  }
+  if (by) lede.textContent = `${D.summary.findings} finding(s), one per relation: ${by.verified} about verified names, ${by.other} about addresses and registrations, ${by.claimed} about claimed names, ${by.stale} about stale names, ${by.wildcard} about wildcard-covered names. All kept; the last groups open on demand.`;
+  const panel = el("div", {className: "panel"});
+  const pad = el("div", {className: "panel-pad"});
   const table = (items) => {
-    const t = el("table", {}, el("tr", {}, el("th", {textContent: "Claim"}), el("th", {textContent: "Confidence"}), el("th", {textContent: "Evidence"})));
+    const body = el("tbody");
     for (const f of items) {
-      const evidenceCell = el("td");
-      for (const id of f.evidence_ids) {
-        const ev = D.evidence[id];
-        evidenceCell.append(el("details", {},
-          el("summary", {textContent: `${ev.source}: ${ev.request}`}),
-          el("div", {className: "muted", textContent: `collected ${ev.collected_at} · id ${id}`}),
-          el("pre", {textContent: ev.payload.slice(0, 20000)})));
-      }
-      const claim = el("td", {textContent: f.claim});
+      const claim = el("td", {}, el("span", {className: "cell-name", textContent: f.claim}));
       for (const id of f.entity_ids) {
         const state = NAME_STATE[id.replace(/^domain:/, "")];
-        if (state && state !== "live") claim.append(el("span", {className: "tag bad", textContent: STATE_LABEL[state]}));
+        if (state && state !== "live") claim.append(el("span", {textContent: " "}), chip("stale", STATE_LABEL[state]));
       }
-      t.append(el("tr", {},
+      const tr = el("tr", {},
         claim,
-        el("td", {}, el("span", {className: `badge ${f.confidence}`, textContent: f.confidence})),
-        evidenceCell));
+        el("td", {}, chip(f.confidence === "high" ? "verified" : f.confidence === "medium" ? "band-probable" : "tag", f.confidence)),
+        el("td", {}, receiptStack(f.evidence_ids)));
+      rowOpensEvidence(tr, f.claim, "finding · " + f.confidence, f.evidence_ids, f.claim);
+      body.append(tr);
     }
-    return t;
+    return el("div", {className: "tablewrap"}, el("table", {}, el("thead", {}, el("tr", {}, ...["Claim", "Confidence", "Receipts"].map(t => el("th", {textContent: t})))), body));
   };
-  host.append(tierGroups(D.findings, f => f.tier || "verified", ["verified", "other", "claimed", "stale", "wildcard"], "finding(s)", table));
+  pad.append(tierGroups(D.findings, f => f.tier || "verified", ["verified", "other", "claimed", "stale", "wildcard"], "finding(s)", table));
+  panel.append(pad);
+  host.append(panel);
 }
 
 function renderEntities() {
@@ -438,47 +869,72 @@ function renderEntities() {
   for (const t of Object.keys(D.summary.by_type)) typeSelect.append(el("option", {value: t, textContent: t}));
   const scopeSelect = el("select", {}, el("option", {value: "", textContent: "all scopes"}));
   for (const s of ["in", "candidate", "linked", "out"]) scopeSelect.append(el("option", {value: s, textContent: s}));
-  const search = el("input", {type: "search", placeholder: "filter"});
+  const search = el("input", {type: "search", placeholder: "filter entities…", "aria-label": "Filter entities"});
   const body = el("tbody");
   const draw = () => {
     body.replaceChildren();
+    let shown = 0;
     for (const e of D.entities) {
       if (typeSelect.value && e.type !== typeSelect.value) continue;
       if (scopeSelect.value && e.state !== scopeSelect.value) continue;
       if (search.value && !e.value.includes(search.value.toLowerCase())) continue;
-      const resolution = e.type === "domain" && NAME_STATE[e.value] ? ` · ${STATE_LABEL[NAME_STATE[e.value]]}` : "";
-      body.append(el("tr", {}, el("td", {textContent: e.value}), el("td", {textContent: e.type}), el("td", {textContent: e.state + resolution})));
+      shown++;
+      const resolution = e.type === "domain" && NAME_STATE[e.value] ? STATE_LABEL[NAME_STATE[e.value]] : "";
+      body.append(el("tr", {},
+        el("td", {className: "cell-name"}, e.value),
+        el("td", {}, chip("tag", e.type)),
+        el("td", {}, chip(e.state === "in" ? "verified" : e.state === "out" ? "stale" : "state", e.state), resolution ? frag(el("span", {textContent: " "}), chip("state", resolution)) : null)));
     }
+    if (!shown) body.append(el("tr", {}, el("td", {colSpan: 3, className: "empty", textContent: "No entity matches the filter."})));
   };
   for (const control of [typeSelect, scopeSelect, search]) control.addEventListener("input", draw);
-  host.append(typeSelect, scopeSelect, search,
-    el("table", {}, el("thead", {}, el("tr", {}, el("th", {textContent: "Value"}), el("th", {textContent: "Type"}), el("th", {textContent: "Scope"}))), body));
   draw();
+  const panel = el("div", {className: "panel"},
+    el("div", {className: "controls"}, el("label", {className: "ctl"}, "Type", typeSelect), el("label", {className: "ctl"}, "Scope", scopeSelect), el("label", {className: "ctl grow"}, "Search", search)),
+    el("div", {className: "tablewrap"}, el("table", {}, el("thead", {}, el("tr", {}, ...["Value", "Type", "Scope & resolution"].map(t => el("th", {textContent: t})))), body)));
+  host.append(panel);
 }
 
+function renderProof() {
+  const host = document.getElementById("proof");
+  const evidenceCount = Object.keys(D.evidence || {}).length;
+  const panel = el("div", {className: "proof"});
+  panel.append(el("div", {className: "seal"}, receiptMark("2f6b43a1c0d9e8f7", false), "Every claim is content-addressed"));
+  panel.append(el("h2", {textContent: "Proof"}));
+  panel.append(el("p", {className: "lede", textContent:
+    `This report holds ${evidenceCount} evidence record(s). Each has an id that is the sha256 of (source, request, payload), so the bar marks beside every claim identify the exact bytes behind it; changing any byte changes the id. The full records are in the signed bundle's evidence.jsonl, chained in audit.jsonl.`}));
+  const ol = el("ol");
+  ol.append(el("li", {}, "Export the bundle during the scan with ", el("code", {textContent: "--bundle"}), " (written to proof.scrutator, signed with a local Ed25519 key)."));
+  ol.append(el("li", {}, "Offline check: ", el("code", {textContent: "scrutator verify proof.scrutator --pin <fingerprint>"}), " confirms the manifest hashes, the audit chain, the signature and the pinned signer."));
+  ol.append(el("li", {}, "Re-check against the live sources: ", el("code", {textContent: "scrutator verify proof.scrutator --replay"}), " re-issues each replayable request and reports every record unchanged, changed or unavailable."));
+  ol.append(el("li", {}, "The signer's fingerprint is printed by the scan and carried in the bundle manifest; obtain it out of band before you pin it."));
+  panel.append(ol);
+  host.append(panel);
+}
+
+const GRAPH_COLORS = {domain: "#3f7bd6", ip: "#2f9e6a", asn: "#c6861f", org: "#8a6ad0"};
 function drawGraph() {
   const svg = document.getElementById("graph");
   const W = 1000, H = 520;
   svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
   const rank = {in: 0, candidate: 1, linked: 2, out: 3};
-  const ents = [...D.entities].sort((a, b) => rank[a.state] - rank[b.state]).slice(0, 300);
+  // Collapse by default to what the scan investigated: in-scope, candidates and linked addresses. Out-of-scope
+  // entities (every third party a name touches) are the bulk of a large scan and turn the graph into a hairball;
+  // they stay in the Entities table. The cap keeps the layout legible past 500 investigated entities.
+  const investigated = D.entities.filter(e => e.state !== "out");
+  const pool = investigated.length ? investigated : D.entities;
+  const ents = [...pool].sort((a, b) => rank[a.state] - rank[b.state]).slice(0, 220);
   const index = new Map(ents.map((e, i) => [e.id, i]));
-  const nodes = ents.map((e, i) => ({
-    e,
-    x: W / 2 + Math.cos(i) * 200 * (1 + i / ents.length),
-    y: H / 2 + Math.sin(i) * 150 * (1 + i / ents.length),
-    vx: 0, vy: 0,
-  }));
+  const nodes = ents.map((e, i) => ({e, x: W / 2 + Math.cos(i) * 200 * (1 + i / ents.length), y: H / 2 + Math.sin(i) * 150 * (1 + i / ents.length), vx: 0, vy: 0}));
   const links = D.edges.filter(l => index.has(l.src) && index.has(l.dst)).map(l => [index.get(l.src), index.get(l.dst)]);
   for (let step = 0; step < 250; step++) {
-    for (let i = 0; i < nodes.length; i++) {
-      for (let j = i + 1; j < nodes.length; j++) {
-        const a = nodes[i], b = nodes[j];
-        let dx = a.x - b.x, dy = a.y - b.y;
-        const d2 = Math.max(dx * dx + dy * dy, 25), d = Math.sqrt(d2), f = 900 / d2;
-        dx /= d; dy /= d;
-        a.vx += dx * f; a.vy += dy * f; b.vx -= dx * f; b.vy -= dy * f;
-      }
+    for (let i = 0; i < nodes.length; i++) for (let j = i + 1; j < nodes.length; j++) {
+      const a = nodes[i], b = nodes[j];
+      let dx = a.x - b.x, dy = a.y - b.y;
+      const d2 = Math.max(dx * dx + dy * dy, 25), d = Math.sqrt(d2), f = 900 / d2;
+      dx /= d; dy /= d;
+      a.vx += dx * f; a.vy += dy * f; b.vx -= dx * f; b.vy -= dy * f;
     }
     for (const [i, j] of links) {
       const a = nodes[i], b = nodes[j];
@@ -487,31 +943,48 @@ function drawGraph() {
     }
     for (const n of nodes) {
       n.vx += (W / 2 - n.x) * 0.002; n.vy += (H / 2 - n.y) * 0.002;
-      n.x = Math.min(W - 10, Math.max(10, n.x + n.vx));
-      n.y = Math.min(H - 10, Math.max(10, n.y + n.vy));
+      n.x = Math.min(W - 10, Math.max(10, n.x + n.vx)); n.y = Math.min(H - 10, Math.max(10, n.y + n.vy));
       n.vx *= 0.6; n.vy *= 0.6;
     }
   }
-  const NS = "http://www.w3.org/2000/svg";
-  const mk = (tag, attrs) => {
-    const node = document.createElementNS(NS, tag);
-    for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
-    return node;
-  };
-  for (const [i, j] of links) {
-    svg.append(mk("line", {x1: nodes[i].x, y1: nodes[i].y, x2: nodes[j].x, y2: nodes[j].y, stroke: "currentColor", "stroke-opacity": 0.25}));
-  }
-  const colors = {domain: "#2b5fd9", ip: "#047857", asn: "#b45309", org: "#7c3aed"};
+  const mk = (tag, attrs) => { const node = document.createElementNS(NS, tag); for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v); return node; };
+  for (const [i, j] of links) svg.append(mk("line", {x1: nodes[i].x, y1: nodes[i].y, x2: nodes[j].x, y2: nodes[j].y, stroke: "currentColor", "stroke-opacity": 0.14, "stroke-width": 1}));
   for (const n of nodes) {
-    const circle = mk("circle", {
-      cx: n.x, cy: n.y, r: n.e.state === "in" ? 6 : 4,
-      fill: colors[n.e.type] || "#888", "fill-opacity": n.e.state === "out" ? 0.35 : 1,
-    });
-    const title = mk("title", {});
-    title.textContent = `${n.e.type}: ${n.e.value} (${n.e.state})`;
-    circle.append(title);
-    svg.append(circle);
+    const circle = mk("circle", {cx: n.x, cy: n.y, r: n.e.state === "in" ? 6 : 4, fill: GRAPH_COLORS[n.e.type] || "#888", "fill-opacity": n.e.state === "out" ? 0.4 : 0.95, stroke: "var(--paper)", "stroke-width": 1});
+    const title = mk("title", {}); title.textContent = `${n.e.type}: ${n.e.value} (${n.e.state})`;
+    circle.append(title); svg.append(circle);
   }
+  const legend = document.getElementById("graph-legend");
+  for (const [type, color] of Object.entries(GRAPH_COLORS)) legend.append(el("span", {}, el("i", {style: "background:" + color}), type));
+  const hidden = D.entities.length - ents.length;
+  legend.append(el("span", {className: "faint", textContent: hidden > 0 ? `${ents.length} investigated entities shown · ${hidden} out-of-scope or capped, in the Entities table` : `${ents.length} entities`}));
+}
+
+/* ---- theme + keyboard ---- */
+function setupChrome() {
+  // Everything here is enhancement: a report rendered by a bare DOM (no documentElement, no localStorage, no
+  // document-level events — as the test harness does) must render fully without it, so each step is guarded.
+  const root = document.documentElement;
+  const btn = document.getElementById("theme");
+  const label = document.getElementById("theme-label");
+  if (root && root.setAttribute && root.getAttribute && btn && btn.addEventListener) {
+    const read = () => { try { return localStorage.getItem("scrutator-theme"); } catch (_) { return null; } };
+    const stored = read();
+    if (stored) root.setAttribute("data-theme", stored);
+    const reflect = () => { const t = root.getAttribute("data-theme"); if (label) label.textContent = t === "dark" ? "Dark" : t === "light" ? "Light" : "Theme"; };
+    reflect();
+    btn.addEventListener("click", () => {
+      const current = root.getAttribute("data-theme");
+      const next = current === "dark" ? "light" : current === "light" ? "dark" : "dark";
+      root.setAttribute("data-theme", next);
+      try { localStorage.setItem("scrutator-theme", next); } catch (_) {}
+      reflect();
+    });
+  }
+  const close = document.getElementById("drawer-close"), scrim = document.getElementById("drawer-scrim");
+  if (close && close.addEventListener) close.addEventListener("click", closeEvidence);
+  if (scrim && scrim.addEventListener) scrim.addEventListener("click", closeEvidence);
+  if (typeof document.addEventListener === "function") document.addEventListener("keydown", (e) => { if (e && e.key === "Escape") closeEvidence(); });
 }
 
 renderNarrative();
@@ -526,8 +999,12 @@ renderAttribution();
 renderAnalystLeads();
 renderFindings();
 renderEntities();
+buildVerdict();
+buildToc();
 drawGraph();
+renderProof();
 renderLeads();
+setupChrome();
 </script>
 </body>
 </html>

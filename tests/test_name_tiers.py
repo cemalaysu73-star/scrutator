@@ -351,10 +351,10 @@ new Function("document", fs.readFileSync(pagePath, "utf8"))(document);
 const find = (node, pred, out = []) => { if (pred(node)) out.push(node); node.children.forEach(c => find(c, pred, out)); return out; };
 const before = document.getElementById("findings").textContent;
 const groups = find(document.getElementById("findings"), n => n.tag === "details" && n.listeners.toggle);
-const names = find(document.getElementById("risks"), n => n.tag === "details" && n.listeners.toggle);
+const names = find(document.getElementById("names"), n => n.tag === "details" && n.listeners.toggle);
 groups.forEach(g => { g.open = true; g.listeners.toggle(); });
 const after = document.getElementById("findings").textContent;
-fs.writeFileSync(outPath, JSON.stringify({before, after, groups: groups.length, nameGroups: names.length, cards: document.getElementById("cards").textContent, headline: document.getElementById("headline").textContent}));
+fs.writeFileSync(outPath, JSON.stringify({before, after, groups: groups.length, nameGroups: names.length, cards: document.getElementById("cards").textContent, names: document.getElementById("names").textContent, headline: document.getElementById("headline").textContent}));
 """
 
 
