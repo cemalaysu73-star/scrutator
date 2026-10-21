@@ -110,6 +110,8 @@ async def test_the_fallback_is_off_in_tests_by_default(make_ctx):
 
 from scrutator import pgwire
 
+LOCAL_FIXTURE = lambda host, port: None  # noqa: E731 - the local fixture server stands in for crt.sh:5432 (egress.check_tcp)
+
 
 async def _serve(handler):
     server = await asyncio.start_server(handler, "127.0.0.1", 0)
@@ -153,7 +155,7 @@ async def test_pgwire_runs_a_simple_query_against_a_trust_server():
     gen = _serve(handler)
     port = await gen.__anext__()
     try:
-        columns, rows = await pgwire.query("127.0.0.1", "SELECT name_value FROM x", port=port, timeout=5)
+        columns, rows = await pgwire.query("127.0.0.1", "SELECT name_value FROM x", port=port, timeout=5, allow=LOCAL_FIXTURE)
         assert columns == ["name_value"] and rows == [["example.com"]]
     finally:
         await gen.aclose()
@@ -177,7 +179,7 @@ async def test_pgwire_refuses_a_server_that_asks_for_a_password():
     port = await gen.__anext__()
     try:
         with pytest.raises(pgwire.PgError, match="password"):
-            await pgwire.query("127.0.0.1", "SELECT 1", port=port, timeout=5)
+            await pgwire.query("127.0.0.1", "SELECT 1", port=port, timeout=5, allow=LOCAL_FIXTURE)
     finally:
         await gen.aclose()
 

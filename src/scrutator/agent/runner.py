@@ -119,8 +119,19 @@ async def run_agent(
     return stats
 
 
-def _by_priority(waiting: list[tuple[int, Candidate]]) -> list[tuple[int, Candidate]]:
-    return sorted(waiting, key=lambda w: (w[1].module.priority, w[1].module.name, w[1].entity.id))
+STEP_RESERVE_DIVISOR = 5
+
+
+def _listed_only(engine: Engine, entity: Entity) -> bool:
+    """A name that only sources listing names (weight 1) have given so far, and that the user did not ask about."""
+    return entity.type is EntityType.DOMAIN and entity.value not in engine.roots and engine.vouch(entity.id) <= 1
+
+
+def _by_priority(waiting: list[tuple[int, Candidate]], engine: Engine | None = None) -> list[tuple[int, Candidate]]:
+    """Cheapest module first; among lookups of one module, the name the sources vouch for most strongly first, so a
+    step budget spent on a long list of names spends it on the names most likely to exist."""
+    vouch = engine.vouch if engine is not None else (lambda _id: 0)
+    return sorted(waiting, key=lambda w: (w[1].module.priority, w[1].module.name, -vouch(w[1].entity.id), w[1].entity.id))
 
 
 async def _run_pipelined(
@@ -163,9 +174,23 @@ async def _run_pipelined(
                     stats.deadline_hit = stopped = True
                 else:
                     room = max(0, max_steps - stats.modules_run)
-                    ordered = _by_priority(waiting)
-                    batch, waiting = ordered[:room], ordered[room:]
-                    if waiting:  # candidates remain and the budget is spent
+                    # a fifth of the step budget is kept for names more than a list vouches for (and for addresses):
+                    # lookups about names only an aggregator or an archive gave stop at the rest and wait
+                    list_room = max(0, max_steps - max_steps // STEP_RESERVE_DIVISOR - stats.modules_run)
+                    batch, held = [], []
+                    for item in _by_priority(waiting, engine):
+                        if len(batch) >= room:
+                            held.append(item)
+                        elif _listed_only(engine, item[1].entity):
+                            if list_room > 0:
+                                list_room -= 1
+                                batch.append(item)
+                            else:
+                                held.append(item)
+                        else:
+                            batch.append(item)
+                    waiting = held
+                    if waiting and len(batch) >= room:  # candidates remain and the budget is spent
                         stats.steps_exhausted = stopped = True
                     for depth, candidate in batch:
                         task = asyncio.ensure_future(engine.run_module(scan_id, candidate.module, candidate.entity))
@@ -174,6 +199,8 @@ async def _run_pipelined(
                         stats.modules_run += 1
                         stats.rounds = max(stats.rounds, depth)
             if not running:
+                if waiting:  # only lookups the reserve held back are left: the budget for them is spent
+                    stats.steps_exhausted = True
                 break
             finished, _ = await asyncio.wait(running, return_when=asyncio.FIRST_COMPLETED)
             for task in finished:

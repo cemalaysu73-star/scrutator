@@ -74,9 +74,21 @@ h3{font-size:16px;margin:22px 0 2px;font-weight:600}
   outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
 
 /* verdict strip */
-.verdict{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:1px;background:var(--line);
+/* Flex, not an auto-fit grid: every row is filled edge to edge, so no empty grey cell is ever left at the end of a
+   row; the cell count (data-n, 3 to 8) picks a row length that leaves no stat alone on the last row. */
+.verdict{display:flex;flex-wrap:wrap;gap:1px;background:var(--line);
   border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;margin:var(--gap) 0 2px;box-shadow:var(--shadow)}
-.vcell{background:var(--surface);padding:13px 16px 12px}
+.vcell{background:var(--surface);padding:13px 16px 12px;flex:1 1 0;min-width:0}
+@media (max-width:960px){
+  .vcell{flex-basis:calc(33.34% - 1px)}
+  .verdict[data-n="4"] .vcell{flex-basis:calc(50% - 1px)}
+  .verdict[data-n="7"] .vcell,.verdict[data-n="8"] .vcell{flex-basis:calc(25% - 1px)}
+}
+@media (max-width:560px){
+  .vcell,.verdict[data-n] .vcell{flex-basis:calc(50% - 1px)}
+  /* an odd count: the first stat (the verified names) takes the whole first row as the headline */
+  .verdict[data-n="3"] .vcell:first-child,.verdict[data-n="5"] .vcell:first-child,.verdict[data-n="7"] .vcell:first-child{flex-basis:100%}
+}
 .vcell .n{font-family:var(--mono);font-variant-numeric:tabular-nums;font-size:clamp(22px,3vw,27px);font-weight:600;line-height:1.05;display:block}
 .vcell .k{font-size:12px;color:var(--ink-2);margin-top:3px;letter-spacing:.01em}
 .vcell.lead{background:var(--proof-wash)} .vcell.lead .n{color:var(--proof-ink)}
@@ -224,7 +236,6 @@ aside.drawer.open{transform:none}
 
 @media (max-width:640px){
   th,td{padding:9px 11px}
-  .verdict{grid-template-columns:repeat(auto-fit,minmax(104px,1fr))}
   h2{margin-top:calc(var(--gap)*1.1)}
 }
 @media print{
@@ -425,6 +436,7 @@ function buildVerdict() {
   if (by.linked) cells.push(["", by.linked, "Linked"]);
   if (D.summary.candidates) cells.push(["", D.summary.candidates, "Candidates"]);
   cells.push(["lead", evidenceCount, "Evidence records"]);
+  host.setAttribute("data-n", String(cells.length));
   for (const [cls, n, k] of cells) {
     host.append(el("div", {className: "vcell " + cls}, el("span", {className: "n", textContent: String(n)}), el("span", {className: "k", textContent: k})));
   }

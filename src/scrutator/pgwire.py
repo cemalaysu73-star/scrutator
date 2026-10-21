@@ -45,8 +45,15 @@ async def _read_message(reader: asyncio.StreamReader) -> tuple[bytes, bytes]:
 
 
 async def query(host: str, sql: str, *, port: int = 5432, user: str = "guest", database: str = "certwatch",
-                timeout: float = 30.0) -> tuple[list[str], list[list[str | None]]]:
-    """Run one read-only query. Returns (column names, rows of text values)."""
+                timeout: float = 30.0, allow=None) -> tuple[list[str], list[list[str | None]]]:
+    """Run one read-only query. Returns (column names, rows of text values).
+
+    The endpoint must pass the egress policy for raw TCP (`scrutator.egress.check_tcp`: crt.sh:5432 only) before any
+    connection is opened. `allow` replaces that check, for the tests' local fixture server only."""
+    from scrutator.egress import check_tcp
+
+    (allow or check_tcp)(host, port)
+
     async def go():
         reader, writer = await asyncio.open_connection(host, port)
         try:

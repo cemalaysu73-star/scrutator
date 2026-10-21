@@ -53,9 +53,21 @@ def coverage(store: Store, scan_id: int) -> dict[str, Any]:
         "deadline_s": limits.get("deadline_s"),
         "deadline_hit": any(r.get("event") == "deadline" for r in log),
         "sources_down": sorted({r["module"] for r in log if r.get("event") == "breaker"}),
-        # present only when the cap was reached: how many names the sources gave that the scan did not record
-        **({"entity_cap": {"cap": capped[0]["cap"], "dropped": sum(int(r["dropped"]) for r in capped)}} if capped else {}),
+        # present only when the cap was reached: how many names the sources gave that the scan did not record, which
+        # sources gave them, and (when sources that only list names were held to a share of the cap) where that share ended
+        **({"entity_cap": _entity_cap(capped)} if capped else {}),
     }
+
+
+def _entity_cap(capped: list[dict]) -> dict:
+    by_source: Counter = Counter()
+    for record in capped:
+        by_source[str(record.get("module"))] += int(record["dropped"])
+    out = {"cap": capped[0]["cap"], "dropped": sum(by_source.values()), "dropped_by_source": dict(sorted(by_source.items()))}
+    limits = [int(r["limit"]) for r in capped if isinstance(r.get("limit"), int) and r["limit"] < r["cap"]]
+    if limits:
+        out["list_sources_limit"] = min(limits)  # sources that only list names stopped here; the rest was kept for DNS
+    return out
 
 
 def _meta_json(store: Store, scan_id: int, key: str) -> Any:

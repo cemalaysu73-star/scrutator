@@ -329,9 +329,13 @@ def scan(
         )
     capped = report["coverage"].get("entity_cap")
     if capped:
+        noisy = ", ".join(f"{name} {count}" for name, count in sorted(capped.get("dropped_by_source", {}).items(), key=lambda kv: -kv[1])[:3])
         _echo(
-            f"Entity cap of {capped['cap']} reached: {capped['dropped']} name(s) the sources gave were not recorded "
-            "and nothing past them was looked up. Raise --max-entities to keep them."
+            f"Entity cap of {capped['cap']} reached: {capped['dropped']} name(s) the sources gave were not recorded"
+            + (f" (most from {noisy})" if noisy else "") + " and nothing past them was looked up."
+            + (f" Sources that only list names were held to {capped['list_sources_limit']}, so the rest of the cap stayed"
+               " free for what DNS and certificates vouch for." if capped.get("list_sources_limit") else "")
+            + " Raise --max-entities to keep them."
         )
     if report["coverage"]["sources_down"]:
         _echo(

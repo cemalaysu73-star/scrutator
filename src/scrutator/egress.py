@@ -55,6 +55,19 @@ SOURCE_HOSTS = frozenset(
 # which refer a query on to another registry.
 REDIRECTORS = frozenset({"rdap.org"})
 
+# The only connections that are not HTTP: (host, port) pairs a module may open a raw TCP connection to. One today: crt.sh's
+# public certificate database (scrutator.pgwire, the crt.sh module's fallback when its web search fails). Host and port
+# are fixed in code, never read from a response or a bundle; `check_tcp` is called by pgwire before it connects, so no
+# caller can reach another endpoint through it. Every connection leaves a trace in the scan: an evidence record
+# `PGSQL crt.sh:5432/...` when it answered, or an `error` record of the crtsh module naming the database when it did not.
+TCP_ENDPOINTS = frozenset({("crt.sh", 5432)})
+
+
+def check_tcp(host: str, port: int) -> None:
+    """Raise EgressDenied unless (host, port) is one of TCP_ENDPOINTS. Nothing is resolved or sent."""
+    if (str(host).lower().rstrip("."), int(port)) not in TCP_ENDPOINTS:
+        raise EgressDenied(f"egress refused: {host}:{port} is not an allowed TCP endpoint", request=httpx.Request("GET", "https://invalid.invalid/"))
+
 Resolve = Callable[[str], Awaitable[list[str]]]
 
 

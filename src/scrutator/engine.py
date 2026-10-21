@@ -20,6 +20,7 @@ DEFAULT_BREAKER_THRESHOLD = 3
 # that read an organisation's pages or people-related records.
 _NOT_MINED = frozenset({"wildcard", "brand"})
 _PROBE_PREFIX = "wc-probe-"
+RESERVE_DIVISOR = 5  # a fifth of the entity cap is kept for names vouched for by more than a list
 
 
 class _Slots:
@@ -85,6 +86,11 @@ class Engine:
         # A hard cap on the entities a scan records. One answer can name tens of thousands of hosts (a certificate
         # log of a large zone); past the cap new names are counted in the audit log (`entity_cap`), not recorded.
         self.max_entities = max_entities
+        # Part of the cap is kept for names that more than a list vouches for (Module.name_weight > 1: DNS, certificates,
+        # scans of the host) and for what their lookups find (addresses, networks): sources that only list names
+        # (aggregators, archives) may fill the cap up to `max_entities - reserve`. One aggregator that answers 20,000 junk
+        # names can then never use up the room the in-scope DNS answers need (R6: example.com, 0% recall).
+        self.reserve = max_entities // RESERVE_DIVISOR if max_entities else 0
         # The longest any one lookup may take, whatever the module allows (`scrutator quick` keeps a slow source from
         # spending its whole budget). A lookup cut by it is a timeout like any other: recorded as an error.
         self.timeout_cap = timeout_cap
@@ -195,6 +201,17 @@ class Engine:
                 found.append(Observation(target, "mentions", evidence))
         return found
 
+    def vouch(self, entity_id: str) -> int:
+        """How strongly the sources so far vouch for a name (sum of their name weights); 0 for anything else."""
+        return sum(self._named_by.get(entity_id, {}).values())
+
+    def entity_limit(self, module: Module) -> int | None:
+        """How many entities the scan may hold when `module` records a new one: the cap, less the reserve for a source
+        that only lists names."""
+        if self.max_entities is None:
+            return None
+        return self.max_entities if getattr(module, "name_weight", 1) > 1 else self.max_entities - self.reserve
+
     def names_settled(self) -> None:
         """The scan has no lookup about a name waiting or running: the names it has are resolved (or failed), and what
         runs now is about addresses. Listeners with an `on_names_settled` method are told once."""
@@ -288,6 +305,7 @@ class Engine:
         # everything the lookup found is written in one transaction: the store runs on the event loop's
         # thread, so a commit per record stalls every other lookup for as long as the disk takes
         dropped = 0
+        limit = self.entity_limit(module)
         observations_kept = len(observations)
         with self.store.batch():
             for obs in observations:
@@ -301,7 +319,7 @@ class Engine:
                 if self.max_entities is not None and self.store.scope_state(scan_id, obs.entity.id) is None:
                     if self._entities is None:
                         self._entities = self.store.entity_count(scan_id)
-                    if self._entities >= self.max_entities:
+                    if self._entities >= limit:
                         dropped += 1
                         observations_kept -= 1
                         continue
@@ -325,7 +343,7 @@ class Engine:
             )
             if dropped:
                 self.entities_dropped += dropped
-                self._audit(scan_id, "entity_cap", module, entity, dropped=dropped, cap=self.max_entities)
+                self._audit(scan_id, "entity_cap", module, entity, dropped=dropped, cap=self.max_entities, limit=limit)
         recorded.extend(observations if observations_kept == len(observations) else [
             obs for obs in observations
             if isinstance(obs, Fact) or obs.entity == entity or self.store.scope_state(scan_id, obs.entity.id) is not None
