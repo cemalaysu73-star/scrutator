@@ -6,7 +6,8 @@ import httpx
 from scrutator.deadline import Deadline
 from scrutator.keys import redact
 from scrutator.model import Entity, EntityType, ScopeState
-from scrutator.modules.base import Fact, Mode, Module, ModuleContext, SourceUnavailable
+from scrutator import mentions
+from scrutator.modules.base import Fact, Mode, Module, ModuleContext, Observation, SourceUnavailable
 from scrutator.modules.registry import select_modules
 from scrutator.scope import ScopePolicy
 from scrutator.store import Store
@@ -15,6 +16,10 @@ from scrutator.store import Store
 # connection, or a module saying so (HTTP 5xx or 429, an exhausted quota).
 _SOURCE_FAILURES = (SourceUnavailable, httpx.TransportError, asyncio.TimeoutError, ConnectionError, OSError)
 DEFAULT_BREAKER_THRESHOLD = 3
+# Lookups whose answers are not read for mentions: the wildcard probe (a random name by design), and the opt-in modules
+# that read an organisation's pages or people-related records.
+_NOT_MINED = frozenset({"wildcard", "brand"})
+_PROBE_PREFIX = "wc-probe-"
 
 
 class _Slots:
@@ -68,6 +73,7 @@ class Engine:
         breaker_threshold: int = DEFAULT_BREAKER_THRESHOLD,
         max_entities: int | None = None,
         timeout_cap: float | None = None,
+        mine_mentions: bool = True,
     ) -> None:
         self.store = store
         self.scope = scope
@@ -82,6 +88,10 @@ class Engine:
         # The longest any one lookup may take, whatever the module allows (`scrutator quick` keeps a slow source from
         # spending its whole budget). A lookup cut by it is a timeout like any other: recorded as an error.
         self.timeout_cap = timeout_cap
+        # Read every evidence payload for in-scope names the scan does not know yet (scrutator.mentions).
+        self.mine_mentions = mine_mentions
+        self._mention_roots: frozenset | None = None
+        self._mention_pattern = None
         self._entities: int | None = None  # entities recorded so far, counted once and then kept up to date
         self.entities_dropped = 0
         self.roots: set[str] = set(scope.to_dict()["domains"])
@@ -154,6 +164,36 @@ class Engine:
                 scan_id, "breaker", module, entity,
                 after=self._failures[key], last_error=last_error, group=key,
             )
+
+    def _mentions(self, scan_id: int, module: Module, entity: Entity, observations: list) -> list[Observation]:
+        """In-scope names written inside the evidence this lookup returned that the scan does not know yet
+        (scrutator.mentions): each becomes a `mentions` relation of the entity the lookup was about, citing the record
+        that contains it. No request is made."""
+        if module.name in _NOT_MINED or module.name.startswith("exposure"):
+            return []
+        roots = frozenset(self.roots)
+        if self._mention_roots != roots:
+            self._mention_roots, self._mention_pattern = roots, mentions.pattern(set(roots))
+        known = {obs.entity.value for obs in observations if isinstance(obs, Observation)}
+        found: list[Observation] = []
+        seen: set[str] = set()
+        for obs in observations:
+            evidence = obs.evidence
+            if evidence.id in seen:
+                continue
+            seen.add(evidence.id)
+            for name in mentions.mentioned(evidence.payload, set(roots), self._mention_pattern):
+                if name in known or name.startswith(_PROBE_PREFIX):
+                    continue
+                try:
+                    target = Entity(type=EntityType.DOMAIN, value=name)
+                except ValueError:
+                    continue
+                if not self.scope.decide_entity(target).allowed or self.store.scope_state(scan_id, target.id) is not None:
+                    continue
+                known.add(name)
+                found.append(Observation(target, "mentions", evidence))
+        return found
 
     def names_settled(self) -> None:
         """The scan has no lookup about a name waiting or running: the names it has are resolved (or failed), and what
@@ -241,6 +281,8 @@ class Engine:
             return []
         self._failures[key] = 0
 
+        if self.mine_mentions:
+            observations = [*observations, *self._mentions(scan_id, module, entity, observations)]
         explorable: list[Entity] = []
         evidence_ids: set[str] = set()
         # everything the lookup found is written in one transaction: the store runs on the event loop's

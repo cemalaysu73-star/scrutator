@@ -596,10 +596,16 @@ async def run_bench(out: Path, *, key=None, model: str | None = None, ollama_url
     # The lab answers instantly: rdap.org's real pacing (eight at once, then one a second) would only add waiting.
     paced = rdap_module.PACE
     rdap_module.PACE = (100_000, 100_000.0)
+    # The bench is offline: crt.sh's database (the crtsh module's fallback) is never asked from a lab.
+    from scrutator.modules import crtsh as crtsh_module
+
+    fallback = crtsh_module.DB_FALLBACK
+    crtsh_module.DB_FALLBACK = False
     try:
         sections = await _sections(out, state, key, model, ollama_url)
     finally:
         rdap_module.PACE = paced
+        crtsh_module.DB_FALLBACK = fallback
     state["lab"][0].close()
     state["attribution"][0].close()
     result = {

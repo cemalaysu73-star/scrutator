@@ -18,6 +18,8 @@ _REL_TEXT = {
     "historic_cname": "was seen as an alias (CNAME) of",
     "historic_ns": "was seen using name server",
     "historic_mx": "was seen using mail server",
+    "mentions": "has a record that mentions",
+    "reverse_dns": "has a PTR record naming",
 }
 
 
@@ -55,7 +57,7 @@ def build_findings(store: Store, scan_id: int) -> list[Finding]:
 
 
 FINDING_TIERS = ("verified", "other", "claimed", "stale", "wildcard")
-_NAMING_RELS = frozenset({"has_subdomain", "related_host", "known_as"})
+_NAMING_RELS = frozenset({"has_subdomain", "related_host", "known_as", "mentions", "reverse_dns"})
 
 
 def finding_tier(rel: str, src: str, dst: str, tiers: dict[str, str]) -> str:

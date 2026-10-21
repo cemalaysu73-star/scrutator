@@ -46,6 +46,7 @@ def test_allowlist_is_exactly_the_sources_the_modules_use():
         "api.hackertarget.com", "api.subdomain.center", "urlscan.io", "api.mnemonic.no", "internetdb.shodan.io",
         # R6: public addresses are asked of the regional registry's RDAP server directly
         "rdap.arin.net", "rdap.db.ripe.net", "rdap.apnic.net", "rdap.lacnic.net", "rdap.afrinic.net",
+        "ip.thc.org",  # R6: IP.THC.ORG subdomain finder
     }
 
 

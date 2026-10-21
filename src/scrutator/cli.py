@@ -218,12 +218,20 @@ def scan(
     exclude_sources: Optional[str] = typer.Option(None, "--exclude-sources", help="Do not use these sources (comma-separated).", rich_help_panel="Source policy"),
     noncommercial: bool = typer.Option(True, "--noncommercial/--no-noncommercial", help="--no-noncommercial: leave out sources whose free tier is for non-commercial use only (InternetDB, RIPEstat, CertSpotter, Subdomain Center).", rich_help_panel="Source policy"),
     brand: bool = typer.Option(False, "--brand", help="Brand presence (off by default; contacts the organisation's site): read the platform links on its home page (robots.txt honoured), check whether those accounts and look-alikes of the brand name exist (profile page status only). For an organisation's domain.", rich_help_panel="Source policy"),
+    axfr: bool = typer.Option(False, "--axfr", help="Ask each name server of the in-scope zone once for a zone transfer (AXFR, TCP 53). Active-ish: it questions the target's own servers, so it also needs --active. Every answer, refusal included, is evidence.", rich_help_panel="Source policy"),
+    active: bool = typer.Option(False, "--active", help="Confirm the active-ish lookups asked for (--axfr): you are authorised to query the target's own name servers. Recorded in the audit log before any lookup.", rich_help_panel="Source policy"),
     live: Optional[bool] = typer.Option(None, "--live/--no-live", help="Print each name the moment DNS confirms it is live, while the scan goes on (default: on when the output is a terminal). The report is the same either way."),
 ) -> None:
     """Run a passive scan and write evidence-backed reports."""
     policy = _source_policy(sources, exclude_sources, not noncommercial)
     if brand:
         policy = policy.opt("brand")
+    if axfr and not active:
+        raise _fail("--axfr asks the target's own name servers for its zone: add --active to confirm you may do that")
+    if active and not axfr:
+        raise _fail("--active confirms an active-ish lookup, and none was asked for (--axfr)")
+    if axfr:
+        policy = policy.opt("axfr")
     wanted = {f.strip() for f in formats.split(",") if f.strip()}
     if not wanted or not wanted <= _FORMATS:
         raise _fail(f"--format must be a comma-separated subset of {sorted(_FORMATS)}")
@@ -269,7 +277,7 @@ def scan(
                 max_steps=max_steps or config.max_steps, max_entities=max_entities, packs=packs,
                 attribution=attribute, max_candidates=max_candidates, playbooks=playbooks,
                 deadline=deadline, breaker_threshold=breaker, source_policy=policy,
-                listeners=[watcher] if watcher is not None else None,
+                listeners=[watcher] if watcher is not None else None, allow_active=active,
             )
             if watcher is not None:
                 watcher.on_names_settled()  # the planner's rounds do not signal it; said once either way

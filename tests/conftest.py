@@ -13,6 +13,9 @@ def no_rdap_pacing(monkeypatch):
     from scrutator.modules import brand
 
     monkeypatch.setattr(brand, "PACE", 100_000.0)
+    from scrutator.modules import crtsh
+
+    monkeypatch.setattr(crtsh, "DB_FALLBACK", False)  # never a connection to crt.sh's database from a test
 
 
 class FakeResolver:

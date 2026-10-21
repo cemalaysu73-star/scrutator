@@ -34,6 +34,7 @@ SOURCE_HOSTS = frozenset(
         "rdap.apnic.net",
         "rdap.lacnic.net",
         "rdap.afrinic.net",
+        "ip.thc.org",
         "stat.ripe.net",
         "web.archive.org",
         "index.commoncrawl.org",

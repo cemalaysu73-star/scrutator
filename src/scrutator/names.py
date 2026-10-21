@@ -44,10 +44,11 @@ RECENT_DAYS = 90
 # until `not_after`) and a scan that fetched the host (`task.time`). Every other naming source is a list.
 _CERT_SOURCES = frozenset({"crtsh", "certspotter"})
 _OBSERVED_SOURCES = frozenset({"urlscan"})
+_ZONE_SOURCES = frozenset({"axfr"})  # an authoritative copy of the zone (R6, opt-in)
 _DNS = re.compile(r"DNS (A|AAAA|CNAME|MX|NS|TXT) (\S+)")
 _OTHER_RECORDS = ("CNAME", "MX", "NS", "TXT")
 _PROBE = re.compile(r"wc-probe-[0-9a-f]{12}\.(\S+)")
-_NAMING_RELS = frozenset({"has_subdomain", "related_host", "known_as"})
+_NAMING_RELS = frozenset({"has_subdomain", "related_host", "known_as", "mentions", "reverse_dns"})
 _MAX_AHEAD = timedelta(days=800)  # no certificate lasts this long: a later date is not a date to believe
 
 
@@ -133,6 +134,9 @@ def _tier(
     recent = [v for v in vouchers if v["recent"]]
     if state == "live":
         return "verified", "dns", reason, []
+    if state in ("unresolved", "wildcard") and set(named_by) & _ZONE_SOURCES:
+        # the zone's own name server listed it in a zone transfer (opt-in --axfr): authoritative, whatever has an address
+        return "verified", "zone", "the zone's own name server lists it (zone transfer)", []
     if state == "unresolved" and records:
         return "verified", "dns", _dns_record_reason(records), sorted(records.values())
     if state in ("unresolved", "wildcard") and recent:

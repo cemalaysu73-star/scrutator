@@ -90,6 +90,10 @@ async def run_scan(
     chosen, _ = policy.select(chosen)
     store.set_meta(scan_id, "source_policy", json.dumps(record, sort_keys=True))
     store.append_audit(scan_id, {"event": "source_policy", **record})
+    if allow_active:
+        # the user confirmed active-ish lookups (--active): said in the signed log before any lookup runs
+        active = sorted(m.name for m in chosen if m.mode.value == "active")
+        store.append_audit(scan_id, {"event": "active_authorised", "modules": active, "by": "--active"})
     if ctx is not None and any(m.name == "rdap" for m in chosen):
         _offer_rdap_networks(store, scan_id, ctx)
 

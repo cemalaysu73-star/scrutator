@@ -24,6 +24,7 @@ ALLOWED_HTTP_HOSTS = frozenset(
         "rdap.apnic.net",
         "rdap.lacnic.net",
         "rdap.afrinic.net",
+        "ip.thc.org",
         "stat.ripe.net",
         "web.archive.org",
         "index.commoncrawl.org",
@@ -36,6 +37,9 @@ ALLOWED_HTTP_HOSTS = frozenset(
     }
 )
 _DNS = re.compile(r"DNS (A|AAAA|CNAME|MX|NS|TXT|CAA) (\S+)")
+# crt.sh's public database (the crtsh module's fallback): only this fixed query about one name is ever re-run, never SQL
+# from a bundle (scrutator.modules.crtsh.db_query builds it).
+_PGSQL = re.compile(r"PGSQL crt\.sh:5432/certwatch identities ([a-z0-9_.-]+)")
 # Brand presence asks public profile pages for their HTTP status (scrutator/brand.py). A replay may re-ask, but only these
 # hosts (the bundled platforms whose status tells; fixed here, never taken from a bundle's packs) and only a path that
 # has the shape of a profile page: one handle, optionally after "@" or "u/", nothing else.
@@ -93,6 +97,12 @@ def parse_request(request: str) -> tuple[str, ...] | None:
         ):
             return ("profile", url)
         return None
+    match = _PGSQL.fullmatch(request)
+    if match:
+        try:
+            return ("pgsql", canonical_host(match.group(1)))
+        except ValueError:
+            return None
     match = _DNS.fullmatch(request)
     if match:
         try:
@@ -250,6 +260,22 @@ async def replay_evidence(
             fetches[url] = asyncio.ensure_future(get())
         return await fetches[url]
 
+    queries: dict[str, asyncio.Future] = {}
+
+    async def query_db(domain: str) -> str:
+        """crt.sh's database, the fixed query, once per name per replay (see scrutator.modules.crtsh)."""
+        if domain not in queries:
+            from scrutator import pgwire
+            from scrutator.modules.crtsh import DB_HOST, DB_PORT, DB_TIMEOUT, db_query, db_rows
+
+            async def run() -> str:
+                async with semaphore:
+                    columns, rows = await pgwire.query(DB_HOST, db_query(domain), port=DB_PORT, timeout=DB_TIMEOUT)
+                return json.dumps(db_rows(columns, rows), sort_keys=True)
+
+            queries[domain] = asyncio.ensure_future(run())
+        return await queries[domain]
+
     async def one(rec: dict) -> ReplayResult:
         def result(status: str, detail: str = "") -> ReplayResult:
             return ReplayResult(rec["id"], rec["source"], rec["request"], status, detail)
@@ -258,6 +284,8 @@ async def replay_evidence(
         parsed = parse_request(rec["request"])
         if parsed is None:
             return result("skipped", "request is not replayable")
+        if parsed[0] == "pgsql" and subject is not None and not _inside(parsed[1], subject):
+            return result("skipped", "name is outside the bundle's scope and entities")
         if parsed[0] == "dns" and subject is not None and not _inside(parsed[2], subject):
             return result("skipped", "name is outside the bundle's scope and entities")
         if attempted >= max_records:
@@ -277,7 +305,9 @@ async def replay_evidence(
                     recorded = None
                 return result("unchanged" if recorded == response.status_code else "changed",
                               "" if recorded == response.status_code else f"HTTP {recorded} then, {response.status_code} now")
-            if parsed[0] == "http":
+            if parsed[0] == "pgsql":
+                same = supports(rec["payload"], await query_db(parsed[1]))
+            elif parsed[0] == "http":
                 status, text = await fetch(parsed[1])
                 if status != 200:
                     return result("unavailable", f"HTTP {status}")
