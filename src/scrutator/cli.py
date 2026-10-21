@@ -839,6 +839,7 @@ def risk(
     as_json: bool = typer.Option(False, "--json", help="Machine-readable output."),
     sarif: Optional[Path] = typer.Option(None, "--sarif", help="Also write the risks as SARIF 2.1.0 to this file."),
     fail_on: Optional[str] = typer.Option(None, "--fail-on", help="Exit with status 1 if a risk at or above this severity exists: info, low, medium or high."),
+    compliance: bool = typer.Option(False, "--compliance", help="Also show the informational compliance mapping of each rule (ISO/IEC 27001 Annex A, NIS2 Art. 21(2), CIS Controls, OWASP, KVKK). Not a certification or a legal conclusion."),
 ) -> None:
     """List the risks of a scan: hygiene findings, provider concentration and analyst detectors.
 
@@ -865,8 +866,9 @@ def risk(
 
     if sarif is not None:
         sarif.write_text(json.dumps(to_sarif({**report, "risks": risks}), indent=2, sort_keys=True), encoding="utf-8")
+    mapping = _compliance_rows(risks) if compliance else None
     if as_json:
-        _echo(json.dumps({"risks": risks, "dependencies": report["dependencies"]}, indent=2, sort_keys=True))
+        _echo(json.dumps({"risks": risks, "dependencies": report["dependencies"], **({"compliance": mapping} if mapping is not None else {})}, indent=2, sort_keys=True))
     else:
         _echo(f"{label} of {report['scan']['seed']}. {_risk_line(risks)}")
         if report.get("summary", {}).get("names"):
@@ -876,6 +878,12 @@ def risk(
             _echo(f"         {item['title']}. {item['explanation']}")
             _echo(f"         evidence: {len(item['evidence_ids'])} record(s), fingerprint {item['fingerprint']}")
             _echo(f"         fix: {item['remediation']}")
+            if mapping is not None and mapping.get(item["rule_id"]):
+                _echo("         informational mapping: " + "; ".join(
+                    f"{m['ref']}{'' if m['verified'] else ' (unverified)'}" for m in mapping[item["rule_id"]]))
+        if mapping is not None:
+            _echo("Compliance references are an informational mapping, not a certification or a legal conclusion; "
+                  "'unverified' ones (all of ISO/IEC 27001) could not be read at an authoritative public source.")
         if report["dependencies"]:
             _echo("Provider dependencies:")
             for dep in report["dependencies"]:
@@ -887,6 +895,16 @@ def risk(
         if blocking:
             _echo(f"{len(blocking)} risk(s) at or above {fail_on}.", err=True)
             raise typer.Exit(1)
+
+
+def _compliance_rows(risks: list[dict]) -> dict[str, list[dict]]:
+    """The informational compliance mapping (packs/data/compliance.yaml) of the rules these risks come from."""
+    packs = load_packs()
+    out: dict[str, list[dict]] = {}
+    for rule_id in sorted({r["rule_id"] for r in risks}):
+        entry = packs.compliance_for(rule_id)
+        out[rule_id] = [m.model_dump(mode="json") for m in entry.mappings] if entry is not None else []
+    return out
 
 
 def _candidate_line(attribution: dict) -> str:

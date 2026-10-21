@@ -75,6 +75,30 @@ A playbook can change the order in which the planner ranks lookups, never the op
 scope. Playbooks are procedures written for Scrutator; the bundled ones are all `verified: false` and their `source`
 is background reading.
 
+## A compliance mapping
+
+`compliance.yaml` maps each risk rule to the places in a framework where its subject is discussed, so a consultant can
+file a finding in the right part of an ISO/IEC 27001, NIS2 or KVKK/GDPR evidence folder. It is an **informational
+mapping, not a certification, an audit opinion or a legal conclusion**; `scrutator audit` and `scrutator risk
+--compliance` say so wherever they show it.
+
+```yaml
+  - id: dmarc-missing
+    rule: dmarc-missing          # a rule of risk/catalog.py; every rule has exactly one entry (tested)
+    source: "https://www.cisecurity.org/controls/cis-controls-navigator"
+    verified: false              # true only when every mapping below is
+    mappings:
+      - {framework: cis, ref: "CIS 9.5", title: "Implement DMARC", verified: true, source: "https://www.cisecurity.org/controls/cis-controls-navigator"}
+      - {framework: iso27001, ref: "ISO 27001 A.5.14", title: "Information transfer", verified: false, source: "https://www.iso.org/standard/27001"}
+```
+
+Frameworks: `iso27001`, `nis2`, `cis`, `owasp`, `kvkk`. A mapping is `verified: true` only when the reference was read
+on an authoritative public page (the EU Publications Office text of NIS2, the CIS Controls navigator, the OWASP WSTG
+and Top 10 pages, mevzuat.gov.tr for KVKK), on 2026-10-21. ISO/IEC 27001:2022 is a paid standard and iso.org answered
+403, so **every ISO mapping is unverified**: check its number and title against a licensed copy. In every case the link
+between a finding and a control is the author's judgement. Like playbooks, the mapping is not part of the hashed pack
+content: no scan result depends on it.
+
 ## Rules
 
 - `verified: true` means a maintainer checked the patterns against the cited `source`. Entries marked `false` stay

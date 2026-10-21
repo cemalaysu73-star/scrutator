@@ -1,0 +1,256 @@
+# Informational compliance mapping: which control of a framework a risk rule's finding is relevant to.
+#
+# This is NOT a certification, an audit opinion or a legal conclusion. It tells a reader where in a framework the
+# subject of a finding is discussed, so a consultant can file the evidence in the right place of an ISO/IEC 27001,
+# NIS2 or KVKK/GDPR evidence folder. Whether a finding is evidence for or against a control is the auditor's call.
+#
+# `verified: true` on a mapping means: the referenced article, safeguard or test was read on the cited authoritative
+# public page on 2026-10-21 and its subject matches the paraphrase in `title`. It does not mean the framework owner or
+# any auditor agrees that the finding belongs there; that link is the author's judgement in every case.
+# `verified: false` means the reference could not be read at an authoritative public source: ISO/IEC 27001:2022 is a
+# paid standard and iso.org answered 403 to the pages that might list Annex A, so every ISO mapping is unverified and
+# its control number and title are the author's, to be checked against a licensed copy of the standard.
+# An entry is `verified: true` only when every one of its mappings is.
+#
+# Sources read on 2026-10-21:
+#   NIS2  Directive (EU) 2022/2555, Official Journal text from the EU Publications Office (EUR-Lex returned empty pages):
+#         https://publications.europa.eu/resource/cellar/9b84d482-85bd-11ed-9887-01aa75ed71a1.0006.03/DOC_1
+#   CIS   CIS Critical Security Controls navigator, showing v8.1 (safeguard numbers as in v8):
+#         https://www.cisecurity.org/controls/cis-controls-navigator
+#   OWASP Web Security Testing Guide, WSTG-CONF-10 Subdomain Takeover, and the OWASP Top 10 2021 pages
+#   KVKK  Law No. 6698, official text on mevzuat.gov.tr
+
+schema: 1
+kind: compliance
+version: 2026.10.1
+updated: 2026-10-21
+description: >-
+  Informational mapping of each risk rule to ISO/IEC 27001:2022 Annex A, NIS2 Article 21(2), CIS Controls v8.1,
+  OWASP and KVKK references. Not a certification, an audit opinion or a legal conclusion.
+entries:
+  - id: dangling-cname-claimable
+    rule: dangling-cname-claimable
+    source: "https://wstg.owasp.org/latest/4-Web_Application_Security_Testing/02-Configuration_and_Deployment_Management/10-Subdomain_Takeover"
+    verified: false
+    note: "A dangling alias is a stale inventory entry and a misconfiguration; WSTG-CONF-10 tests exactly this."
+    mappings:
+      - {framework: owasp, ref: "OWASP WSTG-CONF-10", title: "Test for subdomain takeover", verified: true, source: "https://wstg.owasp.org/latest/4-Web_Application_Security_Testing/02-Configuration_and_Deployment_Management/10-Subdomain_Takeover"}
+      - {framework: owasp, ref: "OWASP A05:2021", title: "Security misconfiguration", verified: true, source: "https://top10.owasp.org/2021/A05_2021-Security_Misconfiguration"}
+      - {framework: nis2, ref: "NIS2 Art. 21(2)(e)", title: "Security in maintenance of systems, incl. vulnerability handling", verified: true, source: "https://publications.europa.eu/resource/cellar/9b84d482-85bd-11ed-9887-01aa75ed71a1.0006.03/DOC_1"}
+      - {framework: cis, ref: "CIS 1.1", title: "Establish and maintain a detailed enterprise asset inventory", verified: true, source: "https://www.cisecurity.org/controls/cis-controls-navigator"}
+      - {framework: cis, ref: "CIS 4.1", title: "Establish and maintain a secure configuration process", verified: true, source: "https://www.cisecurity.org/controls/cis-controls-navigator"}
+      - {framework: iso27001, ref: "ISO 27001 A.8.9", title: "Configuration management", verified: false, source: "https://www.iso.org/standard/27001"}
+      - {framework: iso27001, ref: "ISO 27001 A.5.9", title: "Inventory of information and other associated assets", verified: false, source: "https://www.iso.org/standard/27001"}
+  - id: dangling-cname-known-service
+    rule: dangling-cname-known-service
+    source: "https://wstg.owasp.org/latest/4-Web_Application_Security_Testing/02-Configuration_and_Deployment_Management/10-Subdomain_Takeover"
+    verified: false
+    mappings:
+      - {framework: owasp, ref: "OWASP WSTG-CONF-10", title: "Test for subdomain takeover", verified: true, source: "https://wstg.owasp.org/latest/4-Web_Application_Security_Testing/02-Configuration_and_Deployment_Management/10-Subdomain_Takeover"}
+      - {framework: owasp, ref: "OWASP A05:2021", title: "Security misconfiguration", verified: true, source: "https://top10.owasp.org/2021/A05_2021-Security_Misconfiguration"}
+      - {framework: nis2, ref: "NIS2 Art. 21(2)(e)", title: "Security in maintenance of systems, incl. vulnerability handling", verified: true, source: "https://publications.europa.eu/resource/cellar/9b84d482-85bd-11ed-9887-01aa75ed71a1.0006.03/DOC_1"}
+      - {framework: cis, ref: "CIS 1.1", title: "Establish and maintain a detailed enterprise asset inventory", verified: true, source: "https://www.cisecurity.org/controls/cis-controls-navigator"}
+      - {framework: cis, ref: "CIS 4.1", title: "Establish and maintain a secure configuration process", verified: true, source: "https://www.cisecurity.org/controls/cis-controls-navigator"}
+      - {framework: iso27001, ref: "ISO 27001 A.8.9", title: "Configuration management", verified: false, source: "https://www.iso.org/standard/27001"}
+      - {framework: iso27001, ref: "ISO 27001 A.5.9", title: "Inventory of information and other associated assets", verified: false, source: "https://www.iso.org/standard/27001"}
+  - id: dangling-cname
+    rule: dangling-cname
+    source: "https://top10.owasp.org/2021/A05_2021-Security_Misconfiguration"
+    verified: false
+    mappings:
+      - {framework: owasp, ref: "OWASP A05:2021", title: "Security misconfiguration", verified: true, source: "https://top10.owasp.org/2021/A05_2021-Security_Misconfiguration"}
+      - {framework: nis2, ref: "NIS2 Art. 21(2)(e)", title: "Security in maintenance of systems, incl. vulnerability handling", verified: true, source: "https://publications.europa.eu/resource/cellar/9b84d482-85bd-11ed-9887-01aa75ed71a1.0006.03/DOC_1"}
+      - {framework: cis, ref: "CIS 1.1", title: "Establish and maintain a detailed enterprise asset inventory", verified: true, source: "https://www.cisecurity.org/controls/cis-controls-navigator"}
+      - {framework: cis, ref: "CIS 4.1", title: "Establish and maintain a secure configuration process", verified: true, source: "https://www.cisecurity.org/controls/cis-controls-navigator"}
+      - {framework: iso27001, ref: "ISO 27001 A.8.9", title: "Configuration management", verified: false, source: "https://www.iso.org/standard/27001"}
+      - {framework: iso27001, ref: "ISO 27001 A.5.9", title: "Inventory of information and other associated assets", verified: false, source: "https://www.iso.org/standard/27001"}
+  - id: spf-allows-all
+    rule: spf-allows-all
+    source: "https://www.cisecurity.org/controls/cis-controls-navigator"
+    verified: false
+    note: "SPF is one of the standards a DMARC deployment rests on."
+    mappings:
+      - {framework: cis, ref: "CIS 9.5", title: "Implement DMARC", verified: true, source: "https://www.cisecurity.org/controls/cis-controls-navigator"}
+      - {framework: nis2, ref: "NIS2 Art. 21(2)(g)", title: "Basic cyber hygiene practices", verified: true, source: "https://publications.europa.eu/resource/cellar/9b84d482-85bd-11ed-9887-01aa75ed71a1.0006.03/DOC_1"}
+      - {framework: iso27001, ref: "ISO 27001 A.5.14", title: "Information transfer", verified: false, source: "https://www.iso.org/standard/27001"}
+      - {framework: iso27001, ref: "ISO 27001 A.8.21", title: "Security of network services", verified: false, source: "https://www.iso.org/standard/27001"}
+  - id: spf-neutral-all
+    rule: spf-neutral-all
+    source: "https://www.cisecurity.org/controls/cis-controls-navigator"
+    verified: false
+    mappings:
+      - {framework: cis, ref: "CIS 9.5", title: "Implement DMARC", verified: true, source: "https://www.cisecurity.org/controls/cis-controls-navigator"}
+      - {framework: nis2, ref: "NIS2 Art. 21(2)(g)", title: "Basic cyber hygiene practices", verified: true, source: "https://publications.europa.eu/resource/cellar/9b84d482-85bd-11ed-9887-01aa75ed71a1.0006.03/DOC_1"}
+      - {framework: iso27001, ref: "ISO 27001 A.5.14", title: "Information transfer", verified: false, source: "https://www.iso.org/standard/27001"}
+      - {framework: iso27001, ref: "ISO 27001 A.8.21", title: "Security of network services", verified: false, source: "https://www.iso.org/standard/27001"}
+  - id: spf-softfail-all
+    rule: spf-softfail-all
+    source: "https://www.cisecurity.org/controls/cis-controls-navigator"
+    verified: false
+    mappings:
+      - {framework: cis, ref: "CIS 9.5", title: "Implement DMARC", verified: true, source: "https://www.cisecurity.org/controls/cis-controls-navigator"}
+      - {framework: nis2, ref: "NIS2 Art. 21(2)(g)", title: "Basic cyber hygiene practices", verified: true, source: "https://publications.europa.eu/resource/cellar/9b84d482-85bd-11ed-9887-01aa75ed71a1.0006.03/DOC_1"}
+      - {framework: iso27001, ref: "ISO 27001 A.5.14", title: "Information transfer", verified: false, source: "https://www.iso.org/standard/27001"}
+      - {framework: iso27001, ref: "ISO 27001 A.8.21", title: "Security of network services", verified: false, source: "https://www.iso.org/standard/27001"}
+  - id: spf-no-all
+    rule: spf-no-all
+    source: "https://www.cisecurity.org/controls/cis-controls-navigator"
+    verified: false
+    mappings:
+      - {framework: cis, ref: "CIS 9.5", title: "Implement DMARC", verified: true, source: "https://www.cisecurity.org/controls/cis-controls-navigator"}
+      - {framework: nis2, ref: "NIS2 Art. 21(2)(g)", title: "Basic cyber hygiene practices", verified: true, source: "https://publications.europa.eu/resource/cellar/9b84d482-85bd-11ed-9887-01aa75ed71a1.0006.03/DOC_1"}
+      - {framework: iso27001, ref: "ISO 27001 A.5.14", title: "Information transfer", verified: false, source: "https://www.iso.org/standard/27001"}
+      - {framework: iso27001, ref: "ISO 27001 A.8.21", title: "Security of network services", verified: false, source: "https://www.iso.org/standard/27001"}
+  - id: spf-multiple-records
+    rule: spf-multiple-records
+    source: "https://www.cisecurity.org/controls/cis-controls-navigator"
+    verified: false
+    mappings:
+      - {framework: cis, ref: "CIS 9.5", title: "Implement DMARC", verified: true, source: "https://www.cisecurity.org/controls/cis-controls-navigator"}
+      - {framework: nis2, ref: "NIS2 Art. 21(2)(g)", title: "Basic cyber hygiene practices", verified: true, source: "https://publications.europa.eu/resource/cellar/9b84d482-85bd-11ed-9887-01aa75ed71a1.0006.03/DOC_1"}
+      - {framework: iso27001, ref: "ISO 27001 A.5.14", title: "Information transfer", verified: false, source: "https://www.iso.org/standard/27001"}
+      - {framework: iso27001, ref: "ISO 27001 A.8.21", title: "Security of network services", verified: false, source: "https://www.iso.org/standard/27001"}
+  - id: spf-too-many-lookups
+    rule: spf-too-many-lookups
+    source: "https://www.cisecurity.org/controls/cis-controls-navigator"
+    verified: false
+    mappings:
+      - {framework: cis, ref: "CIS 9.5", title: "Implement DMARC", verified: true, source: "https://www.cisecurity.org/controls/cis-controls-navigator"}
+      - {framework: nis2, ref: "NIS2 Art. 21(2)(g)", title: "Basic cyber hygiene practices", verified: true, source: "https://publications.europa.eu/resource/cellar/9b84d482-85bd-11ed-9887-01aa75ed71a1.0006.03/DOC_1"}
+      - {framework: iso27001, ref: "ISO 27001 A.5.14", title: "Information transfer", verified: false, source: "https://www.iso.org/standard/27001"}
+      - {framework: iso27001, ref: "ISO 27001 A.8.21", title: "Security of network services", verified: false, source: "https://www.iso.org/standard/27001"}
+  - id: dmarc-missing
+    rule: dmarc-missing
+    source: "https://www.cisecurity.org/controls/cis-controls-navigator"
+    verified: false
+    mappings:
+      - {framework: cis, ref: "CIS 9.5", title: "Implement DMARC", verified: true, source: "https://www.cisecurity.org/controls/cis-controls-navigator"}
+      - {framework: nis2, ref: "NIS2 Art. 21(2)(g)", title: "Basic cyber hygiene practices", verified: true, source: "https://publications.europa.eu/resource/cellar/9b84d482-85bd-11ed-9887-01aa75ed71a1.0006.03/DOC_1"}
+      - {framework: iso27001, ref: "ISO 27001 A.5.14", title: "Information transfer", verified: false, source: "https://www.iso.org/standard/27001"}
+      - {framework: iso27001, ref: "ISO 27001 A.8.21", title: "Security of network services", verified: false, source: "https://www.iso.org/standard/27001"}
+  - id: dmarc-monitoring-only
+    rule: dmarc-monitoring-only
+    source: "https://www.cisecurity.org/controls/cis-controls-navigator"
+    verified: false
+    mappings:
+      - {framework: cis, ref: "CIS 9.5", title: "Implement DMARC", verified: true, source: "https://www.cisecurity.org/controls/cis-controls-navigator"}
+      - {framework: nis2, ref: "NIS2 Art. 21(2)(g)", title: "Basic cyber hygiene practices", verified: true, source: "https://publications.europa.eu/resource/cellar/9b84d482-85bd-11ed-9887-01aa75ed71a1.0006.03/DOC_1"}
+      - {framework: iso27001, ref: "ISO 27001 A.5.14", title: "Information transfer", verified: false, source: "https://www.iso.org/standard/27001"}
+      - {framework: iso27001, ref: "ISO 27001 A.8.21", title: "Security of network services", verified: false, source: "https://www.iso.org/standard/27001"}
+  - id: caa-missing
+    rule: caa-missing
+    source: "https://publications.europa.eu/resource/cellar/9b84d482-85bd-11ed-9887-01aa75ed71a1.0006.03/DOC_1"
+    verified: false
+    note: "CAA limits which authorities may issue certificates for the domain."
+    mappings:
+      - {framework: nis2, ref: "NIS2 Art. 21(2)(h)", title: "Policies on cryptography and encryption", verified: true, source: "https://publications.europa.eu/resource/cellar/9b84d482-85bd-11ed-9887-01aa75ed71a1.0006.03/DOC_1"}
+      - {framework: cis, ref: "CIS 4.1", title: "Establish and maintain a secure configuration process", verified: true, source: "https://www.cisecurity.org/controls/cis-controls-navigator"}
+      - {framework: iso27001, ref: "ISO 27001 A.8.24", title: "Use of cryptography", verified: false, source: "https://www.iso.org/standard/27001"}
+  - id: domain-expired
+    rule: domain-expired
+    source: "https://publications.europa.eu/resource/cellar/9b84d482-85bd-11ed-9887-01aa75ed71a1.0006.03/DOC_1"
+    verified: false
+    mappings:
+      - {framework: nis2, ref: "NIS2 Art. 21(2)(c)", title: "Business continuity, backup management, disaster recovery", verified: true, source: "https://publications.europa.eu/resource/cellar/9b84d482-85bd-11ed-9887-01aa75ed71a1.0006.03/DOC_1"}
+      - {framework: nis2, ref: "NIS2 Art. 21(2)(i)", title: "Asset management", verified: true, source: "https://publications.europa.eu/resource/cellar/9b84d482-85bd-11ed-9887-01aa75ed71a1.0006.03/DOC_1"}
+      - {framework: cis, ref: "CIS 1.1", title: "Establish and maintain a detailed enterprise asset inventory", verified: true, source: "https://www.cisecurity.org/controls/cis-controls-navigator"}
+      - {framework: iso27001, ref: "ISO 27001 A.5.9", title: "Inventory of information and other associated assets", verified: false, source: "https://www.iso.org/standard/27001"}
+      - {framework: iso27001, ref: "ISO 27001 A.5.30", title: "ICT readiness for business continuity", verified: false, source: "https://www.iso.org/standard/27001"}
+  - id: domain-expiring
+    rule: domain-expiring
+    source: "https://publications.europa.eu/resource/cellar/9b84d482-85bd-11ed-9887-01aa75ed71a1.0006.03/DOC_1"
+    verified: false
+    mappings:
+      - {framework: nis2, ref: "NIS2 Art. 21(2)(c)", title: "Business continuity, backup management, disaster recovery", verified: true, source: "https://publications.europa.eu/resource/cellar/9b84d482-85bd-11ed-9887-01aa75ed71a1.0006.03/DOC_1"}
+      - {framework: nis2, ref: "NIS2 Art. 21(2)(i)", title: "Asset management", verified: true, source: "https://publications.europa.eu/resource/cellar/9b84d482-85bd-11ed-9887-01aa75ed71a1.0006.03/DOC_1"}
+      - {framework: cis, ref: "CIS 1.1", title: "Establish and maintain a detailed enterprise asset inventory", verified: true, source: "https://www.cisecurity.org/controls/cis-controls-navigator"}
+      - {framework: iso27001, ref: "ISO 27001 A.5.9", title: "Inventory of information and other associated assets", verified: false, source: "https://www.iso.org/standard/27001"}
+      - {framework: iso27001, ref: "ISO 27001 A.5.30", title: "ICT readiness for business continuity", verified: false, source: "https://www.iso.org/standard/27001"}
+  - id: forgotten-name
+    rule: forgotten-name
+    source: "https://publications.europa.eu/resource/cellar/9b84d482-85bd-11ed-9887-01aa75ed71a1.0006.03/DOC_1"
+    verified: false
+    note: "Heuristic rule: the name only looks like a test or staging system."
+    mappings:
+      - {framework: nis2, ref: "NIS2 Art. 21(2)(i)", title: "Asset management", verified: true, source: "https://publications.europa.eu/resource/cellar/9b84d482-85bd-11ed-9887-01aa75ed71a1.0006.03/DOC_1"}
+      - {framework: cis, ref: "CIS 1.1", title: "Establish and maintain a detailed enterprise asset inventory", verified: true, source: "https://www.cisecurity.org/controls/cis-controls-navigator"}
+      - {framework: cis, ref: "CIS 7.6", title: "Automated vulnerability scans of externally exposed assets", verified: true, source: "https://www.cisecurity.org/controls/cis-controls-navigator"}
+      - {framework: owasp, ref: "OWASP A05:2021", title: "Security misconfiguration", verified: true, source: "https://top10.owasp.org/2021/A05_2021-Security_Misconfiguration"}
+      - {framework: iso27001, ref: "ISO 27001 A.5.9", title: "Inventory of information and other associated assets", verified: false, source: "https://www.iso.org/standard/27001"}
+      - {framework: iso27001, ref: "ISO 27001 A.8.8", title: "Management of technical vulnerabilities", verified: false, source: "https://www.iso.org/standard/27001"}
+  - id: exposed-risky-service
+    rule: exposed-risky-service
+    source: "https://publications.europa.eu/resource/cellar/9b84d482-85bd-11ed-9887-01aa75ed71a1.0006.03/DOC_1"
+    verified: false
+    note: "KVKK Art. 12 applies only where the service holds personal data; the scan cannot tell."
+    mappings:
+      - {framework: nis2, ref: "NIS2 Art. 21(2)(e)", title: "Security in maintenance of systems, incl. vulnerability handling", verified: true, source: "https://publications.europa.eu/resource/cellar/9b84d482-85bd-11ed-9887-01aa75ed71a1.0006.03/DOC_1"}
+      - {framework: cis, ref: "CIS 4.1", title: "Establish and maintain a secure configuration process", verified: true, source: "https://www.cisecurity.org/controls/cis-controls-navigator"}
+      - {framework: cis, ref: "CIS 7.6", title: "Automated vulnerability scans of externally exposed assets", verified: true, source: "https://www.cisecurity.org/controls/cis-controls-navigator"}
+      - {framework: cis, ref: "CIS 12.1", title: "Ensure network infrastructure is up to date", verified: true, source: "https://www.cisecurity.org/controls/cis-controls-navigator"}
+      - {framework: owasp, ref: "OWASP A05:2021", title: "Security misconfiguration", verified: true, source: "https://top10.owasp.org/2021/A05_2021-Security_Misconfiguration"}
+      - {framework: kvkk, ref: "KVKK Art. 12(1)", title: "Technical and administrative measures to keep personal data secure", verified: true, source: "https://www.mevzuat.gov.tr/anasayfa/MevzuatFihristDetayIframe?MevzuatTur=1&MevzuatNo=6698&MevzuatTertip=5"}
+      - {framework: iso27001, ref: "ISO 27001 A.8.20", title: "Networks security", verified: false, source: "https://www.iso.org/standard/27001"}
+      - {framework: iso27001, ref: "ISO 27001 A.8.8", title: "Management of technical vulnerabilities", verified: false, source: "https://www.iso.org/standard/27001"}
+  - id: concentration-dns
+    rule: concentration-dns
+    source: "https://publications.europa.eu/resource/cellar/9b84d482-85bd-11ed-9887-01aa75ed71a1.0006.03/DOC_1"
+    verified: false
+    mappings:
+      - {framework: nis2, ref: "NIS2 Art. 21(2)(c)", title: "Business continuity, backup management, disaster recovery", verified: true, source: "https://publications.europa.eu/resource/cellar/9b84d482-85bd-11ed-9887-01aa75ed71a1.0006.03/DOC_1"}
+      - {framework: nis2, ref: "NIS2 Art. 21(2)(d)", title: "Supply chain security, including service providers", verified: true, source: "https://publications.europa.eu/resource/cellar/9b84d482-85bd-11ed-9887-01aa75ed71a1.0006.03/DOC_1"}
+      - {framework: cis, ref: "CIS 15.1", title: "Establish and maintain an inventory of service providers", verified: true, source: "https://www.cisecurity.org/controls/cis-controls-navigator"}
+      - {framework: iso27001, ref: "ISO 27001 A.5.19", title: "Information security in supplier relationships", verified: false, source: "https://www.iso.org/standard/27001"}
+      - {framework: iso27001, ref: "ISO 27001 A.5.23", title: "Information security for use of cloud services", verified: false, source: "https://www.iso.org/standard/27001"}
+      - {framework: iso27001, ref: "ISO 27001 A.5.30", title: "ICT readiness for business continuity", verified: false, source: "https://www.iso.org/standard/27001"}
+  - id: concentration-edge
+    rule: concentration-edge
+    source: "https://publications.europa.eu/resource/cellar/9b84d482-85bd-11ed-9887-01aa75ed71a1.0006.03/DOC_1"
+    verified: false
+    mappings:
+      - {framework: nis2, ref: "NIS2 Art. 21(2)(c)", title: "Business continuity, backup management, disaster recovery", verified: true, source: "https://publications.europa.eu/resource/cellar/9b84d482-85bd-11ed-9887-01aa75ed71a1.0006.03/DOC_1"}
+      - {framework: nis2, ref: "NIS2 Art. 21(2)(d)", title: "Supply chain security, including service providers", verified: true, source: "https://publications.europa.eu/resource/cellar/9b84d482-85bd-11ed-9887-01aa75ed71a1.0006.03/DOC_1"}
+      - {framework: cis, ref: "CIS 15.1", title: "Establish and maintain an inventory of service providers", verified: true, source: "https://www.cisecurity.org/controls/cis-controls-navigator"}
+      - {framework: iso27001, ref: "ISO 27001 A.5.19", title: "Information security in supplier relationships", verified: false, source: "https://www.iso.org/standard/27001"}
+      - {framework: iso27001, ref: "ISO 27001 A.5.23", title: "Information security for use of cloud services", verified: false, source: "https://www.iso.org/standard/27001"}
+      - {framework: iso27001, ref: "ISO 27001 A.5.30", title: "ICT readiness for business continuity", verified: false, source: "https://www.iso.org/standard/27001"}
+  - id: ghost-hostname
+    rule: ghost-hostname
+    source: "https://publications.europa.eu/resource/cellar/9b84d482-85bd-11ed-9887-01aa75ed71a1.0006.03/DOC_1"
+    verified: false
+    mappings:
+      - {framework: nis2, ref: "NIS2 Art. 21(2)(i)", title: "Asset management", verified: true, source: "https://publications.europa.eu/resource/cellar/9b84d482-85bd-11ed-9887-01aa75ed71a1.0006.03/DOC_1"}
+      - {framework: cis, ref: "CIS 1.1", title: "Establish and maintain a detailed enterprise asset inventory", verified: true, source: "https://www.cisecurity.org/controls/cis-controls-navigator"}
+      - {framework: iso27001, ref: "ISO 27001 A.5.9", title: "Inventory of information and other associated assets", verified: false, source: "https://www.iso.org/standard/27001"}
+  - id: numbering-gap
+    rule: numbering-gap
+    source: "https://publications.europa.eu/resource/cellar/9b84d482-85bd-11ed-9887-01aa75ed71a1.0006.03/DOC_1"
+    verified: false
+    mappings:
+      - {framework: nis2, ref: "NIS2 Art. 21(2)(i)", title: "Asset management", verified: true, source: "https://publications.europa.eu/resource/cellar/9b84d482-85bd-11ed-9887-01aa75ed71a1.0006.03/DOC_1"}
+      - {framework: cis, ref: "CIS 1.1", title: "Establish and maintain a detailed enterprise asset inventory", verified: true, source: "https://www.cisecurity.org/controls/cis-controls-navigator"}
+      - {framework: iso27001, ref: "ISO 27001 A.5.9", title: "Inventory of information and other associated assets", verified: false, source: "https://www.iso.org/standard/27001"}
+  - id: source-disagreement
+    rule: source-disagreement
+    source: "https://www.cisecurity.org/controls/cis-controls-navigator"
+    verified: false
+    mappings:
+      - {framework: cis, ref: "CIS 4.1", title: "Establish and maintain a secure configuration process", verified: true, source: "https://www.cisecurity.org/controls/cis-controls-navigator"}
+      - {framework: owasp, ref: "OWASP A05:2021", title: "Security misconfiguration", verified: true, source: "https://top10.owasp.org/2021/A05_2021-Security_Misconfiguration"}
+      - {framework: iso27001, ref: "ISO 27001 A.8.9", title: "Configuration management", verified: false, source: "https://www.iso.org/standard/27001"}
+  - id: brand-handle-unregistered
+    rule: brand-handle-unregistered
+    source: "https://publications.europa.eu/resource/cellar/9b84d482-85bd-11ed-9887-01aa75ed71a1.0006.03/DOC_1"
+    verified: false
+    note: "A weak link: brand impersonation is a threat to watch, not a control failure."
+    mappings:
+      - {framework: nis2, ref: "NIS2 Art. 21(2)(a)", title: "Risk analysis and information system security policies", verified: true, source: "https://publications.europa.eu/resource/cellar/9b84d482-85bd-11ed-9887-01aa75ed71a1.0006.03/DOC_1"}
+      - {framework: iso27001, ref: "ISO 27001 A.5.7", title: "Threat intelligence", verified: false, source: "https://www.iso.org/standard/27001"}
+  - id: brand-lookalike-handle
+    rule: brand-lookalike-handle
+    source: "https://publications.europa.eu/resource/cellar/9b84d482-85bd-11ed-9887-01aa75ed71a1.0006.03/DOC_1"
+    verified: false
+    note: "A weak link: brand impersonation is a threat to watch, not a control failure."
+    mappings:
+      - {framework: nis2, ref: "NIS2 Art. 21(2)(a)", title: "Risk analysis and information system security policies", verified: true, source: "https://publications.europa.eu/resource/cellar/9b84d482-85bd-11ed-9887-01aa75ed71a1.0006.03/DOC_1"}
+      - {framework: iso27001, ref: "ISO 27001 A.5.7", title: "Threat intelligence", verified: false, source: "https://www.iso.org/standard/27001"}

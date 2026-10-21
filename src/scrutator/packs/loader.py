@@ -181,7 +181,7 @@ def validate_dir(directory=None) -> list[str]:
 class PackSet:
     """The merged content of the bundled packs and any user packs, with matching helpers."""
 
-    def __init__(self, files: Sequence[dict], providers=(), takeover=(), signals=(), playbooks=(), platforms=()) -> None:
+    def __init__(self, files: Sequence[dict], providers=(), takeover=(), signals=(), playbooks=(), platforms=(), compliance=()) -> None:
         self.files = tuple(files)
         self.platforms: tuple[PlatformEntry, ...] = tuple(sorted(platforms, key=lambda e: e.id))
         self.providers: tuple[ProviderEntry, ...] = tuple(sorted(providers, key=lambda e: e.id))
@@ -189,6 +189,8 @@ class PackSet:
         self.signals: tuple[SignalEntry, ...] = tuple(sorted(signals, key=lambda e: e.id))
         # not part of effective(): playbooks guide the agent, no derived result depends on them
         self.playbooks: tuple[PlaybookEntry, ...] = tuple(sorted(playbooks, key=lambda e: e.id))
+        # not part of effective() either: the informational compliance mapping the audit shows; no result depends on it
+        self.compliance: tuple = tuple(sorted(compliance, key=lambda e: e.id))
 
     # description
 
@@ -213,7 +215,7 @@ class PackSet:
         drop = set(kinds) & NEWER_KINDS
         return PackSet(
             [f for f in self.files if f.get("kind") not in drop], self.providers, self.takeover, self.signals, self.playbooks,
-            () if "platforms" in drop else self.platforms,
+            () if "platforms" in drop else self.platforms, self.compliance,
         )
 
     @property
@@ -292,6 +294,10 @@ class PackSet:
             return best[1] if best else None
         return self._best("providers", kind, value)
 
+    def compliance_for(self, rule_id: str):
+        """The compliance mapping entry of a risk rule, or None."""
+        return next((e for e in self.compliance if e.rule == rule_id), None)
+
     def match_takeover(self, host: str) -> TakeoverEntry | None:
         """The takeover fingerprint whose CNAME suffix matches `host`, if any."""
         return self._best("takeover", "cname", host)
@@ -310,5 +316,5 @@ def load_packs(extra_dirs: Sequence[Path] = (), *, bundled=True) -> PackSet:
                 merged[info.kind][entry.id] = entry
     return PackSet(
         infos, merged["providers"].values(), merged["takeover"].values(), merged["signals"].values(), merged["playbooks"].values(),
-        merged["platforms"].values(),
+        merged["platforms"].values(), merged["compliance"].values(),
     )

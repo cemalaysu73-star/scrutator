@@ -18,7 +18,7 @@ SCHEMA_VERSION = 1
 # `verify` re-derives from them, so they are hashed together. Playbooks only guide the agent; no
 # result depends on them, so they are loaded and validated like the rest but kept out of that hash.
 KINDS = ("providers", "takeover", "signals", "platforms")
-ALL_KINDS = (*KINDS, "playbooks")
+ALL_KINDS = (*KINDS, "playbooks", "compliance")
 # kinds added after bundles already existed: a bundle made before a kind existed declares no file of it, and is
 # compared with a trusted copy without that kind (it cannot have used it)
 NEWER_KINDS = frozenset({"platforms"})
@@ -194,6 +194,44 @@ class PlaybookEntry(Entry):
         return values
 
 
+FRAMEWORKS = ("iso27001", "nis2", "cis", "owasp", "kvkk")
+
+
+class ComplianceMapping(BaseModel):
+    """One reference of a framework a rule's finding is relevant to. `title` is the author's paraphrase, never the
+    framework's text; `verified` means the reference was read at `source` (an authoritative public page)."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    framework: Literal["iso27001", "nis2", "cis", "owasp", "kvkk"]
+    ref: str = Field(min_length=1, max_length=40)
+    title: str = Field(min_length=1, max_length=120)
+    verified: bool
+    source: str = Field(max_length=300)
+
+    @field_validator("source")
+    @classmethod
+    def _https(cls, value: str) -> str:
+        if not value.startswith("https://") or re.search(r"\s", value):
+            raise ValueError("source must be an https URL")
+        return value
+
+
+class ComplianceEntry(Entry):
+    """Informational mapping of one risk rule to framework references (packs/data/compliance.yaml). No result of a
+    scan depends on it: like playbooks it stays out of the hashed pack content, and the audit shows it as an
+    informational mapping, not a certification or a legal conclusion."""
+
+    rule: str = Field(min_length=1, max_length=64)
+    mappings: tuple[ComplianceMapping, ...] = Field(min_length=1, max_length=16)
+
+    @model_validator(mode="after")
+    def _verified_only_when_every_mapping_is(self) -> "ComplianceEntry":
+        if self.verified and not all(m.verified for m in self.mappings):
+            raise ValueError("an entry is verified only when every one of its mappings is")
+        return self
+
+
 _HANDLE_PUNCTUATION = set("-_.")
 
 
@@ -308,10 +346,15 @@ class PlatformsFile(_Envelope):
     entries: list[PlatformEntry]
 
 
+class ComplianceFile(_Envelope):
+    kind: Literal["compliance"]
+    entries: list[ComplianceEntry]
+
+
 class PlaybooksFile(_Envelope):
     kind: Literal["playbooks"]
     entries: list[PlaybookEntry]
 
 
-FILE_MODELS = {"providers": ProvidersFile, "takeover": TakeoverFile, "signals": SignalsFile, "platforms": PlatformsFile, "playbooks": PlaybooksFile}
-ENTRY_MODELS = {"providers": ProviderEntry, "takeover": TakeoverEntry, "signals": SignalEntry, "platforms": PlatformEntry, "playbooks": PlaybookEntry}
+FILE_MODELS = {"providers": ProvidersFile, "takeover": TakeoverFile, "signals": SignalsFile, "platforms": PlatformsFile, "playbooks": PlaybooksFile, "compliance": ComplianceFile}
+ENTRY_MODELS = {"providers": ProviderEntry, "takeover": TakeoverEntry, "signals": SignalEntry, "platforms": PlatformEntry, "playbooks": PlaybookEntry, "compliance": ComplianceEntry}
