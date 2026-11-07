@@ -1,71 +1,98 @@
 # Scrutator
 
-**Infrastructure OSINT where every claim has a receipt.** Point it at a domain you are allowed to assess. It asks public
-sources what they know (certificate transparency, DNS, registration data, archives, passive-DNS aggregators), and
-gives you back a map of the organisation's internet-facing infrastructure in which every finding links to the raw
-record it came from, and the whole report can be shipped as a **signed proof bundle that a stranger can verify**.
+[![ci](https://github.com/cemalaysu73-star/scrutator/actions/workflows/ci.yml/badge.svg)](https://github.com/cemalaysu73-star/scrutator/actions/workflows/ci.yml)
+[![licence: Apache-2.0](https://img.shields.io/badge/licence-Apache--2.0-blue.svg)](LICENSE)
+[![python: 3.11 | 3.12 | 3.13](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue.svg)](pyproject.toml)
 
-Passive by default: it never port-scans, never probes the target, never brute-forces names, never looks up a person.
-(The one opt-in exception, `scan --brand`, reads the organisation's own home page with robots.txt honoured: see
-[brand presence](#brand-presence).)
+**Infrastructure OSINT where every claim has a receipt.** Point it at a domain you are allowed to assess: it asks
+public sources what they know and gives you back a map of the organisation's internet-facing infrastructure in which
+every finding links to the raw record it came from, and the whole report ships as a **signed proof bundle that a
+stranger can verify offline**.
 
-The report is a single self-contained HTML file that works offline: a verdict strip, a searchable, sortable table of
-names with their evidence tier, risks grouped by severity, and an **evidence drawer** — click any name, risk or
-finding and the exact records that back it appear, each with its sha256 and the command to re-verify it.
+For penetration testers and red teamers doing recon, bug-bounty hunters, investigative journalists and OSINT
+researchers, incident responders and due-diligence analysts. Passive by default: it never port-scans, never probes the
+target, never brute-forces names, never looks up a person. (The few opt-in exceptions are named in
+[how it works](docs/how-it-works.md#what-it-will-never-do).)
 
 ![The Scrutator report: a verdict strip and the verified-name table](docs/screenshots/report-hero.jpg)
 
-![Clicking a risk opens its evidence: the two DNS records behind a dangling CNAME, each with its hash](docs/screenshots/report-evidence-drawer.jpg)
+## The demo, in 20 seconds
 
-## Why it is different
-
-Most recon tools print a list of names. The list is hard to use for three reasons, and Scrutator is built around them.
-
-- **A list is not a result.** `example.com` has one live website; an aggregator will happily list five hundred names
-  for it. Scrutator gives every name a **tier**, derived from evidence: *verified* (DNS resolves it, or a dated
-  certificate names it) or only *claimed* (a list says so, DNS shows nothing). The headline is `2 verified, 498
-  claimed`, not `500 subdomains`.
-- **A claim without a source is a rumour.** Every finding, risk and AI statement cites the evidence ids it rests on;
-  the evidence is the raw answer of the source, stored once and addressed by its hash. Click a finding in the report
-  and the DNS answer, the certificate or the RDAP record appears. "No such record" is evidence too; a timeout never
-  becomes a finding.
-- **A report you cannot check is an opinion.** `scrutator scan --bundle` writes a zip with the report, every raw
-  record, a hash-chained audit log and an Ed25519 signature. `scrutator verify` re-derives the findings, risks, name
-  tiers and attribution from the evidence and fails, naming the check, if a single byte was changed or a risk was
-  quietly removed. It is built to be run on files from people you do not trust.
-
-And the AI, if you use it, has to show receipts too: it runs on a model on your machine by default, cloud is an
-explicit logged opt-in, and nothing a model writes reaches the report unless it passes a deterministic check and an
-independent verifier.
-
-## A real run
-
-`example.com` is reserved for documentation, so it is a safe target. This is the unedited output of
-`python demo/run_demo.py --live` on 2026-10-20 (the scan step; [full transcript](demo/transcripts/live.txt)):
+`python demo/run_demo.py` runs offline, on a planted fixture zone, in about 30 seconds. This is an abridged copy of a
+real run (nothing edited but the cuts marked `...`; [the full recording](demo/transcripts/offline.txt) is in the repo).
 
 ```
-$ scrutator scan example.com --ai off --bundle --key-dir keys
-Scan #1 of example.com: 2 verified, 498 claimed (0 stale, 0 wildcard-covered).
-541 entities, 558 relations, 558 findings (526 module runs, 3 rounds).
-Findings: 51 about verified names and 9 about addresses and registrations; 498 more about claimed (498), stale (0) or wildcard-covered (0) names, kept in the report and collapsed in the HTML.
-Names: 2 live, 498 stale, 0 wildcard-covered, 0 unresolved.
-Risks: 2 (0 high, 0 medium, 2 low, 0 info). Run `scrutator risk` for the list.
-3 source run(s) failed after retries; see Source coverage in the report.
-AI: off (no local model found, or --ai off). Deterministic mode.
-Wrote report.json, report.html to demo-out\live
-Proof bundle: demo-out\live\proof.scrutator (signing key 3d0f002d59884ecdeb75198fe7c36afbb6c35136ab02b1ddc4e36a829e35699f)
-```
+== Step 1: scan the fixture zone
+   names: 17 verified, 1 claimed (4 stale, 0 wildcard-covered)
+   55 entities, 73 findings, 83 evidence records, 23 risks (the zone has 22 planted issues)
 
-then, in the same run, `scrutator verify proof.scrutator --pin signing.pub` passes nineteen named checks, and the same
-command on a copy with one bit flipped ends:
+== Step 2: follow a claim to its evidence
+   the most severe risk: [high] CNAME to a claimable service that no longer exists
+      shop.example.com is an alias (CNAME) of demo.pages.example.org, and the address lookup for shop.example.com
+      returned NXDOMAIN, so the target does not exist. demo.pages.example.org matches the takeover fingerprint lab-pages.
+   it cites 2 evidence record(s); the first is id c4d48be7276d6db6... (sha256 of source, request, payload):
+      source   dns
+      request  DNS A shop.example.com
+      payload  'NXDOMAIN'
 
-```
+== Step 5: verify it, pinning the signer's key
+$ scrutator verify proof.scrutator --pin signing.pub
+PASS  file hashes
+PASS  signature valid
+PASS  signing key pinned
+PASS  audit chain
+PASS  evidence hashes
+PASS  findings derivable
+PASS  risks derivable
+...  (19 named checks)
+Verification passed.
+
+== Step 6: tamper with it (one bit flipped inside report.json)
+$ scrutator verify flipped.scrutator --pin signing.pub
 FAIL  file hashes  (report.json does not match the manifest)
-FAIL  findings derivable  (the findings are not what the cited evidence implies)
+FAIL  report references  (1 cited evidence record(s) are not in the bundle)
+FAIL  name states derivable  (the name states and tiers are not what the cited evidence implies)
 Verification FAILED: do not rely on this bundle.
 ```
 
-Run it yourself in about 40 seconds (or offline, in 30, on a planted fixture zone): [demo/README.md](demo/README.md).
+That bundle is [in the repo](docs/examples/lab-zone/) and verifies with
+`scrutator verify docs/examples/lab-zone/proof.scrutator --pin docs/examples/lab-zone/signing.pub`.
+
+## Install and first scan
+
+```bash
+pip install -e .                  # from a clone; Python 3.11 or newer; Windows, macOS, Linux (add ".[mcp]" for the MCP server)
+scrutator scan example.com --bundle   # passive; writes scrutator-out/report.html, report.json, proof.scrutator
+scrutator verify scrutator-out/proof.scrutator --pin ~/.config/scrutator/signing.pub
+```
+
+`scrutator keygen` creates the signing key first if you have none. Not on PyPI yet, so install from a clone. More in
+the [quickstart](docs/quickstart.md).
+
+## What makes it different
+
+- **Tiers, not lists.** `example.com` has one live website and an aggregator lists five hundred names for it. Every
+  name is *verified* (DNS resolves it, or a dated certificate names it) or only *claimed*. The headline reads
+  `2 verified, 498 claimed`, not `500 subdomains`.
+- **Every claim cites a record.** Findings, risks and AI statements carry the ids of the raw source answers they rest
+  on, stored once and addressed by their sha256. "No such record" is evidence; a timeout never becomes a finding.
+- **A report you can check.** `scrutator verify` re-derives findings, risks, name tiers and attribution from the
+  bundle's own evidence and fails, naming the check, if one byte changed or a risk was quietly removed. It is built to
+  be run on files from people you do not trust.
+- **Scope and AI under your control.** Scope is decided by the engine, deny by default, never by a prompt. AI is
+  optional, runs on a model on your machine by default, and nothing a model writes reaches the report unless a
+  deterministic check and a verifier pass it.
+
+[How it works, all of it](docs/how-it-works.md) · [Use cases with exact commands](docs/use-cases.md) · [FAQ](docs/faq.md)
+
+## What it is not
+
+- **Not a vulnerability scanner or a pentest tool.** It exploits nothing, tests no credentials and sends nothing to the
+  target in passive mode. Its risks are configuration leads for the owner to confirm.
+- **Not faster and not wider than the established recon tools.** subfinder and Amass ask more sources; knockpy
+  finishes in seconds. A scan takes tens of seconds. If you want maximum enumeration, run those too.
+- **Not a proof of truth or of time.** A bundle proves the report follows from the records and that nothing changed
+  after signing. It does not prove the sources were right, and there is no trusted timestamp.
 
 ## Honest limits
 
@@ -76,6 +103,9 @@ Read these before you rely on it. They are also in [docs/security.md](docs/secur
   (`zonetransfer.me`, 31 names in its published zone) Scrutator and every competitor we could run reach a small part
   of it (Scrutator 4 of 31). Names that no certificate, archive or aggregator holds are not found. The opt-in zone
   transfer (`--axfr --active`) would reach them, but it times out from the network the benchmark runs on.
+- **Competitors not run.** The benchmark compares against sublist3r, knockpy and dnsrecon (which errored on every
+  target). subfinder, Amass, SpiderFoot and theHarvester were **not run**, so nothing is claimed about them. Three of
+  the four truth sets are pseudo-truth built from what the tools found.
 - **A full scan still takes tens of seconds** (rate-limited sources, DNS, RDAP, and crt.sh's database when its web
   search is down); `knockpy` finishes in seconds because it asks fewer things. What changed in R6 is that you no longer
   wait blind: `scrutator scan` prints each name the moment DNS confirms it is live, and `scrutator quick <domain>`
@@ -96,7 +126,15 @@ Read these before you rely on it. They are also in [docs/security.md](docs/secur
 - **The two opt-in modules are narrow on purpose.** Brand presence knows only what a profile page's HTTP status says
   (a suspended account can look like a missing one); organisation exposure is a preview that has not had the legal
   and ethics review its design requires, and runs only when you set `SCRUTATOR_PREVIEW_EXPOSURE=1`.
-- **Not released.** Not on PyPI, no signed releases, no private beta yet. v1.0 is a candidate, not a release.
+- **A proxy covers HTTP, not DNS.** `SCRUTATOR_PROXY` routes the HTTP sources and the crt.sh connection through an
+  HTTP or SOCKS proxy; DNS lookups still go to your system resolver. See the
+  [operational-security note](docs/use-cases.md#operational-security-what-the-tool-does-on-the-network).
+- **Not on PyPI, no signed releases yet.** Install from a clone; see the release notes for how to verify a release.
+
+Benchmark numbers, exactly as measured (run `2026-10-21-r6-final`, [r6.md](docs/benchmarks/r6.md)): the frozen
+criterion (recall at least the best competitor's on every truth target, every result evidence-backed, bundle
+verifies) was met on all four targets: zonetransfer.me 13% against knockpy 6%; example.com and nmap.org 100%, ties;
+owasp.org 97% (59 live names) against knockpy 72%. A win against sublist3r, knockpy and a dnsrecon that errored.
 
 ## For consultants and bug-bounty hunters
 
@@ -117,10 +155,9 @@ scrutator audit-check audit-ornek/audit.html audit-ornek/proof.scrutator      # 
 
 A real sample, made from the planted lab fixture (example.com names only, a fictional client, a placeholder auditor):
 [docs/examples/audit/audit.html](docs/examples/audit/audit.html) and its [PDF](docs/examples/audit/audit.pdf), the
-[Turkish version](docs/examples/audit/tr/audit.html), the bundle and the signer's key next to them. Measured on this
-machine: a passive scan plus the audit took 21 to 44 s on the benchmark targets
-([unit economics](docs/business/unit-economics.md)). Docs: [client audits](docs/audit.md),
-[monitoring for clients](docs/hosting.md), [business pack](docs/business/README.md).
+[Turkish version](docs/examples/audit/tr/audit.html), the bundle and the signer's key next to them. Measured on the
+author's machine: a passive scan plus the audit took 21 to 44 s on the benchmark targets. Docs:
+[client audits](docs/audit.md), [monitoring for clients](docs/hosting.md).
 
 **Bug-bounty hunters**: `scrutator bounty import` turns a programme's scope (HackerOne CSV, Bugcrowd JSON, a pasted
 list) into a deny-by-default scope file and refuses what it cannot represent safely (`*`, `*.com`, odd schemes,
@@ -128,8 +165,19 @@ user-info URLs, private ranges, hidden characters); `scrutator bounty watch` ann
 names, takeover candidates, certificates and open services, each with the evidence ids, and writes a ready-to-paste
 report draft for every takeover candidate. Passive only: it never probes or claims anything. [docs/bounty.md](docs/bounty.md)
 
-What it is not: not a vulnerability scanner or a pentest, not faster and not wider than the established recon tools.
-What it is: the one where every claim can be checked.
+## Where to go
+
+| If you want to | Read |
+|---|---|
+| understand the whole thing | [How it works](docs/how-it-works.md), [concepts](docs/concepts.md) |
+| run a real workflow | [Use cases](docs/use-cases.md): pentest recon, bug bounty, audits, due diligence, incident response, journalism |
+| know what leaves your machine, and whether it is legal and safe | [FAQ](docs/faq.md), [AI modes and privacy](docs/ai-and-privacy.md), [Responsible use](RESPONSIBLE_USE.md) |
+| check a report someone sent you | [Proof bundles](docs/proof-bundles.md), [FAQ](docs/faq.md#how-do-i-verify-a-report-someone-sent-me) |
+| see the evidence for the claims | [Benchmark](docs/benchmarks.md), [security model](docs/security.md), [example reports](docs/examples/README.md) |
+| extend it | [Writing a module](docs/writing-a-module.md), [knowledge packs](docs/knowledge-packs.md), [CONTRIBUTING](CONTRIBUTING.md) |
+| everything else | [Documentation index](docs/index.md), [CHANGELOG](CHANGELOG.md), [SECURITY](SECURITY.md) |
+
+The rest of this file is the reference for every command and option.
 
 ## Install
 
