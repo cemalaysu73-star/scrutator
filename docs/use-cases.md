@@ -163,6 +163,7 @@ Goal: during an incident, quickly list what the affected organisation exposes, f
 compare it with an earlier one.
 
 ```bash
+scrutator keygen --key-dir keys                                          # once per case, or reuse your key
 scrutator quick victim.example --bundle --out ir/case-17 --key-dir keys    # names in seconds; prints live names as DNS confirms them
 scrutator scan victim.example --attribution --bundle --out ir/case-17-full --key-dir keys
 scrutator risk --db ir/case-17-full/scrutator.db --sarif ir/case-17.sarif
