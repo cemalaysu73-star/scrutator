@@ -134,6 +134,7 @@ async def _probe(store: Store, scan_id: int, plan: Plan, budget: Budget, config:
     run = _Run(store, scan_id, budget, config, summary)
     states = await _tcp_stage(run, plan)
     summary["tcp"] = {state: sum(1 for v in states.values() if v == state) for state in sorted(set(states.values()))}
+    await _tls_stage(run, plan, states)
 
 
 async def _tcp_stage(run: _Run, plan: Plan) -> dict[tuple[str, int], str]:
@@ -150,3 +151,23 @@ async def _tcp_stage(run: _Run, plan: Plan) -> dict[tuple[str, int], str]:
     jobs = [one(t["ip"], p["port"]) for t in plan.targets for p in t["ports"]]
     await asyncio.gather(*jobs)
     return states
+
+
+async def _tls_stage(run: _Run, plan: Plan, states: dict[tuple[str, int], str]) -> None:
+    """A handshake with each in-scope name on every open TLS port (port 443: every name; other ports: the first), and the two
+    legacy-protocol attempts once per open TLS port."""
+    from scrutator import active
+    from scrutator.active.tlscheck import LEGACY, legacy_probe, tls_handshake
+
+    kw = {"limits": run.limits, "budget": run.budget, "relax": run.config.relax}
+    jobs = []
+    for target in plan.targets:
+        ip, names = target["ip"], target["probe_names"]
+        for port in active.TLS_PORTS:
+            if states.get((ip, port)) != "open":
+                continue
+            for sni in names if port == active.HTTPS_PORT else names[:1]:
+                jobs.append(run.call("tls", ip, lambda ip=ip, port=port, sni=sni: tls_handshake(ip, port, sni, **kw), port=port, sni=sni))
+            for version in LEGACY:
+                jobs.append(run.call("tls", ip, lambda ip=ip, port=port, v=version: legacy_probe(ip, port, v, names[0], **kw), port=port, legacy=version))
+    await asyncio.gather(*jobs)
