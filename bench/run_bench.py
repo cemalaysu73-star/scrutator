@@ -44,7 +44,7 @@ ROOT = Path(__file__).resolve().parent
 REPO = ROOT.parent
 ADAPTERS = ROOT / "adapters"
 
-# Frozen in .cemal/PLAN.md before the first run. Do not add targets without writing them there first.
+# Frozen in docs/benchmark-protocol.md before the first run. Do not add targets without writing them there first.
 TARGETS = {
     "zonetransfer.me": {"truth": "axfr", "axfr_server": "nsztm1.digi.ninja"},
     "example.com": {"truth": "pseudo"},

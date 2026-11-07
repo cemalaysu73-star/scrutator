@@ -67,9 +67,6 @@ verifiable evidence. Speed and source count are not claimed.
   certificate or DNS vouches for (a test with 20,000 junk names); the cap is reported per source; the report's summary
   strip never leaves an empty cell or a lone stat (checked at 360, 768 and 1280 px).
 - **Bench**: `scrutator-bench/4` with sections `audit`, `bounty`, `monitor`.
-- **Business pack** (docs/business/): offers, competitor prices read from their own pages with URL and date, measured
-  machine time per audit, three labelled revenue scenarios, a 30-day go-to-market in Turkish and English, a legal and
-  risk checklist, open-core licensing options.
 
 ## 1.0.0rc2 (2026-10-21, a release candidate; not published)
 

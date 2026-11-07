@@ -14,7 +14,7 @@ There are two benchmarks, and they answer different questions:
 A head-to-head, passive, keyless comparison of Scrutator with the subdomain/recon tools that can be
 installed from PyPI without downloading executables. One command reproduces it.
 
-The frozen targets and the bar are in `.cemal/PLAN.md`. The latest written reading is in
+The frozen targets and the bar are in [`docs/benchmark-protocol.md`](../docs/benchmark-protocol.md). The latest written reading is in
 `docs/benchmarks/`.
 
 ## Targets
