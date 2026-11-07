@@ -108,7 +108,7 @@ zone). For the other three, **pseudo-truth**: the union of in-scope hostnames re
 benchmark time. That is a lower bound biased towards what the tools collectively see; recall against it flatters every
 tool and says nothing about names no tool found.
 
-The frozen criterion (`.cemal/PLAN.md`): Scrutator is "best" in a round only if recall is at least the best competitor's
+The frozen criterion: Scrutator is "best" in a round only if recall is at least the best competitor's
 on every truth target, **and** every result is backed by an evidence record, **and** the bundle verifies. A tie on
 recall plus those extras counts as a win; lower recall is a loss.
 

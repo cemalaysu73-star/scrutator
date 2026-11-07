@@ -2,6 +2,9 @@
 
 | Page | Read it to |
 |---|---|
+| [How it works](how-it-works.md) | the pipeline from seed to signed bundle with diagrams, what "evidence-backed" and "verifiable" mean, how it differs from other recon tools, what it will never do |
+| [Use cases](use-cases.md) | seven workflows with exact commands, including an operational-security note for journalists and researchers |
+| [FAQ](faq.md) | legality, safety, what leaves your machine, why sources fail, adding a source, verifying a report |
 | [Quickstart](quickstart.md) | install, scan `example.com`, open the report, verify and tamper with a bundle |
 | [Concepts](concepts.md) | the evidence model, scope states, name tiers, packs, attribution |
 | [Reading a report](reading-a-report.md) | what each section of the HTML and JSON report means and how far to trust it |
@@ -12,7 +15,6 @@
 | [Client audits](audit.md) | `scrutator audit`: a branded, print-ready deliverable from a signed scan, the authorisation letter, and how the client checks it offline |
 | [Bug-bounty mode](bounty.md) | import a programme scope (deny by default), watch it for new assets and takeover candidates, get report drafts |
 | [Running monitoring for clients](hosting.md) | `watch` as a retainer: alerts, weekly digest, e-mail; a Windows scheduled task, a systemd timer, Docker Compose |
-| [Business pack](business/README.md) | offers, competitor prices (sourced), unit economics and scenarios, a 30-day go-to-market, legal and risk checklist, licensing options |
 | [Writing a knowledge pack](knowledge-packs.md) | add a provider, a takeover fingerprint or a playbook |
 | [Writing a module](writing-a-module.md) | add a data source |
 | [Security model and known limits](security.md) | the guarantees, how they are tested, what is not guaranteed |
