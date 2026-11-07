@@ -18,7 +18,7 @@ SCHEMA_VERSION = 1
 # `verify` re-derives from them, so they are hashed together. Playbooks only guide the agent; no
 # result depends on them, so they are loaded and validated like the rest but kept out of that hash.
 KINDS = ("providers", "takeover", "signals", "platforms")
-ALL_KINDS = (*KINDS, "playbooks", "compliance")
+ALL_KINDS = (*KINDS, "playbooks", "compliance", "shared")
 # kinds added after bundles already existed: a bundle made before a kind existed declares no file of it, and is
 # compared with a trusted copy without that kind (it cannot have used it)
 NEWER_KINDS = frozenset({"platforms"})
@@ -232,6 +232,66 @@ class ComplianceEntry(Entry):
         return self
 
 
+class SharedPlatformEntry(Entry):
+    """A platform whose addresses serve many customers (a CDN, a PaaS front end, a website builder, a pages host).
+    Active confirmation never connects to such an address: it is not the client's server, and a connection check would
+    be a connection to someone else's infrastructure (scrutator/active/plan.py). An address is recognised by its AS
+    number, a CIDR range, a host-name suffix (a CNAME target of an in-scope name, or a reverse name InternetDB saw for the
+    address) or a substring of the network name RIPEstat reports. No result of a scan is derived from this kind: it
+    only keeps probes away, so like playbooks it stays out of the hashed pack content. `verified: false` entries stay
+    in force: a wrong pattern here costs a skipped probe, never a probe of the wrong host."""
+
+    platform: str = Field(min_length=1, max_length=80)
+    kind: Literal["cdn", "paas", "pages", "builder", "edge"]
+    asn: tuple[int, ...] = ()
+    cidrs: tuple[str, ...] = ()
+    hosts: tuple[str, ...] = ()
+    netname: tuple[str, ...] = ()
+
+    @field_validator("asn")
+    @classmethod
+    def _asns(cls, values: tuple[int, ...]) -> tuple[int, ...]:
+        for v in values:
+            if not 1 <= v <= 4294967295:
+                raise ValueError(f"not an AS number: {v}")
+        return values
+
+    @field_validator("cidrs")
+    @classmethod
+    def _cidrs(cls, values: tuple[str, ...]) -> tuple[str, ...]:
+        import ipaddress
+
+        out = []
+        for value in values:
+            try:
+                net = ipaddress.ip_network(value, strict=True)
+            except ValueError as exc:
+                raise ValueError(f"not a CIDR range: {value!r}") from exc
+            if net.version == 4 and net.prefixlen < 12:
+                raise ValueError(f"{value} is wider than a /12: refusing a pattern that would cover too much")
+            out.append(str(net))
+        return tuple(out)
+
+    @field_validator("hosts")
+    @classmethod
+    def _hosts(cls, values: tuple[str, ...]) -> tuple[str, ...]:
+        return tuple(host_pattern(v) for v in values)
+
+    @field_validator("netname")
+    @classmethod
+    def _netnames(cls, values: tuple[str, ...]) -> tuple[str, ...]:
+        cleaned = tuple(" ".join(v.lower().split()) for v in values)
+        if any(len(v) < 5 for v in cleaned):
+            raise ValueError("a network-name pattern shorter than 5 characters would match too much")
+        return cleaned
+
+    @model_validator(mode="after")
+    def _has_a_pattern(self) -> "SharedPlatformEntry":
+        if not (self.asn or self.cidrs or self.hosts or self.netname):
+            raise ValueError("an entry needs at least one pattern")
+        return self
+
+
 _HANDLE_PUNCTUATION = set("-_.")
 
 
@@ -356,5 +416,10 @@ class PlaybooksFile(_Envelope):
     entries: list[PlaybookEntry]
 
 
-FILE_MODELS = {"providers": ProvidersFile, "takeover": TakeoverFile, "signals": SignalsFile, "platforms": PlatformsFile, "playbooks": PlaybooksFile, "compliance": ComplianceFile}
-ENTRY_MODELS = {"providers": ProviderEntry, "takeover": TakeoverEntry, "signals": SignalEntry, "platforms": PlatformEntry, "playbooks": PlaybookEntry, "compliance": ComplianceEntry}
+class SharedFile(_Envelope):
+    kind: Literal["shared"]
+    entries: list[SharedPlatformEntry]
+
+
+FILE_MODELS = {"providers": ProvidersFile, "takeover": TakeoverFile, "signals": SignalsFile, "platforms": PlatformsFile, "playbooks": PlaybooksFile, "compliance": ComplianceFile, "shared": SharedFile}
+ENTRY_MODELS = {"providers": ProviderEntry, "takeover": TakeoverEntry, "signals": SignalEntry, "platforms": PlatformEntry, "playbooks": PlaybookEntry, "compliance": ComplianceEntry, "shared": SharedPlatformEntry}

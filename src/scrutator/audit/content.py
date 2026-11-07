@@ -34,18 +34,24 @@ def authorisation_from_log(audit_records: list[dict]) -> dict | None:
     first_lookup = next((i for i, r in enumerate(audit_records) if r.get("module")), len(audit_records))
     for index, record in enumerate(audit_records[:first_lookup]):
         if record.get("event") == "engagement":
-            return {
+            found = {
                 "mode": "client", "recorded": "signed", "sha256": str(record.get("sha256") or ""),
                 "organisation": record.get("organisation"), "domains": list(record.get("domains") or []),
                 "authorised_by": record.get("authorised_by") or {}, "start": record.get("start"), "end": record.get("end"),
                 "purpose": record.get("purpose"), "reference": str(record.get("reference") or ""),
             }
+            if record.get("active_testing") is True:
+                found["active"] = True  # only when granted: the facts of earlier audits are unchanged
+            return found
         if record.get("event") == "self_attestation":
-            return {
+            found = {
                 "mode": "self", "recorded": "signed", "sha256": "", "organisation": record.get("organisation") or "",
                 "domains": list(record.get("domains") or []), "authorised_by": {}, "start": None, "end": None,
                 "purpose": "", "reference": str(record.get("reference") or ""),
             }
+            if record.get("active") is True:
+                found["active"] = True
+            return found
     return None
 
 
@@ -55,11 +61,18 @@ def engagement_event(loaded, confirmed: str) -> dict:
             "reference": loaded.engagement.reference}
 
 
-def self_event(domains: list[str], organisation: str, confirmed: str) -> dict:
-    return {
+def self_event(domains: list[str], organisation: str, confirmed: str, *, active: bool = False) -> dict:
+    event = {
         "event": "self_attestation", "domains": list(domains), "organisation": organisation, "confirmed": confirmed,
         "statement": "the person running this scan owns or controls these domains",
     }
+    if active:
+        event["active"] = True
+        event["statement"] = (
+            "the person running this scan owns or controls these domains and the systems their names resolve to, and "
+            "authorises active connection checks of those systems"
+        )
+    return event
 
 
 def authorisation_late(loaded=None, *, domains: list[str] | None = None, organisation: str = "") -> dict:

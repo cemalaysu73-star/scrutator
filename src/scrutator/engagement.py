@@ -60,6 +60,9 @@ class Engagement(BaseModel):
     purpose: str = Field(min_length=10, max_length=500)
     github_orgs: tuple[str, ...] = Field(default=(), max_length=5)
     reference: str = Field(default="", max_length=80)  # the engagement's reference, shown on an audit's cover
+    # True only when the signed letter allows active confirmation (connection checks of the addresses the domains resolve
+    # to: scrutator audit --active). Absent or false: the engagement covers passive review only.
+    active_testing: bool = False
 
     @field_validator("domains")
     @classmethod
@@ -96,7 +99,7 @@ class Engagement(BaseModel):
 
     def record(self) -> dict:
         """What the audit log and the report carry about the engagement."""
-        return {
+        record = {
             "organisation": self.organisation,
             "domains": list(self.domains),
             "authorised_by": {"name": self.authorised_by.name, "role": self.authorised_by.role},
@@ -105,6 +108,9 @@ class Engagement(BaseModel):
             "purpose": self.purpose,
             "github_orgs": list(self.github_orgs),
         }
+        if self.active_testing:
+            record["active_testing"] = True  # only when granted, so the records of earlier engagements are unchanged
+        return record
 
 
 @dataclass(frozen=True)

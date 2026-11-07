@@ -28,6 +28,7 @@ from scrutator.packs.schema import (
     PlatformEntry,
     PlaybookEntry,
     ProviderEntry,
+    SharedPlatformEntry,
     SignalEntry,
     TakeoverEntry,
 )
@@ -181,7 +182,7 @@ def validate_dir(directory=None) -> list[str]:
 class PackSet:
     """The merged content of the bundled packs and any user packs, with matching helpers."""
 
-    def __init__(self, files: Sequence[dict], providers=(), takeover=(), signals=(), playbooks=(), platforms=(), compliance=()) -> None:
+    def __init__(self, files: Sequence[dict], providers=(), takeover=(), signals=(), playbooks=(), platforms=(), compliance=(), shared=()) -> None:
         self.files = tuple(files)
         self.platforms: tuple[PlatformEntry, ...] = tuple(sorted(platforms, key=lambda e: e.id))
         self.providers: tuple[ProviderEntry, ...] = tuple(sorted(providers, key=lambda e: e.id))
@@ -191,6 +192,8 @@ class PackSet:
         self.playbooks: tuple[PlaybookEntry, ...] = tuple(sorted(playbooks, key=lambda e: e.id))
         # not part of effective() either: the informational compliance mapping the audit shows; no result depends on it
         self.compliance: tuple = tuple(sorted(compliance, key=lambda e: e.id))
+        # not part of effective() either: platforms whose addresses active confirmation never connects to (scrutator/active)
+        self.shared: tuple[SharedPlatformEntry, ...] = tuple(sorted(shared, key=lambda e: e.id))
 
     # description
 
@@ -215,7 +218,7 @@ class PackSet:
         drop = set(kinds) & NEWER_KINDS
         return PackSet(
             [f for f in self.files if f.get("kind") not in drop], self.providers, self.takeover, self.signals, self.playbooks,
-            () if "platforms" in drop else self.platforms, self.compliance,
+            () if "platforms" in drop else self.platforms, self.compliance, self.shared,
         )
 
     @property
@@ -316,5 +319,5 @@ def load_packs(extra_dirs: Sequence[Path] = (), *, bundled=True) -> PackSet:
                 merged[info.kind][entry.id] = entry
     return PackSet(
         infos, merged["providers"].values(), merged["takeover"].values(), merged["signals"].values(), merged["playbooks"].values(),
-        merged["platforms"].values(), merged["compliance"].values(),
+        merged["platforms"].values(), merged["compliance"].values(), merged["shared"].values(),
     )

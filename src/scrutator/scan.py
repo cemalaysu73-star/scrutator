@@ -1,6 +1,10 @@
 import asyncio
 import json
 
+from scrutator import proxy as proxy_setting
+from scrutator.active import RISKY_PORTS, WEB_PORTS
+from scrutator.active.gate import active_authorisation, authorised_event
+from scrutator.active.run import ActiveConfig, run_active
 from scrutator.agent.runner import AgentStats, run_agent
 from scrutator.ai.runtime import AIRuntime
 from scrutator.attribution.candidates import attribute_scan
@@ -58,10 +62,14 @@ async def run_scan(
     listeners: list | None = None,
     timeout_cap: float | None = None,
     pre_audit: list[dict] | None = None,
+    active: ActiveConfig | None = None,
 ) -> tuple[int, AgentStats]:
     """Run a scan. With a deadline (seconds, or a `Deadline` shared with the caller) the scan
     always returns in time: lookups still running when it passes are cancelled, nothing new
     starts, and what was collected so far is kept and reported with the gap recorded."""
+    if active is not None:
+        # no authorisation that covers active testing: refused here, before the scan exists and before anything is sent
+        active_authorisation(pre_audit)
     if deadline is None and deadline_s is not None:
         deadline = Deadline(deadline_s)
     scan_id = store.create_scan(seed.value)
@@ -94,6 +102,11 @@ async def run_scan(
     for event in pre_audit or ():
         # what authorises the scan (an engagement, a self-attestation: scrutator audit), in the signed log before any lookup
         store.append_audit(scan_id, dict(event))
+    if active is not None:
+        spec = proxy_setting.current()
+        store.append_audit(scan_id, authorised_event(
+            active.limits, fixed_ports=[*RISKY_PORTS, *WEB_PORTS], proxy=spec.label() if spec else None, relax=active.relax,
+        ))
     if allow_active:
         # the user confirmed active-ish lookups (--active): said in the signed log before any lookup runs
         active = sorted(m.name for m in chosen if m.mode.value == "active")
@@ -122,4 +135,7 @@ async def run_scan(
     stats.deadline_hit = stats.deadline_hit or engine.deadline_losses > 0
     if stats.deadline_hit:
         store.append_audit(scan_id, {"event": "deadline", "seconds": deadline.seconds if deadline else None})
+    if active is not None:
+        # after the passive collection, with its own time budget: the plan is written before the first connection
+        await run_active(store, scan_id, packs, active)
     return scan_id, stats

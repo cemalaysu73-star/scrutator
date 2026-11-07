@@ -1,0 +1,198 @@
+# Shared platforms: addresses that serve many customers. Active confirmation (scrutator audit --active) never connects to
+# an address that one of these entries recognises: it is not the client's own server, and a connection check would be a
+# connection to someone else's infrastructure. The skip and its reason are recorded as evidence.
+#
+# An address is recognised by (any of): its AS number (`asn`), a CIDR range it is in (`cidrs`), a host-name suffix
+# (`hosts`: the CNAME target of an in-scope name, or a reverse name Shodan's InternetDB saw for the address), or a
+# substring of the network name RIPEstat reports (`netname`).
+#
+# `verified: true` means the patterns were checked against the cited source on the date in the note. `verified: false`
+# means they are widely published but not re-read: the entry is still in force (a wrong pattern costs a skipped probe,
+# never a probe of the wrong host), and a maintainer is asked to check it. Add a platform you meet that is missing: an
+# unlisted shared address is probed with a handful of connections, which is the gap this file exists to narrow.
+#
+# Dedicated hosting (Hetzner, OVH, DigitalOcean, an AWS or Azure virtual machine) is deliberately NOT listed: a virtual
+# server is its customer's own machine.
+schema: 1
+kind: shared
+version: 2026.11.1
+updated: 2026-11-07
+description: CDNs, PaaS front ends, website builders and pages hosts whose addresses are never actively probed.
+entries:
+  - id: cloudflare
+    platform: Cloudflare
+    kind: cdn
+    asn: [13335]
+    cidrs: [173.245.48.0/20, 103.21.244.0/22, 103.22.200.0/22, 103.31.4.0/22, 141.101.64.0/18, 108.162.192.0/18, 190.93.240.0/20, 188.114.96.0/20, 197.234.240.0/22, 198.41.128.0/17, 162.158.0.0/15, 104.16.0.0/13, 104.24.0.0/14, 172.64.0.0/13, 131.0.72.0/22]
+    hosts: [cdn.cloudflare.net, cloudflare.net]
+    netname: [cloudflarenet]
+    examples: [AS13335, 104.16.1.1, 172.67.10.10, www.example.com.cdn.cloudflare.net]
+    source: "https://www.cloudflare.com/ips/"
+    verified: true
+    note: "The IPv4 ranges were read from https://www.cloudflare.com/ips-v4 on 2026-11-07 and match this list; AS13335 as in providers.yaml."
+  - id: fastly
+    platform: Fastly
+    kind: cdn
+    asn: [54113]
+    cidrs: [151.101.0.0/16, 199.232.0.0/16]
+    hosts: [fastly.net, fastlylb.net]
+    netname: [fastly]
+    examples: [AS54113, 151.101.1.1, dualstack.nonssl.global.fastly.net]
+    source: "https://www.fastly.com/documentation/reference/network/"
+    verified: false
+  - id: akamai
+    platform: Akamai
+    kind: cdn
+    asn: [20940, 16625]
+    hosts: [edgekey.net, edgesuite.net, akamaiedge.net, akamai.net, akamaitechnologies.com]
+    netname: [akamai]
+    examples: [AS20940, e1234.a.akamaiedge.net, a23-1-2-3.deploy.static.akamaitechnologies.com]
+    source: "https://techdocs.akamai.com/"
+    verified: false
+  - id: amazon-cloudfront
+    platform: Amazon CloudFront
+    kind: cdn
+    hosts: [cloudfront.net]
+    examples: [d111111abcdef8.cloudfront.net, server-1-2-3-4.fra1.r.cloudfront.net]
+    source: "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/CNAMEs.html"
+    verified: false
+    note: "CloudFront addresses sit in Amazon's general AS16509, which is not listed (it also holds customers' own servers); recognised by name only."
+  - id: aws-edge
+    platform: AWS shared front ends
+    kind: edge
+    hosts: [awsglobalaccelerator.com, elb.amazonaws.com, execute-api.amazonaws.com, s3.amazonaws.com, amazonaws.com.cn]
+    examples: [a1234567890.awsglobalaccelerator.com, my-lb-123.us-east-1.elb.amazonaws.com]
+    source: "https://docs.aws.amazon.com/elasticloadbalancing/latest/userguide/how-elastic-load-balancing-works.html"
+    verified: false
+    note: "Load balancer and accelerator addresses are shared infrastructure that changes without notice, so a stored address may belong to someone else by the time of a probe."
+  - id: google-front-ends
+    platform: Google front ends (App Engine, Firebase, Cloud Run, Sites)
+    kind: edge
+    cidrs: [216.239.32.21/32, 216.239.34.21/32, 216.239.36.21/32, 216.239.38.21/32]
+    hosts: [ghs.googlehosted.com, ghs.google.com, appspot.com, web.app, firebaseapp.com, run.app, googlehosted.com]
+    examples: [216.239.32.21, ghs.googlehosted.com, demo.web.app]
+    source: "https://cloud.google.com/appengine/docs/standard/mapping-custom-domains"
+    verified: false
+  - id: azure-front-ends
+    platform: Microsoft Azure shared front ends (Front Door, CDN, App Service)
+    kind: edge
+    hosts: [azurefd.net, azureedge.net, azurewebsites.net, azurestaticapps.net, trafficmanager.net, azure-api.net, azurecontainerapps.io]
+    examples: [demo.azurefd.net, demo.azurewebsites.net, demo.azureedge.net]
+    source: "https://learn.microsoft.com/en-us/azure/frontdoor/front-door-custom-domain"
+    verified: false
+  - id: github-pages
+    platform: GitHub Pages
+    kind: pages
+    cidrs: [185.199.108.0/22]
+    hosts: [github.io]
+    examples: [185.199.108.153, example-org.github.io]
+    source: "https://docs.github.com/en/pages/configuring-a-custom-domain-for-your-github-pages-site/managing-a-custom-domain-for-your-github-pages-site"
+    verified: false
+  - id: vercel
+    platform: Vercel
+    kind: paas
+    cidrs: [76.76.21.0/24, 66.33.60.0/24]
+    hosts: [vercel-dns.com, vercel.app, vercel-dns-017.com]
+    examples: [76.76.21.21, cname.vercel-dns.com, demo.vercel.app]
+    source: "https://vercel.com/docs/domains/working-with-domains"
+    verified: false
+  - id: netlify
+    platform: Netlify
+    kind: paas
+    cidrs: [75.2.60.5/32]
+    hosts: [netlify.app, netlify.com, netlifyglobalcdn.com]
+    examples: [75.2.60.5, demo.netlify.app, apex-loadbalancer.netlify.com]
+    source: "https://docs.netlify.com/domains-https/custom-domains/configure-external-dns/"
+    verified: false
+  - id: heroku
+    platform: Heroku
+    kind: paas
+    hosts: [herokuapp.com, herokudns.com, herokussl.com]
+    examples: [demo.herokuapp.com, demo-1234.herokudns.com]
+    source: "https://devcenter.heroku.com/articles/custom-domains"
+    verified: false
+  - id: fly-io
+    platform: Fly.io
+    kind: paas
+    hosts: [fly.dev, edgeapp.net]
+    examples: [demo.fly.dev]
+    source: "https://fly.io/docs/networking/custom-domain/"
+    verified: false
+  - id: render
+    platform: Render
+    kind: paas
+    hosts: [onrender.com]
+    examples: [demo.onrender.com]
+    source: "https://render.com/docs/custom-domains"
+    verified: false
+  - id: shopify
+    platform: Shopify
+    kind: builder
+    cidrs: [23.227.38.0/24]
+    hosts: [myshopify.com, shops.myshopify.com]
+    examples: [23.227.38.65, shops.myshopify.com]
+    source: "https://help.shopify.com/en/manual/domains/add-a-domain/connecting-domains/connect-domain-manual"
+    verified: false
+  - id: wix
+    platform: Wix
+    kind: builder
+    hosts: [wixdns.net, wixsite.com]
+    examples: [demo.wixdns.net]
+    source: "https://support.wix.com/"
+    verified: false
+  - id: squarespace
+    platform: Squarespace
+    kind: builder
+    hosts: [squarespace.com, sqsp.net]
+    examples: [ext-cust.squarespace.com]
+    source: "https://support.squarespace.com/"
+    verified: false
+  - id: wp-engine
+    platform: WP Engine
+    kind: paas
+    hosts: [wpengine.com, wpenginepowered.com]
+    examples: [demo.wpengine.com]
+    source: "https://wpengine.com/support/"
+    verified: false
+  - id: imperva
+    platform: Imperva (Incapsula)
+    kind: cdn
+    asn: [19551]
+    hosts: [incapdns.net]
+    netname: [incapsula]
+    examples: [AS19551, demo.x.incapdns.net]
+    source: "https://docs.imperva.com/"
+    verified: false
+  - id: sucuri
+    platform: Sucuri
+    kind: cdn
+    asn: [30148]
+    hosts: [sucuri.net]
+    netname: [sucuri]
+    examples: [AS30148, demo.sucuri.net]
+    source: "https://sucuri.net/"
+    verified: false
+  - id: bunny-cdn
+    platform: bunny.net
+    kind: cdn
+    asn: [200325]
+    hosts: [b-cdn.net]
+    examples: [AS200325, demo.b-cdn.net]
+    source: "https://docs.bunny.net/"
+    verified: false
+  - id: stackpath-edgio
+    platform: StackPath and Edgio (Edgecast)
+    kind: cdn
+    asn: [15133, 33438]
+    hosts: [stackpathdns.com, edgecastcdn.net, edgio.net]
+    examples: [AS15133, demo.edgecastcdn.net]
+    source: "https://edg.io/"
+    verified: false
+  - id: cdn77-keycdn
+    platform: CDN77 and KeyCDN
+    kind: cdn
+    asn: [60068, 30633]
+    hosts: [cdn77.org, kxcdn.com]
+    examples: [AS60068, demo.kxcdn.com]
+    source: "https://www.cdn77.com/"
+    verified: false
