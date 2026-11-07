@@ -134,7 +134,7 @@ async def _probe(store: Store, scan_id: int, plan: Plan, budget: Budget, config:
     run = _Run(store, scan_id, budget, config, summary)
     states = await _tcp_stage(run, plan)
     summary["tcp"] = {state: sum(1 for v in states.values() if v == state) for state in sorted(set(states.values()))}
-    await _tls_stage(run, plan, states)
+    await asyncio.gather(_tls_stage(run, plan, states), _web_stage(run, plan, states))
 
 
 async def _tcp_stage(run: _Run, plan: Plan) -> dict[tuple[str, int], str]:
@@ -170,4 +170,21 @@ async def _tls_stage(run: _Run, plan: Plan, states: dict[tuple[str, int], str]) 
                 jobs.append(run.call("tls", ip, lambda ip=ip, port=port, sni=sni: tls_handshake(ip, port, sni, **kw), port=port, sni=sni))
             for version in LEGACY:
                 jobs.append(run.call("tls", ip, lambda ip=ip, port=port, v=version: legacy_probe(ip, port, v, names[0], **kw), port=port, legacy=version))
+    await asyncio.gather(*jobs)
+
+
+async def _web_stage(run: _Run, plan: Plan, states: dict[tuple[str, int], str]) -> None:
+    """One `GET /` for each in-scope name on an open port 80 (plain) and an open port 443 (TLS). Nothing else is requested."""
+    from scrutator import active
+    from scrutator.active.httpcheck import http_get
+
+    kw = {"limits": run.limits, "budget": run.budget, "relax": run.config.relax}
+    jobs = []
+    for target in plan.targets:
+        ip = target["ip"]
+        for port, tls in ((active.HTTP_PORT, False), (active.HTTPS_PORT, True)):
+            if states.get((ip, port)) != "open":
+                continue
+            for name in target["probe_names"]:
+                jobs.append(run.call("http", ip, lambda ip=ip, port=port, name=name, tls=tls: http_get(ip, port, name, tls, **kw), port=port, name=name))
     await asyncio.gather(*jobs)
