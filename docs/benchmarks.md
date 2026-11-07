@@ -37,10 +37,11 @@ sources, reserved names (`example.com`, `*.test`, documentation address ranges).
 
 | `audit` | (R7) the client audit made from the risk lab's signed scan, in English and Turkish; branding written as an attacker would; three tamper cases (an edited number in the page, a high finding dropped and the page re-rendered, a flipped byte in the bundle) | claims about the client without evidence in the bundle = 0; every `audit-check` check passes; hostile branding inert; tampering caught 3 of 3; both languages render and check; every risk of the scan is in the audit |
 | `bounty` | (R7) 22 hostile scope entries (`*`, `*.com.tr`, `javascript:`, user-info URLs, private ranges, hidden characters, ...), 5 odd but safe ones, an oversized file, a membership table, a three-step history with new in-scope and out-of-scope assets | hostile refused 22 of 22; safe normalised 5 of 5; oversized refused; membership errors = 0; alerts on the baseline = 0; new assets detected 4 of 4; out-of-scope announced = 0; repeats = 0 |
+| `active` | (R8) authorised active confirmation against local listeners (a planted server with an expired, an expiring and a mismatched certificate, missing headers, a version banner, a stale third-party port, and a shared-platform, a private and a metadata address that must never be touched) | every planted issue found, none else; no connection to a refused or shared address; the cap held; four authorisation refusals; active evidence never replayed; an open port flipped to closed in a re-signed bundle and five guardrail forgeries all caught by `verify` |
 | `monitor` | (R7) a seven-step history (a finding appears, stays, resolves, stays away, comes back; a name goes) and a mixed set of alerts | dedupe errors = 0; announcements = 4; severity order; the min-severity filter; the digest cites the evidence |
 
-Output: a table, `bench.md`, and `bench.json` with `"schema": "scrutator-bench/4"` (2 added the sections `brand`
-and `org_exposure`, 3 added `recall_speed`, 4 added `audit`, `bounty` and `monitor`):
+Output: a table, `bench.md`, and `bench.json` with `"schema": "scrutator-bench/5"` (2 added the sections `brand`
+and `org_exposure`, 3 added `recall_speed`, 4 added `audit`, `bounty` and `monitor`, 5 added `active`):
 
 ```
 {"schema", "tool", "created_at", "seconds", "signing_key", "pass",

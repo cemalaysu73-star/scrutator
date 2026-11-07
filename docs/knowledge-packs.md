@@ -10,6 +10,7 @@ matching nothing. Adding a provider is one data entry and one fixture, no code.
 | `takeover.yaml` (`takeover`) | services whose names can be claimed when a CNAME to them dangles | `dangling-cname-*` risks |
 | `signals.yaml` (`signals`) | how often an attribution signal shows up in unrelated organisations (empty: no measured corpus exists) | attribution weights |
 | `platforms.yaml` (`platforms`) | public platforms an organisation may link to: profile URL template, how a link to an account looks, the handle's characters and length, and whether the profile page's HTTP status tells existence (with the behaviour observed live) | brand presence (`scan --brand`) and its two risks; templates and character sets only, never regular expressions |
+| `shared.yaml` (`shared`) | platforms whose addresses serve many customers (CDNs, PaaS front ends, website builders): AS numbers, address ranges, host-name suffixes, network names | active confirmation (`audit --active`) never probes an address one of them recognises; not part of the hashed pack content |
 | `playbooks.yaml` (`playbooks`) | short recipes offered to the agent's planner by the situation of the investigation | the planner only; no result depends on them |
 
 ```bash
@@ -74,6 +75,10 @@ Situations: `cname_out`, `san_cohabitants`, `mail`, `delegated`, `ip_without_net
 A playbook can change the order in which the planner ranks lookups, never the options it can choose from, and never the
 scope. Playbooks are procedures written for Scrutator; the bundled ones are all `verified: false` and their `source`
 is background reading.
+
+## Shared platforms
+
+`shared.yaml` (`kind: shared`) lists platforms whose addresses serve many customers: CDNs, PaaS front ends, website builders, pages hosts. Active confirmation (`scrutator audit --active`, [active.md](active.md)) never connects to an address one of these entries recognises, by AS number (`asn`), address range (`cidrs`), host-name suffix (`hosts`: a CNAME target of an in-scope name or a reverse name InternetDB saw) or a substring of the RIPEstat network name (`netname`). It only keeps probes away, so no result depends on it and it is kept out of the hashed pack content. Dedicated hosting (a virtual server at Hetzner, OVH, AWS) is deliberately not listed. A pattern you are unsure of goes in with `verified: false`: a wrong entry costs a skipped probe, never a probe of the wrong host.
 
 ## A compliance mapping
 

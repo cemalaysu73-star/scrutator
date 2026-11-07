@@ -6,7 +6,7 @@ annex, and the signed proof bundle everything rests on. The client, or their aud
 against the bundle with three commands.
 
 It is built for consultants, MSPs and freelancers who sell a one-off **external exposure review** to small and
-mid-size companies, for example as evidence for ISO/IEC 27001, NIS2 or KVKK/GDPR work. It is passive: no port scan, no
+mid-size companies, for example as evidence for ISO/IEC 27001, NIS2 or KVKK/GDPR work. It is passive by default (an opt-in, authorised [active confirmation](active.md) is described on its own page): no port scan, no
 vulnerability scan, no login attempt, no exploitation. Say so when you sell it (the document says so too).
 
 ## 1. Get a written authorisation

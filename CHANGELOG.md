@@ -4,6 +4,37 @@ Built from the git history (`git log`), newest first. Dates are commit dates. Ve
 tagged or published; the numbers are the ones in `pyproject.toml` at the time. Nothing here has been released on
 PyPI.
 
+## 1.0.0rc4 (2026-11-07, a release candidate; not published)
+
+Round R8: authorised active confirmation, strictly guardrailed, and an outbound proxy. The edge stays the same: every
+claim is signed evidence a stranger can check; what is new is a way to say "checked now" instead of "a third party
+said so once".
+
+- **Active confirmation** (`scrutator audit --active`, `scrutator active-plan`; docs/active.md)
+  - After the passive scan, a few ordinary connections to the addresses an in-scope name resolves to: a TCP connect
+    check with a read-only banner capture on the ports a passive source lists plus a fixed list of risky ports and 80/443,
+    a TLS handshake per name (certificate, hostname match, protocol, whether TLS 1.0/1.1 still complete), and one
+    `GET /` per name with a fixed generic User-Agent, no redirect followed.
+  - Guardrails: an engagement with `active_testing: true` or a `--self` attestation naming the systems, recorded in the
+    signed audit log before the first lookup; never reachable from MCP; shared platforms (new `shared.yaml` pack) and
+    private, loopback, link-local, reserved and IPv6 addresses skipped with the reason recorded (also when a public name
+    resolves to one); a hard connection cap (60), concurrency 4, a rate limit, per-step timeouts and a deadline;
+    Ctrl-C safe; no login, payload, fuzzing, brute force or UDP.
+  - Evidence sources `tcp`, `tls`, `http` and `active` (the plan, written before the first connection). Active
+    evidence is never replayed. `verify` re-derives the plan from the passive evidence and fails a bundle whose probes
+    left it, exceeded the cap, hit a refused or shared address, or lack an authorisation recorded before the lookups.
+  - Rules: `exposed-risky-service` is confirmed (high confidence) when a connection succeeds; new `stale-exposure-data`
+    when a third party listed a port that is closed or unanswered now (both are shown); `tls-cert-expired`,
+    `tls-cert-expiring`, `tls-hostname-mismatch`, `tls-legacy-protocol`, `http-no-https-redirect`, `http-missing-hsts`,
+    `http-missing-security-headers`, `server-banner-discloses-version`. Mapped in the compliance pack, in SARIF, in the
+    HTML report (a new section and the evidence drawer), in the audit ("checked now" versus "reported earlier by a
+    third party") and in `scrutator risk`.
+- **`--proxy`** (also `SCRUTATOR_PROXY`): one HTTP or SOCKS5 proxy for every outbound request: the HTTP sources, the web
+  modules, the crt.sh fallback and the active probes. DNS is not proxied; docs/active.md says what that means.
+- **Bench**: `scrutator-bench/5` with the section `active` (local listeners).
+- Rule set 4 (bundles made with rule set 3 verify unchanged unless they hold active evidence); the audit's sample
+  documents were regenerated for this version.
+
 ## 1.0.0rc3 (2026-10-21, a release candidate; not published)
 
 Round R7: make it sellable by someone who sells it. The one edge kept in front: every claim carries signed, independently

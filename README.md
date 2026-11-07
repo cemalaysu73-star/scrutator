@@ -870,6 +870,23 @@ test, not this paragraph):
 - Any risk or candidate that looks wrong is a bug: open the evidence it cites, and file an issue with the
   evidence id.
 
+## Active confirmation (opt-in)
+
+Passive data goes stale: Shodan saw Telnet open last month, is it open now? `scrutator audit --active` answers with a few
+authorised connections to the addresses of your own names: a TCP connect and banner read per port, a TLS handshake, one
+`GET /`. It needs an engagement with `active_testing: true` or `--self`, writes the authorisation to the signed log before
+the first connection, never probes shared platforms (CDNs, hosting platforms) or private, loopback and link-local
+addresses, stays under a connection cap, never logs in or sends a payload, and is never reachable from MCP. A finding says
+whether it was *checked now* or *reported earlier by a third party*; a confirmed port and the stale data it contradicts are
+both shown. `--proxy` routes every outbound request (not DNS) through a proxy.
+
+```bash
+scrutator active-plan scrutator-out/proof.scrutator      # offline: what would be probed, what is skipped and why
+scrutator audit example.com --self --active --out audit-active
+```
+
+Everything it does, never does and how `verify` checks it: [docs/active.md](docs/active.md).
+
 ## Responsible use
 
 Passive mode only queries third-party public sources, but those services see what you search

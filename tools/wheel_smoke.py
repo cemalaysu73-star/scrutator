@@ -101,6 +101,14 @@ def main() -> int:
                           capture_output=True, text=True, timeout=120)
     check("bounty import refuses * and keeps *.example.com", done.returncode == 0 and "refused '*'" in done.stdout and (work / "scope.yaml").exists(), done.stdout.strip()[:160])
 
+    # R8: active confirmation's guardrails and plan are package data and code too; none of these sends anything
+    done = run(exe, "active-plan", str(bundle), cwd=work)
+    check("active-plan (offline, packaged shared-platform pack)", done.returncode == 0 and "nothing is sent" in done.stdout, (done.stdout.strip().splitlines() or [done.stderr[-200:]])[0][:160])
+    done = run(exe, "audit", "example.com", "--active", "--yes", "--out", "refused-out", cwd=work)
+    check("audit --active without an authorisation is refused", done.returncode == 2 and "--engagement" in (done.stdout + done.stderr), (done.stdout + done.stderr).strip()[:160])
+    done = run(exe, "--proxy", "ftp://user:secret@127.0.0.1:1", "sources", cwd=work)
+    check("--proxy with a bad scheme is refused and never echoes credentials", done.returncode == 2 and "secret" not in (done.stdout + done.stderr), (done.stdout + done.stderr).strip()[:120])
+
     if args.live:
         done = run(exe, "scan", "example.com", "--ai", "off", "--out", "live", "--bundle", "--key-dir", "keys", cwd=work, timeout=900)
         check("live scan example.com --ai off --bundle", done.returncode == 0, (done.stdout.strip().splitlines() or [done.stderr[-200:]])[0][:160])
