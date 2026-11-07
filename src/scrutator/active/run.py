@@ -73,6 +73,80 @@ async def run_active(store: Store, scan_id: int, packs: PackSet, config: ActiveC
     return summary
 
 
+class _Run:
+    """The state shared by the stages of one run: where evidence goes, the budget, the clock and the time left."""
+
+    def __init__(self, store: Store, scan_id: int, budget: Budget, config: ActiveConfig, summary: dict) -> None:
+        self.store, self.scan_id, self.budget, self.config, self.summary = store, scan_id, budget, config, summary
+        self.limits = config.limits
+        self.deadline = Deadline(config.limits.deadline_s)
+        self.slots = asyncio.Semaphore(config.limits.concurrency)
+
+    def stopped(self) -> str | None:
+        if self.deadline.expired:
+            return "deadline"
+        if self.budget.exhausted:
+            return "connection cap"
+        return None
+
+    def note_stop(self, reason: str) -> None:
+        self.summary.setdefault("stopped", reason)
+
+    def done(self, module: str, ip: str, evidence: Evidence, **extra) -> None:
+        record(self.store, self.scan_id, evidence)
+        self.store.append_audit(self.scan_id, {"event": "ok", "module": module, "entity": f"ip:{ip}", "evidence_ids": [evidence.id], **extra})
+
+    def failed(self, module: str, ip: str, event: str, reason: str, **extra) -> None:
+        self.store.append_audit(self.scan_id, {"event": event, "module": module, "entity": f"ip:{ip}", "reason": reason, **extra})
+
+    async def call(self, module: str, ip: str, probe, **extra) -> Evidence | None:
+        """Run one probe (`probe` builds the coroutine) under the concurrency limit and the run's deadline; record its
+        evidence, or why there is none."""
+        from scrutator.active.net import ProbeRefused
+
+        async with self.slots:
+            reason = self.stopped()
+            if reason:
+                self.note_stop(reason)
+                self.failed(module, ip, "skipped", reason, **extra)
+                return None
+            try:
+                evidence = await asyncio.wait_for(probe(), max(0.1, self.deadline.remaining()))
+            except asyncio.TimeoutError:
+                self.note_stop("deadline")
+                self.failed(module, ip, "cancelled", "deadline", **extra)
+                return None
+            except ProbeRefused as exc:
+                self.failed(module, ip, "denied", str(exc), **extra)
+                return None
+            except Exception as exc:  # noqa: BLE001 - a probe that breaks is recorded, the run goes on
+                self.failed(module, ip, "error", f"{type(exc).__name__}: {exc}"[:200], **extra)
+                return None
+        if evidence is None:  # the cap was reached between the check and the connection
+            self.note_stop("connection cap")
+            self.failed(module, ip, "skipped", "connection cap", **extra)
+            return None
+        self.done(module, ip, evidence, **extra)
+        return evidence
+
+
 async def _probe(store: Store, scan_id: int, plan: Plan, budget: Budget, config: ActiveConfig, summary: dict) -> None:
-    """The probes themselves (added with the connect, TLS and HTTP checks)."""
-    return None
+    run = _Run(store, scan_id, budget, config, summary)
+    states = await _tcp_stage(run, plan)
+    summary["tcp"] = {state: sum(1 for v in states.values() if v == state) for state in sorted(set(states.values()))}
+
+
+async def _tcp_stage(run: _Run, plan: Plan) -> dict[tuple[str, int], str]:
+    """One connect check (with banner) for every planned (address, port). Returns the state of each."""
+    from scrutator.active.tcpcheck import tcp_check
+
+    states: dict[tuple[str, int], str] = {}
+
+    async def one(ip: str, port: int) -> None:
+        evidence = await run.call("tcp", ip, lambda: tcp_check(ip, port, limits=run.limits, budget=run.budget, relax=run.config.relax), port=port)
+        if evidence is not None:
+            states[(ip, port)] = json.loads(evidence.payload)["state"]
+
+    jobs = [one(t["ip"], p["port"]) for t in plan.targets for p in t["ports"]]
+    await asyncio.gather(*jobs)
+    return states
