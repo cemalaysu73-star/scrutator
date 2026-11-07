@@ -337,3 +337,29 @@ async def test_a_proxy_failure_is_recorded_as_an_error_state_not_as_a_closed_por
         server.close()
     states = {json.loads(e.payload)["state"] for e in evidence_of(store, sid)}
     assert states == {"error"}
+
+
+# ------------------------------------------------------------------------------------------------ binary greetings
+
+
+def test_a_mysql_handshake_keeps_the_version_and_drops_the_random_challenge():
+    body = b"\x0a5.5.5-10.6.20-MariaDB-test\x00" + b"\x2a\x00\x00\x00" + b"CHALLENGE\x01\x02\x03" + b"\x00" * 40
+    packet = len(body).to_bytes(3, "little") + b"\x00" + body
+    banner, note = banner_text(packet)
+    assert banner == "MySQL/MariaDB handshake: server 5.5.5-10.6.20-MariaDB-test" and "CHALLENGE" not in banner
+    assert "challenge dropped" in note
+
+
+def test_an_ssh_identification_line_followed_by_a_key_exchange_packet_keeps_the_line_only():
+    raw = b"SSH-2.0-mod_sftp\r\n" + bytes(range(0x80, 0xFF)) + b"\x00\x01\x02curve25519-sha256"
+    banner, note = banner_text(raw)
+    assert banner == "SSH-2.0-mod_sftp" and note == "binary data after the first line dropped"
+
+
+def test_a_text_greeting_with_several_printable_lines_is_kept_whole():
+    assert banner_text(b"220-first\r\n220 second\r\n") == ("220-first 220 second", "")
+
+
+def test_an_ssh_key_exchange_packet_that_is_mostly_printable_text_is_still_dropped():
+    raw = b"SSH-2.0-mod_sftp\r\n" + b"\x00\x00\x04\x1c\x08\x14\x9f\x01" + b"curve25519-sha256,ecdh-sha2-nistp256,diffie-hellman-group14-sha256," * 3
+    assert banner_text(raw) == ("SSH-2.0-mod_sftp", "binary data after the first line dropped")

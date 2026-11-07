@@ -12,6 +12,7 @@ from datetime import date
 
 from scrutator import __version__
 from scrutator.audit.i18n import EFFORT, EFFORT_RANK, RULES_TR, TEXT, plural
+from scrutator.risk.basis import basis
 from scrutator.risk.engine import RULESET_VERSION
 
 FORMAT = "scrutator-audit/1"
@@ -137,6 +138,9 @@ def _risks(report: dict, lang: str, packs) -> list[dict]:
             "remediation": fix, "effort": effort, "evidence_ids": list(risk["evidence_ids"]), "fingerprint": risk["fingerprint"],
             "compliance": [m.model_dump(mode="json") for m in entry.mappings] if entry is not None else [],
         })
+        found = basis(risk["evidence_ids"], report.get("evidence") or {})
+        if found:  # how it was established (checked now / reported earlier by a third party); absent for public records only
+            rows[-1]["basis"] = found
     rows.sort(key=lambda r: (-_SEV_RANK[r["severity"]], -_CONF_RANK.get(r["confidence"], 0), EFFORT_RANK[r["effort"]], r["rule_id"], r["fingerprint"]))
     for number, row in enumerate(rows, 1):
         row["ref"] = f"R{number}"
@@ -186,15 +190,49 @@ def _join(items: list[str], limit: int = 3) -> str:
     return shown + (f" +{len(items) - limit}" if len(items) > limit else "")
 
 
-def _executive(report: dict, risks: list[dict], sources: list[dict], auth: dict, who: dict, lang: str) -> list[dict]:
+def _active_facts(report: dict) -> dict | None:
+    """What the authorised active confirmation did and found, per address (only when the scan had it)."""
+    section = report.get("active")
+    if not section:
+        return None
+    plan = section.get("plan") or {}
+    names = {t["ip"]: list(t.get("names") or []) for t in plan.get("targets") or []}
+    rows: dict[str, dict] = {}
+    counts = {"open": 0, "closed": 0, "filtered": 0, "error": 0}
+    for check in section.get("checks") or []:
+        row = rows.setdefault(check["ip"], {"ip": check["ip"], "names": names.get(check["ip"], [])[:4], "open": [], "closed": [], "filtered": [], "error": []})
+        state = check.get("state") if check.get("state") in counts else "error"
+        counts[state] += 1
+        if state == "open":
+            row["open"].append({"port": check["port"], "banner": str(check.get("banner") or "")[:120]})
+        else:
+            row[state].append(check["port"])
+    skipped = [{"ip": s["ip"], "names": list(s.get("names") or [])[:4], "kind": s.get("kind"), "reason": s.get("reason"), "platform": s.get("platform") or ""}
+               for s in plan.get("skipped") or []]
+    ids = sorted({c["evidence_id"] for c in section.get("checks") or []} | ({plan["evidence_id"]} if plan.get("evidence_id") else set()))
+    return {
+        "summary": {"addresses": len(rows), "checks": sum(counts.values()), **counts, "skipped": len(skipped),
+                    "cap": (plan.get("limits") or {}).get("max_connections"), "not_planned": plan.get("not_planned_for_the_cap", 0)},
+        "addresses": [rows[ip] for ip in sorted(rows)],
+        "skipped": skipped,
+        "evidence_ids": ids,
+    }
+
+
+def _executive(report: dict, risks: list[dict], sources: list[dict], auth: dict, who: dict, lang: str, active: dict | None = None) -> list[dict]:
     t = TEXT[lang]
     tiers = (report.get("summary") or {}).get("tiers") or {}
     names = report.get("names") or []
     verified_ids = sorted({i for r in names if r.get("tier") == "verified" for i in r["evidence_ids"]})
     claimed_ids = sorted({i for r in names if r.get("tier") == "claimed" for i in r["evidence_ids"]})
-    out = [{"kind": "scope", "text": t["exec_scope"].format(
+    out = [{"kind": "scope", "text": t["exec_scope_active" if active else "exec_scope"].format(
         auditor=who["auditor"] or t["reviewer"], client=who["client"], domains=", ".join(auth["domains"]), date=str(report["scan"]["started_at"])[:10]),
         "evidence_ids": [], "risk_refs": []}]
+    if active:
+        s = active["summary"]
+        out.append({"kind": "fact", "text": t["exec_active"].format(
+            checks=s["checks"], addresses=s["addresses"], open=s["open"], closed=s["closed"], filtered=s["filtered"], skipped=s["skipped"]),
+            "evidence_ids": active["evidence_ids"], "risk_refs": []})
     out.append({"kind": "fact", "text": t["exec_verified"].format(n=tiers.get("verified", 0), **plural(lang, tiers.get("verified", 0))), "evidence_ids": verified_ids, "risk_refs": []})
     if tiers.get("claimed"):
         out.append({"kind": "fact", "text": t["exec_claimed"].format(n=tiers["claimed"], **plural(lang, tiers["claimed"])), "evidence_ids": claimed_ids, "risk_refs": []})
@@ -238,6 +276,7 @@ def build_audit(
         packs = load_packs()
     who = {"auditor": auditor, "client": client or authorisation.get("organisation") or report["scan"]["seed"]}
     risks = _risks(report, lang, packs)
+    active = _active_facts(report)
     inventory, verified_total = _inventory(report)
     sources = _sources(report)
     tiers = (report.get("summary") or {}).get("tiers") or {}
@@ -265,7 +304,7 @@ def build_audit(
         "bundle": bundle,
         "summary": {"verified": tiers.get("verified", 0), "claimed": tiers.get("claimed", 0), "stale": tiers.get("stale", 0),
                     "wildcard": tiers.get("wildcard", 0), "risks": len(risks), "inventory_total": verified_total},
-        "executive": _executive(report, risks, sources, authorisation, who, lang),
+        "executive": _executive(report, risks, sources, authorisation, who, lang, active),
         "risks": risks,
         "inventory": inventory,
         "limits": {
@@ -278,6 +317,7 @@ def build_audit(
                    "sources_used": sorted(s["source"] for s in sources if s["outcome"] != "idle")},
         "evidence": {"cited": cited_rows, "cited_total": len(cited)},
         "polish": None,
+        **({"active": active} if active else {}),  # only an audit of a scan made with --active has the section
     }
 
 

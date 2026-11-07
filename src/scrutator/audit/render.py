@@ -123,7 +123,9 @@ def render_audit(facts: dict, brand: Branding) -> str:
     w("</dl></div>")
     w(f'<p class="conf">{esc(t["annex"])}</p></header>')
 
+    active = facts.get("active")
     sections = [("auth", t["s_auth"]), ("exec", t["s_exec"]), ("risks", t["s_risks"]), ("inventory", t["s_inventory"]),
+                *([("active", t["s_active"])] if active else []),
                 ("limits", t["s_limits"]), ("method", t["s_method"]), ("glossary", t["s_glossary"]), ("evidence", t["s_evidence"])]
     w(f'<section class="toc"><h2>{esc(t["toc"])}</h2><ol>')
     for anchor, label in sections:
@@ -140,7 +142,7 @@ def render_audit(facts: dict, brand: Branding) -> str:
         w("<p>" + esc(t["auth_client"].format(organisation=auth["organisation"], name=by.get("name", ""), role=by.get("role", ""),
                                                start=auth["start"], end=auth["end"], purpose=auth["purpose"])) + "</p>")
         w(f"<p>{esc((t['auth_recorded_signed'] if auth['recorded'] == 'signed' else t['auth_recorded_late']).format(sha=auth['sha256']))}</p>")
-    w(f"<p>{esc(t['auth_passive'])}</p></section>")
+    w(f"<p>{esc(t['auth_active'] if active else t['auth_passive'])}</p></section>")
 
     # executive summary
     w(f'<section id="exec"><h2>{esc(t["s_exec"])}</h2><ol class="exec">')
@@ -181,6 +183,8 @@ def render_audit(facts: dict, brand: Branding) -> str:
             w(f"<dt>{esc(t['col_evidence_says'])}</dt><dd>{esc(row['explanation'])}</dd>")
             w(f"<dt>{esc(t['col_fix'])}</dt><dd>{esc(row['remediation'])}</dd>")
             w(f"<dt>{esc(t['col_effort'])}</dt><dd>{esc(t['effort'][row['effort']])}</dd>")
+            if row.get("basis"):
+                w(f"<dt>{esc(t['col_basis'])}</dt><dd>{esc(_basis(t, row['basis']))}</dd>")
             if row["compliance"]:
                 refs = "; ".join(
                     esc(m["ref"]) + ("" if m["verified"] else f' <span class="unverified">({"unverified" if lang == "en" else "doğrulanmadı"})</span>')
@@ -208,10 +212,31 @@ def render_audit(facts: dict, brand: Branding) -> str:
         w(f"<p class=\"muted\">{esc(t['inventory_more'].format(n=summary['inventory_total'] - len(facts['inventory']), **plural(lang, summary['inventory_total'] - len(facts['inventory']))))}</p>")
     w(f"<p>{esc(t['claimed_line'].format(claimed=summary['claimed'], stale=summary['stale'], wildcard=summary['wildcard']))}</p></section>")
 
+    # active confirmation (only when the scan had it)
+    if active:
+        s = active["summary"]
+        w(f'<section id="active"><h2>{esc(t["s_active"])}</h2><p>{esc(t["active_intro"])}</p>')
+        w('<div class="wide"><table><thead><tr>')
+        for key in ("col_affected", "col_open", "col_closed", "col_unanswered"):
+            w(f"<th>{esc(t[key])}</th>")
+        w("</tr></thead><tbody>")
+        for row in active["addresses"]:
+            opened = "; ".join(f"{o['port']}" + (f" ({o['banner']})" if o["banner"] else "") for o in row["open"]) or "—"
+            quiet = row["filtered"] + row["error"]
+            w(f"<tr><td class=\"mono\">{esc(row['ip'])}<br><span class=\"muted\">{esc(', '.join(row['names']))}</span></td><td class=\"mono\">{esc(opened)}</td>"
+              f"<td class=\"mono\">{esc(', '.join(str(p) for p in row['closed']) or '—')}</td><td class=\"mono\">{esc(', '.join(str(p) for p in quiet) or '—')}</td></tr>")
+        w("</tbody></table></div>")
+        if active["skipped"]:
+            w(f"<p>{esc(t['active_skipped'])}</p><ul>")
+            for row in active["skipped"]:
+                w(f"<li><span class=\"mono\">{esc(row['ip'])}</span> ({esc(', '.join(row['names']))}): {esc(row['reason'])}</li>")
+            w("</ul>")
+        w(f"<p class=\"muted\">{esc(t['active_cap'].format(cap=s['cap'], not_planned=s['not_planned']))}</p></section>")
+
     # limits
     limits = facts["limits"]
-    w(f'<section id="limits"><h2>{esc(t["s_limits"])}</h2><p>{esc(t["not_tested_intro"])}</p><ul>')
-    for line in t["not_tested"]:
+    w(f'<section id="limits"><h2>{esc(t["s_limits"])}</h2><p>{esc(t["not_tested_intro_active" if active else "not_tested_intro"])}</p><ul>')
+    for line in t["not_tested_active" if active else "not_tested"]:
         w(f"<li>{esc(line)}</li>")
     w(f"</ul><h3>{esc(t['coverage_intro'])}</h3>")
     w(f'<div class="wide"><table><thead><tr><th>{esc(t["col_source"])}</th><th>{esc(t["col_state"])}</th></tr></thead><tbody>')
@@ -235,6 +260,8 @@ def render_audit(facts: dict, brand: Branding) -> str:
     w(f'<section id="method"><h2>{esc(t["s_method"])}</h2>')
     for para in t["method_paras"]:
         w(f"<p>{esc(para)}</p>")
+    if active:
+        w(f"<p>{esc(t['method_active'])}</p>")
     w(f"<p>{esc(t['method_sources'].format(list=', '.join(method['sources_used'])))}</p>")
     w("<p class=\"muted\">" + esc(t["method_facts"].format(tool=f"scrutator {facts['scan']['tool']}", ruleset=method["ruleset"], packs=method["packs"],
                                                           started=facts["scan"]["started_at"], generated=facts["generated_at"])) + "</p></section>")
@@ -275,6 +302,15 @@ def render_audit(facts: dict, brand: Branding) -> str:
     w(f'<script type="application/json" id="audit-facts">{data}</script>')
     w("</body></html>")
     return "\n".join(out) + "\n"
+
+
+def _basis(t: dict, found: dict) -> str:
+    who = ", ".join(found.get("third_party") or [])
+    if "checked_at" in found and who:
+        return t["basis_both"].format(when=found["checked_at"], who=who)
+    if "checked_at" in found:
+        return t["basis_checked"].format(when=found["checked_at"])
+    return t["basis_third"].format(who=who)
 
 
 def read_embedded(page: str) -> dict:

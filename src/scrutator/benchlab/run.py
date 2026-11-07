@@ -1,6 +1,6 @@
 """`scrutator bench`: OSINT-Bench v0, offline, one command.
 
-Twelve sections, each a set of metrics with thresholds:
+Thirteen sections, each a set of metrics with thresholds:
 
 - risk_rules: the planted risk lab (every rule planted at least once) and a clean zone (no risk expected).
 - attribution: the planted attribution lab, precision and recall by band.
@@ -21,7 +21,13 @@ Twelve sections, each a set of metrics with thresholds:
   check); hostile bounty scope entries refused and new-asset detection on a fixture history; monitor dedupe,
   severity order and filter (benchlab/r7lab.py).
 
-The JSON written has a stable shape (`schema: "scrutator-bench/4"`); the exit status is 1 if any threshold fails.
+- active (R8): authorised active confirmation against local listeners (benchlab/activelab.py): the planted TLS, HTTP, banner and
+  exposure issues found and nothing else, confirmed versus stale wording, no connection to shared-platform, private or
+  metadata addresses, the connection cap, authorisation refusals, active evidence never replayed, and the forgeries `verify`
+  must catch (an open port flipped to closed in a re-signed bundle, a probe of a shared platform, a private address, an
+  unplanned port, a missing authorisation).
+
+The JSON written has a stable shape (`schema: "scrutator-bench/5"`); the exit status is 1 if any threshold fails.
 Nothing here touches the network, except `--verifier-model`, which asks a model server on this machine (loopback
 only)."""
 
@@ -58,7 +64,7 @@ from scrutator.scan import run_scan
 from scrutator.scope import ScopePolicy
 from scrutator.store import Store
 
-SCHEMA = "scrutator-bench/4"  # 2: sections brand and org_exposure (R5); 3: recall_speed (R6); 4: audit, bounty, monitor (R7)
+SCHEMA = "scrutator-bench/5"  # 2: sections brand and org_exposure (R5); 3: recall_speed (R6); 4: audit, bounty, monitor (R7); 5: active (R8)
 SEED = Entity(type=EntityType.DOMAIN, value="example.com")
 KEYLESS = {m.name for m in load_builtin_modules() if not m.needs_key}
 
@@ -638,6 +644,15 @@ async def recall_speed() -> dict:
     return _section(metrics, notes, started)
 
 
+async def active_section(out: Path, key) -> dict:
+    """R8: authorised active confirmation on the local-listener lab (benchlab/activelab.py)."""
+    from scrutator.benchlab import activelab
+
+    started = time.perf_counter()
+    metrics, notes = await activelab.bench_metrics(out, key)
+    return _section(metrics, notes, started)
+
+
 def _r7_sections(out: Path, state: dict, key) -> dict:
     """R7: the audit deliverable (from the risk lab's scan), bounty scope import and detection, monitor dedupe."""
     from scrutator.benchlab import r7lab
@@ -663,6 +678,7 @@ async def _sections(out: Path, state: dict, key, model, ollama_url) -> dict:
         "org_exposure": await org_exposure_section(out, state, key),
         "recall_speed": await recall_speed(),
         **_r7_sections(out, state, key),
+        "active": await active_section(out, key),
     }
 
 

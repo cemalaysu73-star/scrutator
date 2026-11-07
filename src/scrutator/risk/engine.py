@@ -8,6 +8,7 @@ and compare them with what the bundle claims.
 
 from scrutator.model import Finding
 from scrutator.packs import PackSet
+from scrutator.risk.active import active_risks
 from scrutator.risk.analyst import ANALYST_RULES
 from scrutator.risk.brand import brand_risks
 from scrutator.risk.concentration import concentration_risks
@@ -17,15 +18,18 @@ from scrutator.risk.services import exposed_services
 from scrutator.risk.model import Risk
 from scrutator.risk.view import View
 
-RULESET_VERSION = 3  # 2: exposed-risky-service; certspotter counts as a certificate source. 3: brand presence rules
+RULESET_VERSION = 4  # 2: exposed-risky-service; certspotter counts as a certificate source. 3: brand presence rules. 4: active checks (tls, http, banners, confirmed and stale exposure)
 
 
 def comparable(ruleset, report: dict) -> bool:
     """Can this tool re-derive risks a report says were made by `ruleset`?"""
     if ruleset == RULESET_VERSION:
         return True
+    sources = {r.get("source") for r in (report.get("evidence") or {}).values() if isinstance(r, dict)}
+    if ruleset == 3:
+        return not sources & {"tcp", "tls", "http", "active"}  # rule set 4 only adds what active evidence feeds
     if ruleset == 2:
-        return not any(isinstance(r, dict) and r.get("source") == "brand" for r in (report.get("evidence") or {}).values())
+        return "brand" not in sources and not sources & {"tcp", "tls", "http", "active"}
     return False
 
 
@@ -40,6 +44,7 @@ def analyze(report: dict, packs: PackSet | None = None) -> dict:
     risks.extend(concentration_risks(view, deps))
     risks.extend(exposed_services(report))
     risks.extend(brand_risks(report, packs))
+    risks.extend(active_risks(report))
     for rule in ANALYST_RULES:
         risks.extend(rule(view))
     risks.sort(key=lambda r: (*r.sort_key, r.fingerprint))

@@ -46,6 +46,7 @@ from scrutator.model import Entity, EntityType
 from scrutator.packs import PackError, build_manifest, load_packs, validate_dir
 from scrutator.report import build_report, render_html, render_json
 from scrutator.report.sarif import to_sarif
+from scrutator.risk.basis import basis, basis_text
 from scrutator.risk.model import Severity, severity_at_least
 from scrutator.scan import run_scan
 from scrutator.modules.registry import load_builtin_modules
@@ -953,7 +954,8 @@ def risk(
         sarif.write_text(json.dumps(to_sarif({**report, "risks": risks}), indent=2, sort_keys=True), encoding="utf-8")
     mapping = _compliance_rows(risks) if compliance else None
     if as_json:
-        _echo(json.dumps({"risks": risks, "dependencies": report["dependencies"], **({"compliance": mapping} if mapping is not None else {})}, indent=2, sort_keys=True))
+        shown = [{**r, **({"basis": basis(r["evidence_ids"], report["evidence"])} if basis(r["evidence_ids"], report["evidence"]) else {})} for r in risks]
+        _echo(json.dumps({"risks": shown, "dependencies": report["dependencies"], **({"compliance": mapping} if mapping is not None else {})}, indent=2, sort_keys=True))
     else:
         _echo(f"{label} of {report['scan']['seed']}. {_risk_line(risks)}")
         if report.get("summary", {}).get("names"):
@@ -961,6 +963,9 @@ def risk(
         for item in risks:
             _echo(f"[{item['severity'].upper():<6}] {item['rule_id']}  {', '.join(item['entity_ids'][:3])}")
             _echo(f"         {item['title']}. {item['explanation']}")
+            how = basis_text(basis(item["evidence_ids"], report["evidence"]))
+            if how:
+                _echo(f"         how established: {how}")
             _echo(f"         evidence: {len(item['evidence_ids'])} record(s), fingerprint {item['fingerprint']}")
             _echo(f"         fix: {item['remediation']}")
             if mapping is not None and mapping.get(item["rule_id"]):
@@ -1214,14 +1219,21 @@ def exposure_cmd(
 # ------------------------------------------------------------------------------------------- audit (R7)
 
 
-def _authorise_audit(engagement_file: Optional[Path], self_mode: bool, yes: bool, *, today=None):
-    """The loaded engagement (client mode) or None (self mode), confirmed on the terminal or with --yes."""
+def _authorise_audit(engagement_file: Optional[Path], self_mode: bool, yes: bool, *, today=None, active: bool = False):
+    """The loaded engagement (client mode) or None (self mode), confirmed on the terminal or with --yes. With `active`, the
+    authorisation must also cover active testing: an engagement with `active_testing: true`, or a self-attestation that names
+    the systems the domains point at."""
     from scrutator.engagement import EngagementError, load_engagement
 
     if bool(engagement_file) == bool(self_mode):
         raise _fail("an audit needs exactly one of --engagement FILE (a client's signed authorisation) or --self (your own domains)")
     if self_mode:
         question = "I confirm I own or control the domains in scope (self-assessment)"
+        if active:
+            question = (
+                "I confirm I own or control the domains in scope AND the systems their names resolve to, and I authorise active "
+                "connection checks of those systems (TCP connect, TLS handshake, one HTTP request; no login, no exploit)"
+            )
         loaded = None
     else:
         try:
@@ -1236,6 +1248,11 @@ def _authorise_audit(engagement_file: Optional[Path], self_mode: bool, yes: bool
         _echo(f"  in force: {record['start']} to {record['end']}")
         _echo(f"  file sha256: {loaded.sha256}")
         question = "I confirm this engagement authorises a passive review of these domains"
+        if active:
+            if not loaded.engagement.active_testing:
+                raise _fail("refused: this engagement does not authorise active testing. The signed letter must allow it and the engagement file must say `active_testing: true`. Nothing was sent.")
+            _echo("  active testing: authorised (connection checks of the systems the domains resolve to)")
+            question = "I confirm this engagement authorises active connection checks of the systems these domains point at"
     if yes:
         return loaded, "--yes"
     if sys.stdin is not None and sys.stdin.isatty():
@@ -1266,6 +1283,8 @@ def audit_cmd(
     max_entities: int = typer.Option(5000, "--max-entities", min=1, help="Cap on the entities the scan records."),
     exclude_sources: Optional[str] = typer.Option(None, "--exclude-sources", help="Do not use these sources (comma-separated)."),
     noncommercial: bool = typer.Option(True, "--noncommercial/--no-noncommercial", help="--no-noncommercial: leave out sources whose free tier is for non-commercial use only (advisable for paid work; see docs/sources.md)."),
+    active: bool = typer.Option(False, "--active", help="After the passive scan, confirm what third parties reported with a few authorised connections to the addresses the domains resolve to: TCP connect and banner, TLS handshake, one HTTP request. Needs an engagement with active_testing: true, or --self (which then attests the systems too). Never probes shared platforms or non-public addresses. See docs/active.md."),
+    max_connections: int = typer.Option(60, "--max-connections", min=1, max=500, help="With --active: the most connections the whole active phase may open."),
 ) -> None:
     """Turn a passive scan (or an existing signed bundle) into a client deliverable: audit.html (print-ready), audit.pdf
     when a browser is installed, the interactive report as technical-annex.html, and the signed bundle. Refuses to run
@@ -1287,6 +1306,8 @@ def audit_cmd(
     out.mkdir(parents=True, exist_ok=True)
     timing: dict = {}
 
+    if active and from_bundle is not None:
+        raise _fail("--active runs during a new scan and never re-probes from a bundle: give a domain to scan instead of --from-bundle")
     if from_bundle is not None:
         try:
             loaded_bundle = load_bundle(from_bundle, pin=_pinned(pin))
@@ -1313,7 +1334,7 @@ def audit_cmd(
 
             shutil.copyfile(from_bundle, target)
     else:
-        loaded, confirmed = _authorise_audit(engagement_file, self_mode, yes)
+        loaded, confirmed = _authorise_audit(engagement_file, self_mode, yes, active=active)
         try:
             seed_entity = _parse_seed(seed)
         except ValueError as exc:
@@ -1322,24 +1343,39 @@ def audit_cmd(
             raise _fail("an audit is of an organisation's domain: give a domain")
         if loaded is not None and not loaded.engagement.covers(seed_entity.value):
             raise _fail(f"{seed_entity.value} is not one of the engagement's domains ({', '.join(loaded.engagement.domains)})")
-        event = engagement_event(loaded, confirmed) if loaded is not None else self_event([seed_entity.value], brand.client, confirmed)
+        event = engagement_event(loaded, confirmed) if loaded is not None else self_event([seed_entity.value], brand.client, confirmed, active=active)
         policy = _source_policy(None, exclude_sources, not noncommercial)
         signing_key = _signing_key(key_dir)
         scope = _default_scope(seed_entity)
         store = Store(out / "scrutator.db")
-        _echo(f"Scanning {seed_entity.value} (passive); the authorisation is written to the audit log before any lookup ...")
+        from scrutator.active.gate import ActiveRefused
+        from scrutator.active.guard import Limits
+        from scrutator.active.run import ActiveConfig
+
+        _echo(f"Scanning {seed_entity.value} (passive" + (", then authorised active confirmation" if active else "") + "); the authorisation is written to the audit log before any lookup ...")
+        active_config = ActiveConfig(limits=Limits(max_connections=max_connections)) if active else None
 
         async def go():
             async with open_context() as ctx:
                 return await run_scan(
                     seed_entity, scope, store, ctx, max_steps=1000, max_entities=max_entities,
                     deadline=Deadline(deadline_s) if deadline_s > 0 else None, source_policy=policy, pre_audit=[event],
+                    active=active_config,
                 )
 
         try:
             scan_id, _stats = asyncio.run(go())
+        except ActiveRefused as exc:
+            raise _fail(f"refused: {exc}") from exc
         except ValueError as exc:
             raise _fail(str(exc)) from exc
+        except KeyboardInterrupt:
+            # what was collected is already stored: the audit is made from it, and says the run was interrupted
+            scan_id = store.latest_scan(seed_entity.value)
+            if scan_id is None:
+                raise _fail("interrupted before the scan started") from None
+            store.append_audit(scan_id, {"event": "interrupted"})
+            _echo("Interrupted: the audit covers what was collected so far (partial).")
         timing["scan_s"] = round(time.monotonic() - started, 1)
         _report, _written, bundle_path, _manifest, problem = _write_outputs(store, scan_id, out, set(), signing_key)
         if problem or bundle_path is None:
@@ -1389,12 +1425,50 @@ def audit_cmd(
     if facts["polish"] is not None:
         kept = sum(1 for s in facts["polish"]["statements"] if s["verdict"] == "verified")
         _echo(f"AI: {kept} of {len(facts['polish']['statements'])} executive sentence(s) reworded and verified; the rest kept as written.")
+    if facts.get("active"):
+        shown = facts["active"]
+        s = shown["summary"]
+        _echo(f"Active confirmation: {s['checks']} connection check(s) on {s['addresses']} address(es): {s['open']} open, {s['closed']} closed, {s['filtered']} unanswered; {s['skipped']} address(es) not probed.")
+        for row in shown["addresses"]:
+            opened = ", ".join(f"{o['port']}" + (f" ({o['banner']})" if o["banner"] else "") for o in row["open"]) or "none"
+            _echo(f"  {row['ip']} ({', '.join(row['names'])}): open {opened}")
+        for row in shown["skipped"]:
+            _echo(f"  {row['ip']} ({', '.join(row['names'])}): not probed, {row['reason']}")
     _echo(f"Wrote {', '.join(written.files)}, technical-annex.html and proof.scrutator to {out}")
     if written.pdf is None:
         _echo(f"No PDF: {written.pdf_problem}.")
     _echo(f"Bundle sha256 {info['sha256']}, signing key {info['key_fingerprint']}.")
     _echo(f"Time: {timing.get('scan_s', 0):g} s scan, {timing['audit_s']:g} s audit, {timing['total_s']:g} s in all.")
     _echo(f"Check it as the client will: scrutator audit-check {out / 'audit.html'} {out / 'proof.scrutator'}")
+
+
+@app.command("active-plan")
+def active_plan_cmd(
+    scan_ref: str = typer.Argument(..., metavar="SCAN", help="A scan id in --db, or a .scrutator bundle."),
+    db: Path = typer.Option(Path("scrutator-out/scrutator.db"), "--db", help="SQLite database for scan ids."),
+    as_json: bool = typer.Option(False, "--json", help="Machine-readable output."),
+) -> None:
+    """Show, offline, which addresses and ports `scrutator audit --active` would probe for a scan, and which addresses it would
+    refuse or skip (private ranges, shared platforms) and why. Nothing is sent: it reads a passive scan or bundle."""
+    from scrutator.active.guard import Limits
+    from scrutator.active.plan import plan_active
+
+    report, label = _load_report(scan_ref, db)
+    plan = plan_active(report, load_packs(), Limits()).to_dict()
+    if as_json:
+        _echo(json.dumps(plan, indent=2, sort_keys=True))
+        return
+    _echo(f"{label} of {report['scan']['seed']}: active plan (nothing is sent by this command).")
+    for target in plan["targets"]:
+        ports = ", ".join(str(p["port"]) for p in target["ports"])
+        _echo(f"  probe {target['ip']} ({', '.join(target['names'][:4])}): {len(target['ports'])} connect check(s): {ports}")
+        _echo(f"        passive source lists open: {', '.join(str(p) for p in target['passive_ports']) or 'nothing'}")
+    for skip in plan["skipped"]:
+        _echo(f"  skip  {skip['ip']} ({', '.join(skip['names'][:4])}): {skip['reason']}")
+    if plan["over_cap"]:
+        _echo(f"  {len(plan['over_cap'])} port(s) left out because of the connection cap.")
+    if not plan["targets"]:
+        _echo("  no address would be probed.")
 
 
 @app.command("audit-check")

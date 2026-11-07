@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from scrutator import __version__
+from scrutator.active.section import active_section
 from scrutator.attribution import attribute
 from scrutator.brand import brand_presence
 from scrutator.orgexposure import engagement_record, org_exposure
@@ -179,6 +180,9 @@ def build_report(
     report["dependencies"] = analysis["dependencies"]
     report["summary"]["risks"] = len(analysis["risks"])
     report["exposure"] = exposure(report)
+    active = active_section(report)
+    if active is not None:  # only a scan made with --active has the section
+        report["active"] = active
     brand = brand_presence(report, packs)
     if brand is not None:  # only scans run with --brand have the section
         report["brand"] = brand

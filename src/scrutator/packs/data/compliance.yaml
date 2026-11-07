@@ -22,8 +22,8 @@
 
 schema: 1
 kind: compliance
-version: 2026.10.1
-updated: 2026-10-21
+version: 2026.11.1
+updated: 2026-11-07
 description: >-
   Informational mapping of each risk rule to ISO/IEC 27001:2022 Annex A, NIS2 Article 21(2), CIS Controls v8.1,
   OWASP and KVKK references. Not a certification, an audit opinion or a legal conclusion.
@@ -254,3 +254,87 @@ entries:
     mappings:
       - {framework: nis2, ref: "NIS2 Art. 21(2)(a)", title: "Risk analysis and information system security policies", verified: true, source: "https://publications.europa.eu/resource/cellar/9b84d482-85bd-11ed-9887-01aa75ed71a1.0006.03/DOC_1"}
       - {framework: iso27001, ref: "ISO 27001 A.5.7", title: "Threat intelligence", verified: false, source: "https://www.iso.org/standard/27001"}
+  - id: stale-exposure-data
+    rule: stale-exposure-data
+    source: "https://publications.europa.eu/resource/cellar/9b84d482-85bd-11ed-9887-01aa75ed71a1.0006.03/DOC_1"
+    verified: false
+    note: "Informational: the finding is that third-party data disagrees with a check made now."
+    mappings:
+      - {framework: nis2, ref: "NIS2 Art. 21(2)(e)", title: "Security in maintenance of systems, incl. vulnerability handling", verified: true, source: "https://publications.europa.eu/resource/cellar/9b84d482-85bd-11ed-9887-01aa75ed71a1.0006.03/DOC_1"}
+      - {framework: cis, ref: "CIS 7.6", title: "Automated vulnerability scans of externally exposed assets", verified: true, source: "https://www.cisecurity.org/controls/cis-controls-navigator"}
+      - {framework: iso27001, ref: "ISO 27001 A.8.8", title: "Management of technical vulnerabilities", verified: false, source: "https://www.iso.org/standard/27001"}
+  - id: tls-cert-expired
+    rule: tls-cert-expired
+    source: "https://publications.europa.eu/resource/cellar/9b84d482-85bd-11ed-9887-01aa75ed71a1.0006.03/DOC_1"
+    verified: false
+    mappings:
+      - {framework: nis2, ref: "NIS2 Art. 21(2)(h)", title: "Policies on cryptography and encryption", verified: true, source: "https://publications.europa.eu/resource/cellar/9b84d482-85bd-11ed-9887-01aa75ed71a1.0006.03/DOC_1"}
+      - {framework: cis, ref: "CIS 4.1", title: "Establish and maintain a secure configuration process", verified: true, source: "https://www.cisecurity.org/controls/cis-controls-navigator"}
+      - {framework: owasp, ref: "OWASP A05:2021", title: "Security misconfiguration", verified: true, source: "https://top10.owasp.org/2021/A05_2021-Security_Misconfiguration"}
+      - {framework: iso27001, ref: "ISO 27001 A.8.24", title: "Use of cryptography", verified: false, source: "https://www.iso.org/standard/27001"}
+  - id: tls-cert-expiring
+    rule: tls-cert-expiring
+    source: "https://publications.europa.eu/resource/cellar/9b84d482-85bd-11ed-9887-01aa75ed71a1.0006.03/DOC_1"
+    verified: false
+    mappings:
+      - {framework: nis2, ref: "NIS2 Art. 21(2)(h)", title: "Policies on cryptography and encryption", verified: true, source: "https://publications.europa.eu/resource/cellar/9b84d482-85bd-11ed-9887-01aa75ed71a1.0006.03/DOC_1"}
+      - {framework: cis, ref: "CIS 4.1", title: "Establish and maintain a secure configuration process", verified: true, source: "https://www.cisecurity.org/controls/cis-controls-navigator"}
+      - {framework: owasp, ref: "OWASP A05:2021", title: "Security misconfiguration", verified: true, source: "https://top10.owasp.org/2021/A05_2021-Security_Misconfiguration"}
+      - {framework: iso27001, ref: "ISO 27001 A.8.24", title: "Use of cryptography", verified: false, source: "https://www.iso.org/standard/27001"}
+  - id: tls-hostname-mismatch
+    rule: tls-hostname-mismatch
+    source: "https://publications.europa.eu/resource/cellar/9b84d482-85bd-11ed-9887-01aa75ed71a1.0006.03/DOC_1"
+    verified: false
+    mappings:
+      - {framework: nis2, ref: "NIS2 Art. 21(2)(h)", title: "Policies on cryptography and encryption", verified: true, source: "https://publications.europa.eu/resource/cellar/9b84d482-85bd-11ed-9887-01aa75ed71a1.0006.03/DOC_1"}
+      - {framework: cis, ref: "CIS 4.1", title: "Establish and maintain a secure configuration process", verified: true, source: "https://www.cisecurity.org/controls/cis-controls-navigator"}
+      - {framework: owasp, ref: "OWASP A05:2021", title: "Security misconfiguration", verified: true, source: "https://top10.owasp.org/2021/A05_2021-Security_Misconfiguration"}
+      - {framework: iso27001, ref: "ISO 27001 A.8.24", title: "Use of cryptography", verified: false, source: "https://www.iso.org/standard/27001"}
+  - id: tls-legacy-protocol
+    rule: tls-legacy-protocol
+    source: "https://publications.europa.eu/resource/cellar/9b84d482-85bd-11ed-9887-01aa75ed71a1.0006.03/DOC_1"
+    verified: false
+    mappings:
+      - {framework: nis2, ref: "NIS2 Art. 21(2)(h)", title: "Policies on cryptography and encryption", verified: true, source: "https://publications.europa.eu/resource/cellar/9b84d482-85bd-11ed-9887-01aa75ed71a1.0006.03/DOC_1"}
+      - {framework: cis, ref: "CIS 4.1", title: "Establish and maintain a secure configuration process", verified: true, source: "https://www.cisecurity.org/controls/cis-controls-navigator"}
+      - {framework: owasp, ref: "OWASP A05:2021", title: "Security misconfiguration", verified: true, source: "https://top10.owasp.org/2021/A05_2021-Security_Misconfiguration"}
+      - {framework: kvkk, ref: "KVKK Art. 12(1)", title: "Technical and administrative measures to keep personal data secure", verified: true, source: "https://www.mevzuat.gov.tr/anasayfa/MevzuatFihristDetayIframe?MevzuatTur=1&MevzuatNo=6698&MevzuatTertip=5"}
+      - {framework: iso27001, ref: "ISO 27001 A.8.24", title: "Use of cryptography", verified: false, source: "https://www.iso.org/standard/27001"}
+  - id: http-no-https-redirect
+    rule: http-no-https-redirect
+    source: "https://publications.europa.eu/resource/cellar/9b84d482-85bd-11ed-9887-01aa75ed71a1.0006.03/DOC_1"
+    verified: false
+    mappings:
+      - {framework: nis2, ref: "NIS2 Art. 21(2)(h)", title: "Policies on cryptography and encryption", verified: true, source: "https://publications.europa.eu/resource/cellar/9b84d482-85bd-11ed-9887-01aa75ed71a1.0006.03/DOC_1"}
+      - {framework: cis, ref: "CIS 4.1", title: "Establish and maintain a secure configuration process", verified: true, source: "https://www.cisecurity.org/controls/cis-controls-navigator"}
+      - {framework: owasp, ref: "OWASP A05:2021", title: "Security misconfiguration", verified: true, source: "https://top10.owasp.org/2021/A05_2021-Security_Misconfiguration"}
+      - {framework: kvkk, ref: "KVKK Art. 12(1)", title: "Technical and administrative measures to keep personal data secure", verified: true, source: "https://www.mevzuat.gov.tr/anasayfa/MevzuatFihristDetayIframe?MevzuatTur=1&MevzuatNo=6698&MevzuatTertip=5"}
+      - {framework: iso27001, ref: "ISO 27001 A.8.24", title: "Use of cryptography", verified: false, source: "https://www.iso.org/standard/27001"}
+  - id: http-missing-hsts
+    rule: http-missing-hsts
+    source: "https://publications.europa.eu/resource/cellar/9b84d482-85bd-11ed-9887-01aa75ed71a1.0006.03/DOC_1"
+    verified: false
+    mappings:
+      - {framework: nis2, ref: "NIS2 Art. 21(2)(h)", title: "Policies on cryptography and encryption", verified: true, source: "https://publications.europa.eu/resource/cellar/9b84d482-85bd-11ed-9887-01aa75ed71a1.0006.03/DOC_1"}
+      - {framework: cis, ref: "CIS 4.1", title: "Establish and maintain a secure configuration process", verified: true, source: "https://www.cisecurity.org/controls/cis-controls-navigator"}
+      - {framework: owasp, ref: "OWASP A05:2021", title: "Security misconfiguration", verified: true, source: "https://top10.owasp.org/2021/A05_2021-Security_Misconfiguration"}
+      - {framework: iso27001, ref: "ISO 27001 A.8.24", title: "Use of cryptography", verified: false, source: "https://www.iso.org/standard/27001"}
+  - id: http-missing-security-headers
+    rule: http-missing-security-headers
+    source: "https://top10.owasp.org/2021/A05_2021-Security_Misconfiguration"
+    verified: false
+    note: "Defence in depth: the absence of these headers is not a vulnerability by itself."
+    mappings:
+      - {framework: nis2, ref: "NIS2 Art. 21(2)(g)", title: "Basic cyber hygiene practices", verified: true, source: "https://publications.europa.eu/resource/cellar/9b84d482-85bd-11ed-9887-01aa75ed71a1.0006.03/DOC_1"}
+      - {framework: cis, ref: "CIS 4.1", title: "Establish and maintain a secure configuration process", verified: true, source: "https://www.cisecurity.org/controls/cis-controls-navigator"}
+      - {framework: owasp, ref: "OWASP A05:2021", title: "Security misconfiguration", verified: true, source: "https://top10.owasp.org/2021/A05_2021-Security_Misconfiguration"}
+      - {framework: iso27001, ref: "ISO 27001 A.8.9", title: "Configuration management", verified: false, source: "https://www.iso.org/standard/27001"}
+  - id: server-banner-discloses-version
+    rule: server-banner-discloses-version
+    source: "https://top10.owasp.org/2021/A05_2021-Security_Misconfiguration"
+    verified: false
+    mappings:
+      - {framework: nis2, ref: "NIS2 Art. 21(2)(g)", title: "Basic cyber hygiene practices", verified: true, source: "https://publications.europa.eu/resource/cellar/9b84d482-85bd-11ed-9887-01aa75ed71a1.0006.03/DOC_1"}
+      - {framework: cis, ref: "CIS 4.1", title: "Establish and maintain a secure configuration process", verified: true, source: "https://www.cisecurity.org/controls/cis-controls-navigator"}
+      - {framework: owasp, ref: "OWASP A05:2021", title: "Security misconfiguration", verified: true, source: "https://top10.owasp.org/2021/A05_2021-Security_Misconfiguration"}
+      - {framework: iso27001, ref: "ISO 27001 A.8.9", title: "Configuration management", verified: false, source: "https://www.iso.org/standard/27001"}

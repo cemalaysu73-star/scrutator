@@ -56,6 +56,7 @@ h3{font-size:16px;margin:22px 0 2px;font-weight:600}
 .muted{color:var(--ink-2)}
 .faint{color:var(--ink-3)}
 .lede{color:var(--ink-2);max-width:72ch;margin:4px 0 0;font-size:15px}
+.basis{color:var(--ink-2);font-size:12.5px;margin-top:3px}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 
 /* masthead */
@@ -337,6 +338,24 @@ function copyButton(text, label) {
 /* One evidence record as an inline, keyboard-reachable, printable disclosure that carries the full trace:
    source, request, collection time, sha256 id (copyable), the command to re-verify it, and the payload with
    the claimed text highlighted. The drawer shows the same records; this stays in the page without any click. */
+const ACTIVE_SOURCES = ["tcp", "tls", "http", "active"];
+const CHECKED_SOURCES = ["tcp", "tls", "http"];
+/* How a finding was established, from the sources it cites: a check made now by this tool, an earlier report by a third
+   party (Shodan InternetDB), or both. Public records (DNS, registry, certificate logs) say nothing here. */
+function basisLine(ids) {
+  const checked = [], third = new Set();
+  for (const id of ids || []) {
+    const ev = D.evidence[id];
+    if (!ev) continue;
+    if (CHECKED_SOURCES.includes(ev.source)) checked.push(ev.collected_at);
+    if (ev.source === "internetdb") third.add("Shodan InternetDB");
+  }
+  const when = checked.sort().pop(), who = [...third].sort().join(", ");
+  if (when && who) return "Checked now (" + when + " UTC); also reported earlier by a third party (" + who + ").";
+  if (when) return "Checked now: a connection check made by this tool at " + when + " UTC.";
+  if (who) return "Reported earlier by a third party (" + who + "); not checked now.";
+  return "";
+}
 function evidenceRecord(id, highlight) {
   const ev = D.evidence[id];
   if (!ev) return null;
@@ -351,7 +370,9 @@ function evidenceRecord(id, highlight) {
     el("span", {className: "ev-id", textContent: "sha256 " + id}),
     copyButton(id, "copy id"));
   body.append(meta,
-    el("div", {className: "verify-hint", textContent: "scrutator verify proof.scrutator --replay  ·  record " + shortId(id)}),
+    el("div", {className: "verify-hint", textContent: ACTIVE_SOURCES.includes(ev.source)
+      ? "Active check, made once under this audit's authorisation and never replayed: a verifier does not contact the target. scrutator verify proof.scrutator checks it against the signed log  ·  record " + shortId(id)
+      : "scrutator verify proof.scrutator --replay  ·  record " + shortId(id)}),
     payloadPre(ev.payload, highlight));
   det.append(body);
   return det;
@@ -614,9 +635,11 @@ function renderRisks() {
       if (filter.value && r.category !== filter.value) continue;
       const what = el("td", {}, el("b", {textContent: r.title}), el("span", {textContent: " "}), chip("tag", r.rule_id));
       if (r.category === "analyst") what.append(el("span", {textContent: " "}), chip("band-probable", "analyst"));
+      const how = basisLine(r.evidence_ids);
       what.append(el("div", {textContent: r.explanation}),
-        el("div", {className: "muted", textContent: "Remediation: " + r.remediation}),
-        el("div", {className: "faint mono", textContent: r.entity_ids.join(", ")}));
+        el("div", {className: "muted", textContent: "Remediation: " + r.remediation}));
+      if (how) what.append(el("div", {className: "basis", textContent: how}));
+      what.append(el("div", {className: "faint mono", textContent: r.entity_ids.join(", ")}));
       const tr = el("tr", {},
         el("td", {}, sevBadge(r.severity), el("div", {className: "faint num", textContent: "confidence " + r.confidence})),
         what,
@@ -786,9 +809,33 @@ function renderExposure() {
     body.append(tr);
   }
   const panel = el("div", {className: "panel"},
-    el("div", {className: "panel-pad"}, el("p", {className: "lede", textContent: "What Shodan saw open on the addresses the in-scope names resolve to — an earlier scan by Shodan, not a check made now; CVE ids are Shodan's guesses from product versions. Abuse contact and network name are from RIPEstat. Non-commercial data: see the README."})),
+    el("div", {className: "panel-pad"}, el("p", {className: "lede", textContent: "What Shodan saw open on the addresses the in-scope names resolve to — an earlier scan by Shodan, not a check made now (an authorised active review shows its own checks under Active confirmation); CVE ids are Shodan's guesses from product versions. Abuse contact and network name are from RIPEstat. Non-commercial data: see the README."})),
     el("div", {className: "tablewrap"}, el("table", {}, el("thead", {}, el("tr", {}, ...["Address", "Ports", "Products", "CVEs", "Network", "Abuse contact", "Receipts"].map(t => el("th", {textContent: t})))), body)));
   document.getElementById("risks").append(el("div", {className: "sec-head"}, el("h3", {textContent: "Address exposure (Shodan InternetDB, RIPEstat)"})), panel);
+}
+
+function renderActive() {
+  const a = D.active;
+  if (!a) return;
+  const plan = a.plan || {};
+  const host = el("div", {className: "panel"}, el("div", {className: "panel-pad"},
+    el("p", {className: "lede", textContent: "Authorised active confirmation (scrutator audit --active): connection checks made by this tool, once, to the addresses the in-scope names resolve to. Each row is a check made at the time its record shows, not third-party data. Unanswered means no reply within the timeout and can be a firewall on either side. Shared platforms and non-public addresses are never probed; they are listed below with the reason."})));
+  const body = el("tbody");
+  for (const c of a.checks || []) {
+    const state = c.state === "open" ? chip("verified", "open") : c.state === "closed" ? chip("state", "closed") : c.state === "filtered" ? chip("stale", "unanswered") : chip("stale", c.state || "?");
+    const tr = el("tr", {}, el("td", {className: "mono", textContent: c.ip + ":" + c.port}), el("td", {}, state),
+      el("td", {className: "mono muted", textContent: c.banner || c.detail || ""}), el("td", {}, receiptStack([c.evidence_id])));
+    rowOpensEvidence(tr, c.ip + ":" + c.port, "active check · " + c.state, [c.evidence_id], null);
+    body.append(tr);
+  }
+  host.append(el("div", {className: "tablewrap"}, el("table", {}, el("thead", {}, el("tr", {}, ...["Address:port", "State now", "Greeting / detail", "Receipt"].map(t => el("th", {textContent: t})))), body)));
+  if ((plan.skipped || []).length) {
+    host.append(el("h3", {textContent: "Not probed"}));
+    const list = el("ul");
+    for (const s of plan.skipped) list.append(el("li", {textContent: s.ip + " (" + (s.names || []).join(", ") + "): " + s.reason + (s.verified === false ? " [platform pattern not verified]" : "")}));
+    host.append(list);
+  }
+  document.getElementById("risks").append(el("div", {className: "sec-head"}, el("h3", {textContent: "Active confirmation (authorised, checked now)"})), host);
 }
 
 function renderBrand() {
@@ -1005,6 +1052,7 @@ renderRisks();
 renderNames();
 renderDependencies();
 renderExposure();
+renderActive();
 renderBrand();
 renderOrgExposure();
 renderAttribution();

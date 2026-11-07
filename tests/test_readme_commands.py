@@ -15,7 +15,7 @@ runner = CliRunner()
 COMMANDS = {
     "scan", "keygen", "export", "verify", "diff", "watch", "risk", "ai", "doctor", "packs", "list", "validate", "manifest",
     "candidates", "attribution", "promote", "mcp", "sources", "bench", "protect-key", "exposure", "quick",
-    "audit", "audit-check", "audit-letter", "bounty", "import",
+    "audit", "audit-check", "audit-letter", "bounty", "import", "active-plan",
 }
 # options of the program itself, not of a command (`scrutator --version`)
 ROOT_OPTIONS = {"--version", "--help"}

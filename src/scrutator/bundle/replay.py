@@ -8,6 +8,7 @@ from urllib.parse import urlsplit
 
 import httpx
 
+from scrutator.active import SOURCES as ACTIVE_SOURCES
 from scrutator.model.canonical import canonical_host
 from scrutator.modules.base import Resolver
 from scrutator.resolver import lookup_status
@@ -281,6 +282,9 @@ async def replay_evidence(
             return ReplayResult(rec["id"], rec["source"], rec["request"], status, detail)
 
         nonlocal attempted
+        if rec["source"] in ACTIVE_SOURCES:
+            # a probe of the client's own address, made once under an authorisation: a verifier never contacts a target
+            return result("skipped", "active evidence is not replayed")
         parsed = parse_request(rec["request"])
         if parsed is None:
             return result("skipped", "request is not replayable")

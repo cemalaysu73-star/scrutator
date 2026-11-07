@@ -341,7 +341,21 @@ def test_mcp_cannot_reach_active_confirmation(monkeypatch, tmp_path):
     assert not {p for p in parameters if any(w in p.lower() for w in ("active", "port", "proxy", "probe", "engagement"))}
 
 
-def test_the_mcp_server_offers_no_tool_or_parameter_for_it(tmp_path):
+@pytest.fixture
+def untouched_logging():
+    """Building an MCP server configures logging (levels, handlers); give it back as it was so no later test sees the change."""
+    import logging
+
+    loggers = [logging.getLogger(n) for n in ("", "httpx", "mcp", "httpcore")]
+    saved = [(lg, lg.level, list(lg.handlers), lg.propagate, lg.disabled) for lg in loggers]
+    yield
+    for lg, level, handlers, propagate, disabled in saved:
+        lg.setLevel(level)
+        lg.handlers[:] = handlers
+        lg.propagate, lg.disabled = propagate, disabled
+
+
+def test_the_mcp_server_offers_no_tool_or_parameter_for_it(tmp_path, untouched_logging):
     pytest.importorskip("mcp")
     from scrutator.mcp_server import build_server
     from scrutator.mcp_tools import ToolSet

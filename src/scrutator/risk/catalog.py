@@ -119,8 +119,62 @@ _RULES = [
     _rule(
         "exposed-risky-service", "risk", "medium",
         "A database, remote-administration or file-sharing port is open to the internet",
-        "Shodan's InternetDB lists an open port on an address of the scan that is usually not meant to be reachable from the whole internet (a database, a remote desktop or shell, a file share, a cache). The data is Shodan's earlier scan, not a check made now, so it may be out of date.",
+        "Shodan's InternetDB lists an open port on an address of the scan that is usually not meant to be reachable from the whole internet (a database, a remote desktop or shell, a file share, a cache). The data is Shodan's earlier scan, not a check made now, so it may be out of date. In an authorised active review a successful connection to the port confirms it is open now (rated high confidence).",
         "Confirm with the owner whether the port is open now; if it is, close it at the firewall or restrict it to known addresses, and require authentication.",
+    ),
+    _rule(
+        "stale-exposure-data", "risk", "info",
+        "A passive source reported a port open that a check made now found closed or unanswered",
+        "A passive source (Shodan InternetDB) listed an open port on an address of the scan, and a connection check made during an authorised active review found it closed (the connection was refused) or unanswered (no reply within the timeout). Both facts are shown: the earlier report may simply be out of date, or something between the tester and the address (a firewall, the tester's own network) blocks the connection, in which case 'unanswered' proves little.",
+        "Nothing to fix on the service if the port is meant to be closed. When an unanswered port matters, repeat the check from a second network, and let the third-party data age out or ask its operator to refresh it.",
+    ),
+    _rule(
+        "tls-cert-expired", "risk", "high",
+        "TLS certificate has expired",
+        "During an authorised active review, a TLS handshake with an in-scope name returned a certificate whose validity ended before the check was made. Browsers refuse the connection or show a warning, and API clients fail.",
+        "Issue and install a new certificate with the full chain, then reload the service. Automate renewal (for example ACME) and monitor expiry so it cannot lapse again.",
+    ),
+    _rule(
+        "tls-cert-expiring", "risk", "medium",
+        "TLS certificate expires within 30 days",
+        "During an authorised active review, a TLS handshake with an in-scope name returned a certificate that expires within 30 days of the check (within 7 days is rated high).",
+        "Renew the certificate before it expires and automate renewal (for example ACME); monitor the expiry date of every certificate, not only the website's.",
+    ),
+    _rule(
+        "tls-hostname-mismatch", "risk", "medium",
+        "TLS certificate does not cover the host name",
+        "During an authorised active review, a TLS handshake that asked for an in-scope host name (SNI) returned a certificate whose names do not include it. Visitors get a certificate error, or the name is served by a default virtual host that was never configured for it.",
+        "Issue a certificate that lists the host name (or a wildcard that covers it) and install it for that name, or remove the DNS record if the name is no longer served.",
+    ),
+    _rule(
+        "tls-legacy-protocol", "risk", "medium",
+        "Server still accepts TLS 1.0 or TLS 1.1",
+        "During an authorised active review, a TLS handshake restricted to TLS 1.0 or TLS 1.1 completed. Both protocols are deprecated (RFC 8996) and weaker than TLS 1.2 and 1.3.",
+        "Allow TLS 1.2 and TLS 1.3 only. Check for old clients (legacy devices, very old Java or Windows versions) before the change, and test the result with a second tool.",
+    ),
+    _rule(
+        "http-no-https-redirect", "risk", "low",
+        "Plain HTTP does not redirect to HTTPS",
+        "During an authorised active review, one request for the home page over plain HTTP was answered with content, or with a redirect that does not lead to an HTTPS address of the same organisation, so a visitor who types the bare name stays unencrypted.",
+        "Answer every plain-HTTP request with a permanent redirect (301 or 308) to the HTTPS URL of the same site, at the web server or the load balancer, then add HSTS once HTTPS works everywhere.",
+    ),
+    _rule(
+        "http-missing-hsts", "risk", "low",
+        "HTTPS site does not send HTTP Strict Transport Security",
+        "During an authorised active review, the HTTPS answer for an in-scope name had no Strict-Transport-Security header (or max-age=0), so browsers do not remember to use HTTPS and a downgrade attack on a first visit stays possible.",
+        "Send Strict-Transport-Security with a max-age of at least six months on every HTTPS response, starting with a short value while testing; add includeSubDomains only when every subdomain supports HTTPS.",
+    ),
+    _rule(
+        "http-missing-security-headers", "risk", "low",
+        "HTTP response lacks common browser security headers",
+        "During an authorised active review, the home page answer for an in-scope name lacked one or more of: Content-Security-Policy, clickjacking protection (X-Frame-Options or a CSP frame-ancestors directive), X-Content-Type-Options: nosniff and Referrer-Policy. They are cheap defence in depth against script injection, framing and content sniffing; their absence is not a vulnerability by itself.",
+        "Add the missing headers at the web server or CDN. Start with X-Content-Type-Options: nosniff, a Referrer-Policy such as strict-origin-when-cross-origin, and frame-ancestors; introduce Content-Security-Policy in report-only mode first.",
+    ),
+    _rule(
+        "server-banner-discloses-version", "risk", "info",
+        "A service banner or Server header names a software version",
+        "During an authorised active review, a service greeting (SSH, FTP, SMTP and similar) or an HTTP Server or X-Powered-By header named a product with its version number. That tells an attacker which known weaknesses to try, and tells a defender how old the software is.",
+        "Hide version numbers where the software allows it (for example ServerTokens Prod, server_tokens off, expose_php Off), but treat that as cosmetic: patching to a supported version is the real fix.",
     ),
     _rule(
         "concentration-dns", "risk", "info",

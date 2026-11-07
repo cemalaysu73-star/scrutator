@@ -44,5 +44,10 @@ def authorised_event(limits: Limits, *, fixed_ports, proxy: str | None, relax: f
         "limits": limits.record(), "fixed_ports": list(fixed_ports), "proxy": proxy,
     }
     if relax:
+        from scrutator import active
+
         event["test_mode"] = sorted(relax)
+        ports = {"http": active.HTTP_PORT, "https": active.HTTPS_PORT, "tls": list(active.TLS_PORTS)}
+        if ports != {**active.DEFAULT_PORTS, "tls": list(active.DEFAULT_PORTS["tls"])}:
+            event["test_ports"] = ports
     return event

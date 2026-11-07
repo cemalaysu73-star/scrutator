@@ -18,8 +18,6 @@ import asyncio
 import json
 from dataclasses import dataclass, field
 
-from scrutator import proxy as proxy_setting
-from scrutator.active import RISKY_PORTS, WEB_PORTS, SOURCES
 from scrutator.active.guard import Budget, Limits
 from scrutator.active.plan import Plan, plan_active
 from scrutator.deadline import Deadline
@@ -134,7 +132,10 @@ async def _probe(store: Store, scan_id: int, plan: Plan, budget: Budget, config:
     run = _Run(store, scan_id, budget, config, summary)
     states = await _tcp_stage(run, plan)
     summary["tcp"] = {state: sum(1 for v in states.values() if v == state) for state in sorted(set(states.values()))}
-    await asyncio.gather(_tls_stage(run, plan, states), _web_stage(run, plan, states))
+    # in order of what a reader needs most when the cap bites: the page and its headers, then the certificates, then the legacy
+    # protocol attempts (the most dispensable)
+    await _web_stage(run, plan, states)
+    await _tls_stage(run, plan, states)
 
 
 async def _tcp_stage(run: _Run, plan: Plan) -> dict[tuple[str, int], str]:

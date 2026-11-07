@@ -114,6 +114,10 @@ start: {start}
 end: {end}
 purpose: {purpose_yaml}
 reference: {reference_yaml}
+# Active confirmation (`scrutator audit --active`) needs the signed letter to allow connection checks of the systems the
+# domains resolve to (see docs/active.md for a clause). Leave this false for a passive review, which is what the letter
+# above covers; set it to true only when the signed authorisation says so.
+active_testing: false
 """
 
 

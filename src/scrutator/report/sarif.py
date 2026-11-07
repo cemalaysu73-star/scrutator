@@ -12,6 +12,7 @@ opening a new one.
 
 import re
 
+from scrutator.risk.basis import basis, basis_text
 from scrutator.risk.catalog import RULES
 
 SARIF_VERSION = "2.1.0"
@@ -78,6 +79,9 @@ def to_sarif(report: dict) -> dict:
                 "security-severity": _SECURITY_SEVERITY[risk["severity"]],
             },
         }
+        found = basis(risk["evidence_ids"], evidence)
+        if found:  # checked now by this tool, reported earlier by a third party, or both
+            result["properties"]["basis"] = basis_text(found)
         if entities:
             result["locations"] = [{"logicalLocations": [_logical(entities[0])]}]
             if len(entities) > 1:

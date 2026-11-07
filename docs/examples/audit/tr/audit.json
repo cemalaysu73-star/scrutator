@@ -591,7 +591,7 @@
     }
   ],
   "format": "scrutator-audit/1",
-  "generated_at": "2026-10-21T03:29:55+00:00",
+  "generated_at": "2026-11-07T22:30:59+00:00",
   "inventory": [
     {
       "addresses": [
@@ -954,7 +954,7 @@
   },
   "method": {
     "packs": "44bbd66959eeacfc",
-    "ruleset": 3,
+    "ruleset": 4,
     "sources_used": [
       "asn",
       "certspotter",
@@ -1644,6 +1644,11 @@
       "affected": [
         "192.0.2.50"
       ],
+      "basis": {
+        "third_party": [
+          "Shodan InternetDB"
+        ]
+      },
       "category": "risk",
       "compliance": [
         {
@@ -2283,7 +2288,7 @@
     "verified": 17,
     "wildcard": 0
   },
-  "tool": "1.0.0rc3",
+  "tool": "1.0.0rc4",
   "who": {
     "auditor": "Sample Auditor (placeholder)",
     "client": "Example Corp (fictional sample)"

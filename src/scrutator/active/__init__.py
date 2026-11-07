@@ -48,6 +48,9 @@ PORT_REASONS = {
 TLS_PORTS = (443, 8443, 465, 993, 995, 636)
 # Ports on which one HTTP GET / is sent: plain HTTP on 80, HTTP over TLS on 443. Nowhere else.
 HTTP_PORT, HTTPS_PORT = 80, 443
+# What the three constants above are in a release. A test may rebind them so that local listeners on other ports stand in for
+# a web server; a run that did so says so in the signed audit log (`test_ports`), and only a run in test mode may.
+DEFAULT_PORTS = {"http": 80, "https": 443, "tls": (443, 8443, 465, 993, 995, 636)}
 
 USER_AGENT = f"Scrutator/{__version__} (authorised review)"
 MAX_BANNER = 256

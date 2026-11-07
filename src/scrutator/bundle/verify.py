@@ -4,6 +4,8 @@ import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from scrutator.active.section import active_problems, active_section
+from scrutator.active.records import active_records
 from scrutator.attribution import RULESET_VERSION as ATTRIBUTION_RULESET
 from scrutator.attribution import attribute
 from scrutator.bundle.keys import fingerprint, verify_signature
@@ -345,6 +347,24 @@ def _verify(path: str | Path, pinned_fingerprint: str | None, result: VerifyRepo
             add("exposure derivable", same, "" if same else "the address table is not what the cited evidence implies")
     except Exception as exc:  # noqa: BLE001
         add("exposure derivable", False, f"malformed exposure: {type(exc).__name__}: {exc}")
+
+    # active confirmation: the section is re-derived from the evidence, and the guardrails are audited from the signed log:
+    # authorised before anything was sent, inside the plan this tool derives (no private, shared-platform or unplanned
+    # address or port), not over the recorded connection cap, every probe accounted for in the audit log. Runs when either
+    # the section, the evidence or the audit records are present, so dropping one while keeping another fails too.
+    try:
+        has_active = (
+            active_records(report).any or "active" in report
+            or any(isinstance(r, dict) and r.get("source") in ("tcp", "tls", "http", "active") for r in evidence_rows)
+            or any(str(r.get("event", "")).startswith("active_") for r in audit_records)
+        )
+        if has_active:
+            same = active_section(report) == report.get("active")
+            add("active section derivable", same, "" if same else "the active section is not what the cited evidence implies")
+            problem = active_problems(report, audit_records, evidence_rows, _trusted_packs(), result.warnings)
+            add("active checks authorised and within the plan", not problem, problem)
+    except Exception as exc:  # noqa: BLE001
+        add("active section derivable", False, f"malformed active section: {type(exc).__name__}: {exc}")
 
     # brand presence: re-derived from the report's own evidence and the embedded platforms pack. It runs when either the
     # section or its evidence is present, so dropping the section while keeping the evidence fails too.

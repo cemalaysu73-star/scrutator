@@ -46,6 +46,43 @@ TEXT = {
         "auth_self_recorded": "The self-attestation was written to the scan's signed audit log before the first lookup.",
         "auth_self_late": "The self-attestation was recorded when this report was made, after the scan.",
         "auth_passive": "Permitted activity: passive collection of public records only.",
+        "auth_active": (
+            "Permitted activity: passive collection of public records and, because this authorisation covers it, a limited "
+            "active confirmation: TCP connection checks on a fixed list of ports, TLS handshakes and one HTTP request for "
+            "the home page, only to the addresses that the client's own names resolve to. No login attempt, exploit, "
+            "fuzzing or brute force was made."
+        ),
+        "exec_scope_active": "{auditor} reviewed the internet footprint of {client} ({domains}) on {date}, using public records and, under the authorisation recorded below, a limited set of connection checks to the addresses of those names (TCP connect, TLS handshake, one HTTP request): no login attempts, no exploitation.",
+        "exec_active": "Active checks made during the review: {checks} connection check(s) on {addresses} address(es) found {open} port(s) open, {closed} closed and {filtered} unanswered; {skipped} address(es) on shared platforms or in non-public ranges were not probed.",
+        "s_active": "Active confirmation",
+        "active_intro": "These results are checks made by this tool at the time shown in each record, not third-party data. 'Unanswered' means no reply within the timeout: it can be the client's firewall or the tester's own network.",
+        "col_open": "Open now",
+        "col_closed": "Closed",
+        "col_unanswered": "Unanswered",
+        "active_skipped": "Addresses that were not probed, and why:",
+        "active_cap": "Connection cap: {cap}. Ports left out of the plan because of the cap: {not_planned}.",
+        "col_basis": "How established",
+        "basis_checked": "Checked now: a connection check made by this tool at {when} UTC.",
+        "basis_both": "Checked now ({when} UTC); also reported earlier by a third party ({who}).",
+        "basis_third": "Reported earlier by a third party ({who}); not checked now.",
+        "not_tested_intro_active": "This review was passive except for the authorised active confirmation described above. It did not:",
+        "not_tested_active": [
+            "try to log in, guess credentials or test anonymous access to any service (a banner is read, never answered);",
+            "send exploit or vulnerability payloads, fuzz, or enumerate directories or files;",
+            "probe any address other than those the client's names resolve to, any shared platform (CDN, hosting platform) or any non-public address;",
+            "scan UDP, or any port outside the fixed list and the ports a passive source reported open;",
+            "test web applications, APIs, logins or authentication beyond one request for the home page;",
+            "look at internal networks, endpoints, cloud accounts or source code;",
+            "look up any person, e-mail address or credential, or use breach data;",
+            "test phishing resistance, physical security or staff awareness.",
+        ],
+        "method_active": (
+            "After the passive collection, and only under the authorisation recorded above, the tool made a bounded number of "
+            "connections to the addresses that the client's names resolved to: a TCP connect check per port (the greeting, if any, "
+            "was read and nothing was sent), a TLS handshake on open TLS ports, and one HTTP request for the home page. Each "
+            "result is an evidence record, and the plan (which addresses and ports, which were skipped and why) is itself a "
+            "record written before the first connection."
+        ),
         "exec_note": "Each numbered statement cites the evidence records it rests on (appendix).",
         "exec_ai": "Statements marked * were reworded by a language model and checked against their evidence by an independent verifier; the original wording is in audit.json.",
         "col_priority": "Priority",
@@ -201,6 +238,42 @@ TEXT = {
         "auth_self_recorded": "Öz beyan, ilk sorgudan önce taramanın imzalı denetim kaydına yazılmıştır.",
         "auth_self_late": "Öz beyan, taramadan sonra, bu rapor hazırlanırken kaydedilmiştir.",
         "auth_passive": "İzin verilen faaliyet: yalnızca kamuya açık kayıtların pasif olarak toplanması.",
+        "auth_active": (
+            "İzin verilen faaliyet: kamuya açık kayıtların pasif toplanması ve, bu yetki kapsadığı için, sınırlı bir aktif "
+            "doğrulama: sabit bir port listesinde TCP bağlantı denemeleri, TLS el sıkışmaları ve ana sayfa için tek bir HTTP "
+            "isteği; yalnızca kurumun kendi adlarının çözümlendiği adreslere. Oturum açma denemesi, istismar, fuzzing ya da "
+            "kaba kuvvet yapılmadı."
+        ),
+        "exec_scope_active": "{auditor}, {client} ({domains}) kurumunun internet ayak izini {date} tarihinde kamuya açık kayıtlarla ve aşağıda kayıtlı yetki kapsamında bu adların adreslerine yapılan sınırlı bağlantı denemeleriyle (TCP bağlantısı, TLS el sıkışması, tek HTTP isteği) inceledi: oturum açma denemesi ve istismar yok.",
+        "exec_active": "İnceleme sırasında yapılan aktif denemeler: {addresses} adreste {checks} bağlantı denemesi; {open} port açık, {closed} kapalı, {filtered} yanıtsız; paylaşımlı platformlardaki ya da genel olmayan aralıklardaki {skipped} adres denenmedi.",
+        "s_active": "Aktif doğrulama",
+        "active_intro": "Bu sonuçlar, her kayıtta gösterilen zamanda bu aracın yaptığı denemelerdir; üçüncü taraf verisi değildir. 'Yanıtsız', zaman aşımı içinde yanıt gelmediği anlamına gelir: kurumun güvenlik duvarı ya da test yapanın kendi ağı olabilir.",
+        "col_open": "Şu an açık",
+        "col_closed": "Kapalı",
+        "col_unanswered": "Yanıtsız",
+        "active_skipped": "Denenmeyen adresler ve nedenleri:",
+        "active_cap": "Bağlantı üst sınırı: {cap}. Üst sınır nedeniyle plan dışı kalan portlar: {not_planned}.",
+        "col_basis": "Nasıl saptandı",
+        "basis_checked": "Şimdi denendi: bu aracın {when} UTC tarihinde yaptığı bağlantı denemesi.",
+        "basis_both": "Şimdi denendi ({when} UTC); daha önce üçüncü bir taraf da bildirmişti ({who}).",
+        "basis_third": "Daha önce üçüncü bir taraf bildirdi ({who}); şimdi denenmedi.",
+        "not_tested_intro_active": "Bu inceleme, yukarıda anlatılan yetkili aktif doğrulama dışında pasiftir. Şunları yapmadı:",
+        "not_tested_active": [
+            "bir hizmette oturum açmayı, parola tahmin etmeyi ya da anonim erişimi denemek (başlık okunur, yanıtlanmaz);",
+            "istismar ya da zafiyet yükü göndermek, fuzzing yapmak, dizin ya da dosya taramak;",
+            "kurumun adlarının çözümlendiği adresler dışında bir adresi, paylaşımlı bir platformu (CDN, barındırma platformu) ya da genel olmayan bir adresi denemek;",
+            "UDP ya da sabit liste ve pasif kaynağın açık bildirdiği portlar dışında bir port taramak;",
+            "ana sayfa için tek istek dışında web uygulamalarını, API'leri, girişleri ya da kimlik doğrulamayı test etmek;",
+            "iç ağlara, uç noktalara, bulut hesaplarına ya da kaynak koda bakmak;",
+            "herhangi bir kişiyi, e-posta adresini ya da kimlik bilgisini aramak ya da ihlal verisi kullanmak;",
+            "oltalamaya dirençi, fiziksel güvenliği ya da personel farkındalığını test etmek.",
+        ],
+        "method_active": (
+            "Pasif toplamadan sonra ve yalnızca yukarıda kayıtlı yetki kapsamında, araç kurumun adlarının çözümlendiği adreslere "
+            "sınırlı sayıda bağlantı yaptı: port başına bir TCP bağlantı denemesi (varsa karşılama satırı okundu, hiçbir şey "
+            "gönderilmedi), açık TLS portlarında bir TLS el sıkışması ve ana sayfa için bir HTTP isteği. Her sonuç bir kanıt "
+            "kaydıdır; plan (hangi adresler ve portlar, hangileri neden atlandı) ilk bağlantıdan önce yazılan bir kayıttır."
+        ),
         "exec_note": "Numaralı her ifade dayandığı kanıt kayıtlarını gösterir (ek).",
         "exec_ai": "* işaretli ifadeler bir dil modeliyle sadeleştirilmiş ve bağımsız bir doğrulayıcıyla kanıtlarına karşı denetlenmiştir; özgün metin audit.json dosyasındadır.",
         "col_priority": "Öncelik",
@@ -380,6 +453,9 @@ EFFORT = {
     "forgotten-name": "medium", "exposed-risky-service": "medium", "concentration-dns": "high",
     "concentration-edge": "high", "ghost-hostname": "low", "numbering-gap": "low", "source-disagreement": "low",
     "brand-handle-unregistered": "low", "brand-lookalike-handle": "medium",
+    "stale-exposure-data": "low", "tls-cert-expired": "low", "tls-cert-expiring": "low", "tls-hostname-mismatch": "low",
+    "tls-legacy-protocol": "medium", "http-no-https-redirect": "low", "http-missing-hsts": "low",
+    "http-missing-security-headers": "medium", "server-banner-discloses-version": "medium",
 }
 EFFORT_RANK = {"low": 0, "medium": 1, "high": 2}
 

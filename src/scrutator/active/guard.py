@@ -26,7 +26,7 @@ class Limits:
     http_timeout: float = 6.0
     rate_per_second: float = 8.0  # new connections a second, over the whole run
     max_names_per_ip: int = 3  # in-scope names a TLS handshake and an HTTP request are made for, per address
-    tcp_share: float = 0.7  # the share of the cap the connect checks may plan for; the rest is for handshakes and requests
+    tcp_share: float = 0.6  # the share of the cap the connect checks may plan for; the rest is for handshakes and requests
     deadline_s: float = 120.0  # the whole active phase
 
     def __post_init__(self) -> None:

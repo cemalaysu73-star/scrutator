@@ -46,12 +46,38 @@ def telnet_text(raw: bytes) -> tuple[bytes, bool]:
     return bytes(out), seen
 
 
+def _mysql_version(raw: bytes) -> str | None:
+    """The server version of a MySQL or MariaDB initial handshake packet (3-byte length, sequence 0, protocol 10, a NUL-ended
+    version string, then binary: the connection id and the random challenge, which are not kept), or None."""
+    if len(raw) > 6 and raw[3] == 0 and raw[4] == 10:
+        end = raw.find(b"\x00", 5)
+        version = raw[5:end] if end > 5 else b""
+        if version and all(32 <= c < 127 for c in version):
+            return version.decode("ascii")
+    return None
+
+
+def _printable_share(data: bytes) -> float:
+    return sum(1 for c in data if 32 <= c < 127 or c in (9, 10, 13)) / len(data) if data else 1.0
+
+
 def banner_text(raw: bytes) -> tuple[str, str]:
-    """(sanitised banner, a note about what was not text): control characters and escapes removed, Telnet negotiation dropped."""
-    text, negotiated = telnet_text(raw[:MAX_BANNER])
+    """(sanitised banner, a note about what was not text). Control characters and escapes are removed and Telnet negotiation is
+    dropped. A MySQL/MariaDB handshake is reduced to its version string and a greeting line that is followed by binary data
+    (an SSH identification line and the key-exchange packet behind it) to that first line, so a per-connection random
+    challenge is never stored."""
+    raw = raw[:MAX_BANNER]
+    version = _mysql_version(raw)
+    if version:
+        return f"MySQL/MariaDB handshake: server {version}", "binary handshake: version string kept, connection id and challenge dropped"
+    text, negotiated = telnet_text(raw)
+    note = ""
+    first, newline, rest = text.partition(b"\n")
+    if newline and rest and _printable_share(rest) < 1.0 and _printable_share(first) >= 0.8:  # any binary byte behind a text line
+        text, note = first, "binary data after the first line dropped"
     banner = clean_text(text.decode("utf-8", "replace"), MAX_BANNER)
     if banner:
-        return banner, ""
+        return banner, note
     if negotiated:
         return "", "telnet option negotiation, no text"
     return "", "binary data, no text" if raw else ""
