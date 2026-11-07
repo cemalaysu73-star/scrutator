@@ -4,9 +4,9 @@
 
 Do not open a public issue for a security problem.
 
-- **How:** report it privately to the maintainer. The contact address is not set yet:
-  `SECURITY_CONTACT_PLACEHOLDER` must be replaced by the maintainer before the first public release (for a GitHub
-  repository, enable "Private vulnerability reporting" and say so here).
+- **How:** use GitHub's private vulnerability reporting: open the repository's **Security** tab, choose **Report a
+  vulnerability**, and describe the problem there. Only the maintainers can see it. If that option is missing, open a
+  public issue that says only "I have a security report, please enable private reporting" and put no details in it.
 - **What to include:** the version (`scrutator --version`), the platform, what you did, what happened, and, if you
   have one, a proof bundle or a minimal fixture that shows it. Never send a real signing key or a real API key.
 - **What to expect:** this is a volunteer project without a service level. The maintainer aims to acknowledge a
@@ -30,7 +30,7 @@ vulnerability.
 
 ## Supported versions
 
-There is no stable release yet. Only the latest commit on the main branch is supported.
+Only the latest release and the latest commit on the main branch are supported. Fixes go into the next release.
 
 ## Responsible use
 

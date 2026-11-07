@@ -1,0 +1,51 @@
+name: Bug report
+description: Something does not work, or a result is wrong
+title: "bug: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you. Please do not report a security problem here: use the repository's **Security** tab,
+        **Report a vulnerability** (see SECURITY.md). Do not paste real signing keys or API keys, and do not paste
+        reports about organisations you are not allowed to publish about.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `scrutator --version`
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: Platform and Python version
+      placeholder: Windows 11, Python 3.12
+    validations:
+      required: true
+  - type: textarea
+    id: command
+    attributes:
+      label: The exact command
+      description: Use `example.com` or a domain you own where you can.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected, and what happened
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence id or a minimal bundle
+      description: For a wrong finding, the evidence id from the report. For a verification problem, the output of `scrutator verify` and, if you can share it, a small `.scrutator` file.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: I removed secrets and anything about third parties that I may not share.
+          required: true

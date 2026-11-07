@@ -1,0 +1,55 @@
+name: New source proposal
+description: Propose a data source (a module) for Scrutator
+title: "source: "
+labels: ["new-source"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A source is one file in `src/scrutator/modules/` (see docs/writing-a-module.md). Before any code, we check the
+        terms. A source whose terms forbid automated use, or that needs scraping, will not be added.
+  - type: input
+    id: name
+    attributes:
+      label: Source name and URL
+    validations:
+      required: true
+  - type: textarea
+    id: gives
+    attributes:
+      label: What it gives
+      description: Names, addresses, certificates, history? For which input (a domain, an address)?
+    validations:
+      required: true
+  - type: input
+    id: terms
+    attributes:
+      label: URL of its terms of use or API documentation
+    validations:
+      required: true
+  - type: checkboxes
+    id: terms-check
+    attributes:
+      label: Terms check
+      options:
+        - label: I read the terms and automated queries through a public API are allowed.
+          required: true
+        - label: It needs no scraping of web pages, no login, and no circumvention of a limit.
+          required: true
+        - label: Commercial use is allowed, or I state below that it is non-commercial only (it would then be left out by `--no-noncommercial`).
+          required: true
+        - label: It works without an account, or I state below that it needs a key (keys are read only from environment variables).
+          required: true
+        - label: Its host is a fixed name over HTTPS on port 443 (no IP literals, no user-supplied URLs).
+          required: true
+  - type: textarea
+    id: limits
+    attributes:
+      label: Limits and failure behaviour
+      description: Rate limits, quotas, how it fails (HTTP 429, 5xx, empty answers). A failure must be recorded as a failure, never as "nothing found".
+  - type: textarea
+    id: sample
+    attributes:
+      label: A sample response
+      description: A real answer for `example.com` or another reserved or owned domain, so that a contract test can be written on it. Include a hostile example if you can think of one.
+      render: json

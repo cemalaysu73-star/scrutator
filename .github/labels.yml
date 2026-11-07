@@ -1,0 +1,25 @@
+# Labels the issue forms use. Create them once (for example with `gh label create`, or a label-sync tool).
+- name: bug
+  color: d73a4a
+  description: Something does not work
+- name: enhancement
+  color: a2eeef
+  description: A new feature or an improvement
+- name: new-source
+  color: 0e8a16
+  description: Proposal for a data source (terms check needed)
+- name: false-positive
+  color: fbca04
+  description: A wrong or missing result
+- name: good first issue
+  color: 7057ff
+  description: A small, well-defined starting point
+- name: knowledge-pack
+  color: 1d76db
+  description: A provider, takeover fingerprint or playbook entry
+- name: docs
+  color: 0075ca
+  description: Documentation
+- name: security
+  color: b60205
+  description: Security-relevant (details go through private reporting, not here)

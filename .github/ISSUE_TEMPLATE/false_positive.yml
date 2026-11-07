@@ -1,0 +1,49 @@
+name: False positive or false negative report
+description: A risk, a tier, an attribution or a takeover candidate that is wrong (or one that should have been found)
+title: "result: "
+labels: ["false-positive"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        These reports are how the rules and the knowledge packs get better. Findings are leads, so a wrong lead is
+        useful information, not an insult. Please use `example.com` or a domain you own, or remove names that are not
+        yours to publish.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `scrutator --version`
+    validations:
+      required: true
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What was wrong
+      options:
+        - A risk that is not a real problem (false positive)
+        - A takeover candidate that cannot be taken over
+        - A name tiered verified that is not live, or claimed that is live
+        - An attribution candidate that is not the organisation's
+        - Something that should have been found and was not
+    validations:
+      required: true
+  - type: input
+    id: rule
+    attributes:
+      label: The rule, finding or candidate
+      description: The risk id or title (`scrutator risk`) or the entity name.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: The evidence ids it cites, and what is actually the case
+      description: Which record(s) mislead, and how you know the truth (a `dig` output, the provider's documentation).
+    validations:
+      required: true
+  - type: textarea
+    id: fix
+    attributes:
+      label: A suggested fix, if you have one
+      description: For a provider or takeover fingerprint, the entry and a source URL for it (see docs/knowledge-packs.md).

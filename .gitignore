@@ -23,3 +23,20 @@ audit-out/
 authorisation/
 bounty-watch/
 bounty-scope.yaml
+
+# secrets and private material: never commit
+*.key
+*.pem
+*.p12
+.env
+.env.*
+signing.key
+# build output
+build/
+*.whl
+.coverage
+htmlcov/
+.idea/
+.vscode/
+.DS_Store
+.claude/

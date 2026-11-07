@@ -20,8 +20,9 @@ be a place where that work can be discussed calmly.
 
 ## Reporting and enforcement
 
-Report problems privately to the maintainer at `CONDUCT_CONTACT_PLACEHOLDER` (to be set by the maintainer before the
-first public release). Maintainers may remove comments, issues and contributions that break this code, and may
+Report problems privately to the maintainers through GitHub: open the repository's **Security** tab and choose **Report a
+vulnerability**, marking the report "conduct", or, for something that is not sensitive, use GitHub's "Report content"
+option on the comment or issue. Maintainers may remove comments, issues and contributions that break this code, and may
 suspend or ban people who do. Security problems follow [SECURITY.md](SECURITY.md) instead.
 
 This policy applies in the project's repositories and in spaces where someone represents the project.

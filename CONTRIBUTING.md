@@ -6,7 +6,7 @@ data source; the next is a bug report with an evidence id or a proof bundle.
 ## Set up
 
 ```bash
-git clone <repository>
+git clone https://github.com/cemalaysu73-star/scrutator.git
 cd scrutator
 python -m venv .venv && . .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -e ".[dev]"
@@ -45,7 +45,8 @@ A change that breaks one of these will not be merged, however useful it is:
   that says what and why.
 - Run the whole suite and `scrutator bench` before you open a pull request. CI runs both on Linux, macOS and Windows
   (Python 3.11 to 3.13) and installs the built wheel into a clean environment.
-- Line endings are LF. Files are UTF-8.
+- Line endings are LF. Files are UTF-8. Everything in the repository is written in English.
+- A pull request template asks for the test you added and for the rules above; please fill it in.
 
 ## Good first contributions
 
@@ -71,5 +72,5 @@ negative case. See [docs/benchmarks.md](docs/benchmarks.md). Adapters for other 
 
 ## Reporting bugs and security problems
 
-Bugs: open an issue with the version, the command, and the evidence id or a minimal bundle. Security problems:
+Bugs and ideas: open an issue (there are forms for a bug, a feature, a new source and a false positive) with the version, the command, and the evidence id or a minimal bundle. Security problems:
 see [SECURITY.md](SECURITY.md); do not open a public issue.

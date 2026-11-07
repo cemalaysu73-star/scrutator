@@ -1,0 +1,7 @@
+# Everything is reviewed by the maintainer.
+*                          @cemalaysu73-star
+# The security-relevant parts in particular.
+/src/scrutator/egress.py   @cemalaysu73-star
+/src/scrutator/bundle/     @cemalaysu73-star
+/src/scrutator/scope.py    @cemalaysu73-star
+/SECURITY.md               @cemalaysu73-star

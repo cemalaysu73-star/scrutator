@@ -1,0 +1,33 @@
+name: Feature request
+description: Suggest an improvement
+title: "feat: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem you want to solve
+      description: Who is doing what, and what gets in the way? A concrete workflow beats a feature name.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you would like
+    validations:
+      required: true
+  - type: dropdown
+    id: rules
+    attributes:
+      label: Does it stay inside the project's rules?
+      description: Every claim cites evidence; scope is decided by the engine, deny by default; passive by default (anything active is opt-in and authorised); no person lookup; no secrets in outputs; honest numbers.
+      options:
+        - "Yes, as far as I can tell"
+        - "Not sure, please discuss"
+        - "It needs a change to a rule (explain above)"
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What you do today instead
