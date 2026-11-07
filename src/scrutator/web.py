@@ -82,8 +82,11 @@ class WebGuard:
 @asynccontextmanager
 async def open_web(guard: WebGuard, *, transport: httpx.AsyncBaseTransport | None = None) -> AsyncIterator[httpx.AsyncClient]:
     """The web client: no redirects followed, no retries (a refused request is an answer), short timeouts."""
+    from scrutator import proxy
+
     async with httpx.AsyncClient(
         transport=transport,
+        proxy=proxy.httpx_proxy() if transport is None else None,  # a test's own transport is never proxied
         timeout=httpx.Timeout(20.0, connect=10.0),
         follow_redirects=False,
         headers={"User-Agent": USER_AGENT},

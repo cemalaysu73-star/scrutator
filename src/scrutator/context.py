@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 
 import httpx
 
-from scrutator import __version__
+from scrutator import __version__, proxy
 from scrutator.egress import EgressGuard
 from scrutator.modules.base import ModuleContext
 from scrutator.resolver import DnsResolver
@@ -17,7 +17,11 @@ async def open_context(*, egress: EgressGuard | None = None) -> AsyncIterator[Mo
     """HTTP client for the data-source modules: follows redirects, retries transient failures, and connects only
     where the egress policy allows (scrutator.egress): the source hosts, and RDAP servers a redirect led to."""
     headers = {"User-Agent": f"scrutator/{__version__}"}
-    transport = RetryingTransport(httpx.AsyncHTTPTransport(), give_up_after=GIVE_UP_AFTER_S)
+    try:
+        inner = httpx.AsyncHTTPTransport(proxy=proxy.httpx_proxy())  # None: direct; see scrutator.proxy
+    except ImportError as exc:  # a SOCKS proxy needs the optional socksio package
+        raise proxy.ProxyError("a SOCKS proxy for the HTTP data sources needs the optional package socksio: pip install 'scrutator[socks]'") from exc
+    transport = RetryingTransport(inner, give_up_after=GIVE_UP_AFTER_S)
     async with httpx.AsyncClient(
         transport=transport,
         timeout=httpx.Timeout(60.0, connect=15.0),

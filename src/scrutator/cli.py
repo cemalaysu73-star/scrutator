@@ -84,8 +84,17 @@ def _show_version(value: bool) -> None:
 @app.callback()
 def main(
     version: bool = typer.Option(False, "--version", callback=_show_version, is_eager=True, help="Print the version and exit."),
+    proxy: Optional[str] = typer.Option(None, "--proxy", envvar="SCRUTATOR_PROXY", help="Send every outbound request through this proxy (http://, socks5:// or socks5h://host:port): the HTTP data sources, the opt-in web modules and the active probes. DNS lookups are NOT proxied: see docs/active.md. Prefer the SCRUTATOR_PROXY variable when the URL holds credentials."),
 ) -> None:
     """Scrutator."""
+    if proxy:
+        from scrutator import proxy as proxy_setting
+
+        try:
+            spec = proxy_setting.set_proxy(proxy)
+        except proxy_setting.ProxyError as exc:
+            raise _fail(str(exc)) from exc
+        _echo(f"Outbound requests go through {spec.label()}. DNS lookups do not (see docs/active.md).", err=True)
 
 
 def _parse_seed(raw: str) -> Entity:

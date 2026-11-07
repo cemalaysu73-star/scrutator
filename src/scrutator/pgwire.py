@@ -55,7 +55,9 @@ async def query(host: str, sql: str, *, port: int = 5432, user: str = "guest", d
     (allow or check_tcp)(host, port)
 
     async def go():
-        reader, writer = await asyncio.open_connection(host, port)
+        from scrutator.proxy import open_tcp
+
+        reader, writer = await open_tcp(host, port, timeout=timeout)  # direct, or through --proxy
         try:
             writer.write(_startup(user, database))
             await writer.drain()
