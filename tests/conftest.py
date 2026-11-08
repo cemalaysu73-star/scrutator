@@ -1,3 +1,12 @@
+import os
+
+# Help output must be plain text whatever the environment: GitHub Actions makes Typer/Rich print colour codes that split
+# option names (`--bundle`), and a narrow terminal wraps them. Set before anything imports typer.
+os.environ["NO_COLOR"] = "1"
+os.environ["_TYPER_FORCE_DISABLE_TERMINAL"] = "1"
+os.environ["COLUMNS"] = "200"
+os.environ.pop("FORCE_COLOR", None)
+
 import httpx
 import pytest
 
