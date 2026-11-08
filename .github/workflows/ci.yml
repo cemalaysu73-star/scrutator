@@ -44,7 +44,7 @@ jobs:
           python-version: "3.12"
       - run: python -m pip install -e .
       - run: scrutator bench --out bench-out
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: bench
@@ -83,7 +83,7 @@ jobs:
           cd "$RUNNER_TEMP" && "$BIN/python" -I "$GITHUB_WORKSPACE/tools/wheel_smoke.py" --scrutator "$EXE" --work "$RUNNER_TEMP/smoke"
       - name: SBOM of the installed environment (CycloneDX 1.5)
         run: cd "$RUNNER_TEMP" && "$BIN/python" -I "$GITHUB_WORKSPACE/tools/sbom.py" --extra mcp --out "$RUNNER_TEMP/sbom.cdx.json"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: wheel-and-sbom-${{ matrix.os }}
           path: |
