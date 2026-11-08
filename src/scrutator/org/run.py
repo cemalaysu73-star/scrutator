@@ -31,15 +31,54 @@ class OrgConfig:
     token_present: bool = False
 
 
+def organisation_registrants(payload: str) -> set[str]:
+    """Registrant names in an RDAP answer that the vCard marks as an organisation: its `org` property, or its `fn` when the
+    card says `kind: org`. A bare `fn` is not used: for an individual registrant it is a natural person's name, which the
+    organisation sources must never query."""
+    try:
+        data = json.loads(payload)
+    except (TypeError, ValueError):
+        return set()
+    found: set[str] = set()
+
+    def walk(node) -> None:
+        if isinstance(node, dict):
+            roles = node.get("roles") if isinstance(node.get("roles"), list) else []
+            card = node.get("vcardArray")
+            if "registrant" in roles and isinstance(card, list) and len(card) == 2 and isinstance(card[1], list):
+                props = {item[0]: str(item[3]) for item in card[1] if isinstance(item, list) and len(item) >= 4 and isinstance(item[0], str)}
+                if props.get("org"):
+                    found.add(" ".join(props["org"].split()))
+                elif props.get("kind", "").lower() == "org" and props.get("fn"):
+                    found.add(" ".join(props["fn"].split()))
+            for value in node.values():
+                walk(value)
+        elif isinstance(node, list):
+            for value in node:
+                walk(value)
+
+    walk(data)
+    return found
+
+
 def _registrant_names(store: Store, scan_id: int, seed: str) -> list[tuple[str, tuple[str, ...]]]:
-    """Legal-name candidates from the RDAP registrant of the seed apex already collected in the passive phase."""
+    """Legal-name candidates from the RDAP registrant of the seed apex already collected in the passive phase, only where
+    the cited RDAP answer marks the registrant as an organisation (see `organisation_registrants`)."""
     out = []
     seed_id = f"domain:{seed}"
     for edge in store.edges(scan_id):
-        if edge.src == seed_id and edge.rel == "registrant":
-            name = usable_org(edge.dst.split(":", 1)[1] if ":" in edge.dst else edge.dst)
-            if name:
-                out.append((name, tuple(edge.evidence_ids)))
+        if edge.src != seed_id or edge.rel != "registrant":
+            continue
+        name = usable_org(edge.dst.split(":", 1)[1] if ":" in edge.dst else edge.dst)
+        if not name:
+            continue
+        marked = set()
+        for evidence_id in edge.evidence_ids:
+            evidence = store.get_evidence(evidence_id)
+            if evidence is not None:
+                marked |= {n.casefold() for n in organisation_registrants(evidence.payload)}
+        if name.casefold() in marked:
+            out.append((name, tuple(edge.evidence_ids)))
     return out
 
 

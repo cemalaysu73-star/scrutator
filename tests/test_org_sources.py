@@ -187,3 +187,23 @@ async def test_names_first_seen_in_the_org_phase_are_resolved_once(tmp_path, tok
     asked = {e["request"] for e in report["evidence"].values() if e["source"] == "dns"}
     assert any(r.endswith(" old.example.com") for r in asked)  # the dead host was asked, its NXDOMAIN is evidence
     assert ("api.example.com", "A") in resolver.calls and ("old.example.com", "A") in resolver.calls
+
+
+def test_only_an_organisation_registrant_becomes_a_legal_name():
+    """An RDAP registrant's bare `fn` can be a natural person's name: the organisation sources must never query it."""
+    import json as _json
+
+    from scrutator.org.run import organisation_registrants
+
+    def rdap(*card):
+        return _json.dumps({"entities": [{"roles": ["registrant"], "vcardArray": ["vcard", [["version", {}, "text", "4.0"], *card]]}]})
+
+    person = rdap(["fn", {}, "text", "Jane Example"], ["kind", {}, "text", "individual"])
+    bare = rdap(["fn", {}, "text", "Jane Example"])
+    org = rdap(["fn", {}, "text", "Jane Example"], ["org", {}, "text", "Example Holding B.V."])
+    kind_org = rdap(["fn", {}, "text", "Example Foundation"], ["kind", {}, "text", "org"])
+    assert organisation_registrants(person) == set()
+    assert organisation_registrants(bare) == set()
+    assert organisation_registrants(org) == {"Example Holding B.V."}
+    assert organisation_registrants(kind_org) == {"Example Foundation"}
+    assert organisation_registrants("not json") == set()
