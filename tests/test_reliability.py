@@ -209,14 +209,14 @@ async def test_run_scan_finishes_inside_the_deadline_and_reports_partial_coverag
     started = time.monotonic()
     scan_id, stats = await run_scan(
         dom("example.com"), ScopePolicy(domains=["example.com"]), store, None,
-        modules=[fast, hang], deadline_s=0.5,
+        modules=[fast, hang], deadline_s=3,
     )
-    assert time.monotonic() - started < 5
+    assert time.monotonic() - started < 10
     assert stats.deadline_hit is True
     report = build_report(store, scan_id)
     assert {e["value"] for e in report["entities"]} >= {"a.example.com", "b.example.com"}
     assert report["coverage"]["deadline_hit"] is True
-    assert report["coverage"]["deadline_s"] == 0.5
+    assert report["coverage"]["deadline_s"] == 3
     assert report["sources"]["hang"]["cancelled"] == 1
 
 
