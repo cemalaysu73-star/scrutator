@@ -63,7 +63,7 @@ async def test_a_genuine_bundle_with_attribution_a_promotion_and_a_lead_passes_e
     assert {c.name for c in result.checks} >= {"attribution derivable", "promotions recorded", "risks derivable", "report references"}
     report = report_of(fx.path)
     manifest = json.loads(read_raw(fx.path).files["manifest.json"])
-    assert manifest["analysis"]["attribution"] == {"ruleset": 1, "candidates": len(report["attribution"]["candidates"])}
+    assert manifest["analysis"]["attribution"] == {"ruleset": 2, "candidates": len(report["attribution"]["candidates"])}
     assert [p["entity"] for p in report["promotions"]] == ["domain:partner.test"] and len(report["leads"]["verified"]) == 1
     assert len(result.warnings) == 1 and "not pinned" in result.warnings[0]
 

@@ -8,7 +8,7 @@ measured frequency (see engine.py), which is how a real measurement should enter
 
 from dataclasses import dataclass
 
-RULESET_VERSION = 1
+RULESET_VERSION = 2  # 2: org_record (a public register or Wikidata lists the name as an official domain of the organisation or its group)
 
 BANDS = ("confirmed", "probable", "possible", "unlikely")
 CONFIRMED_AT = 0.90
@@ -27,6 +27,7 @@ SIGNALS: dict[str, tuple[float, str]] = {
     "network_owner": (0.35, "its address is in a network with the same owner or AS as an in-scope address, and that is not a shared provider"),
     "scope_uses": (0.20, "an in-scope name points its name servers, mail or SPF at it, and it is not a shared provider"),
     "cert_issuer": (0.10, "it and an in-scope name use certificates from the same issuer, and that issuer is not a common CA"),
+    "org_record": (0.55, "a public register (GLEIF) or Wikidata lists it as an official website of the organisation or of its parent or subsidiary"),
 }
 
 

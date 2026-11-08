@@ -14,11 +14,13 @@ from scrutator.risk.brand import brand_risks
 from scrutator.risk.concentration import concentration_risks
 from scrutator.risk.dependency import build_dependency_map
 from scrutator.risk.hygiene import HYGIENE_RULES
+from scrutator.risk.org import org_risks
 from scrutator.risk.services import exposed_services
 from scrutator.risk.model import Risk
 from scrutator.risk.view import View
 
-RULESET_VERSION = 4  # 2: exposed-risky-service; certspotter counts as a certificate source. 3: brand presence rules. 4: active checks (tls, http, banners, confirmed and stale exposure)
+RULESET_VERSION = 5  # 2: exposed-risky-service; certspotter counts as a certificate source. 3: brand presence rules. 4: active checks (tls, http, banners, confirmed and stale exposure). 5: organisation sources (breach-history, exposed-credential, lookalike-package, brand-namespace)
+_ORG_SOURCES = {"wikidata", "gleif", "hibp", "github", "github_leaks", "packages", "handles"}
 
 
 def comparable(ruleset, report: dict) -> bool:
@@ -26,10 +28,12 @@ def comparable(ruleset, report: dict) -> bool:
     if ruleset == RULESET_VERSION:
         return True
     sources = {r.get("source") for r in (report.get("evidence") or {}).values() if isinstance(r, dict)}
+    if ruleset == 4:
+        return not sources & _ORG_SOURCES  # rule set 5 only adds what organisation evidence feeds
     if ruleset == 3:
-        return not sources & {"tcp", "tls", "http", "active"}  # rule set 4 only adds what active evidence feeds
+        return not sources & ({"tcp", "tls", "http", "active"} | _ORG_SOURCES)
     if ruleset == 2:
-        return "brand" not in sources and not sources & {"tcp", "tls", "http", "active"}
+        return "brand" not in sources and not sources & ({"tcp", "tls", "http", "active"} | _ORG_SOURCES)
     return False
 
 
@@ -44,6 +48,7 @@ def analyze(report: dict, packs: PackSet | None = None) -> dict:
     risks.extend(concentration_risks(view, deps))
     risks.extend(exposed_services(report))
     risks.extend(brand_risks(report, packs))
+    risks.extend(org_risks(report))
     risks.extend(active_risks(report))
     for rule in ANALYST_RULES:
         risks.extend(rule(view))

@@ -63,7 +63,7 @@ async def test_attribution_explains_every_signal_and_what_could_make_it_wrong(db
     assert invoke("attribution", "--db", db, "--entity", "nobody.test").exit_code == 2
     listing = invoke("attribution", "--db", db).output
     assert "partner.test" in listing and "t0.test" not in listing
-    assert json.loads(invoke("attribution", "--db", db, "--json").output)["attribution"]["ruleset"] == 1
+    assert json.loads(invoke("attribution", "--db", db, "--json").output)["attribution"]["ruleset"] == 2
 
 
 async def test_promote_asks_first_then_writes_the_scope_file_and_the_audit_log(db, tmp_path):

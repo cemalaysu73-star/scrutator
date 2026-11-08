@@ -5,7 +5,7 @@ import scrutator
 
 
 def test_version():
-    assert scrutator.__version__ == "1.0.0rc4"
+    assert scrutator.__version__ == "1.0.0rc5"
 
 
 def test_the_package_metadata_and_the_module_agree_on_the_version():

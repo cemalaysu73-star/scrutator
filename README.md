@@ -198,7 +198,7 @@ CI does the same on Linux and Windows.
 ## Documentation
 
 [Quickstart](docs/quickstart.md) · [Concepts](docs/concepts.md) · [Reading a report](docs/reading-a-report.md) ·
-[Proof bundles](docs/proof-bundles.md) · [Client audits](docs/audit.md) · [Bug bounty](docs/bounty.md) · [Monitoring](docs/hosting.md) · [Sources and terms](docs/sources.md) · [AI modes and privacy](docs/ai-and-privacy.md) ·
+[Proof bundles](docs/proof-bundles.md) · [Client audits](docs/audit.md) · [Bug bounty](docs/bounty.md) · [Monitoring](docs/hosting.md) · [Sources and terms](docs/sources.md) · [Organisation intelligence](docs/organisation.md) · [AI modes and privacy](docs/ai-and-privacy.md) ·
 [MCP](docs/mcp.md) · [Knowledge packs](docs/knowledge-packs.md) · [Writing a module](docs/writing-a-module.md) ·
 [Security model](docs/security.md) · [Benchmark](docs/benchmarks.md) · [Demo](demo/README.md) ·
 [CHANGELOG](CHANGELOG.md) · [SECURITY](SECURITY.md) · [CONTRIBUTING](CONTRIBUTING.md)
@@ -390,6 +390,10 @@ to its raw evidence.
 | `source-disagreement` (analyst) | low | RDAP and the zone list different name servers. |
 | `brand-handle-unregistered` | medium or low (low confidence) | Only with `--brand`. An account the organisation's home page links to (medium), or the bare brand name on a platform it links to (low), answers as not existing on the public profile page. |
 | `brand-lookalike-handle` | low (low confidence) | Only with `--brand`. A look-alike of the brand name exists on a platform the home page links to; ownership unknown. |
+| `breach-history` | info (low when sensitive) | Only with `--org`. A public index lists a breach of a service under the organisation's domain (metadata only: name, date, record count, data classes). History as a third party reported it, not a live finding. |
+| `exposed-credential` | high (medium confidence) | Only with `--org --code-leaks`. A credential format was found in the organisation's own public repository. The value is never stored. Rotate, then remove from history. |
+| `lookalike-package-exists` | low (low confidence) | Only with `--org`. A look-alike of the brand name exists on a package registry and is not linked to an in-scope domain. Ownership unknown. |
+| `brand-namespace-unregistered` | info (low confidence) | Only with `--org`. The brand name is free on a public package registry (a dependency-confusion gap). |
 
 The **analyst** category is layer 1 of the analyst in the design: deterministic detectors for the
 subtle things a reviewer skips. There is no AI in any detector. With an AI summary, risks are given to
@@ -436,6 +440,40 @@ suspended account can look like a missing one; a look-alike may be the organisat
 impersonator's). The behaviour of each platform was observed live on 2026-10-20 from one network (two requests each)
 and is recorded with the entry; platforms change. `verify` re-derives the section from the evidence and the
 embedded pack (`brand derivable`); `verify --replay` re-asks the profile pages, never the organisation's site.
+
+## Organisation intelligence (opt-in)
+
+Off by default. `--org` widens the lens from the domain to the **organisation** behind it — organisations only, never a
+person (no officers, members or commit authors; the GitHub member endpoint is reduced to a count, package author fields
+are dropped, and e-mail addresses are removed from stored free text).
+
+```bash
+scrutator scan example.com --org
+scrutator scan example.com --org --code-leaks --self      # also scan the org's OWN repos for secrets (needs a token)
+```
+
+It adds, each scope-gated and audited like every lookup, with its own `scrutator sources` row and every statement
+citing its evidence:
+
+- **Company records** — GLEIF (legal entity by exact name or LEI, status, address, parent, ultimate parent and
+  children, as legal entities; CC0) and Wikidata (the organisation item whose official website is the seed — filtered
+  to an organisation, never a person or product — its LEI, country, ticker, GitHub account and the official domains of
+  it, its parent and its subsidiaries; CC0). A GLEIF record reached by the org's LEI is confirmed; an exact legal-name
+  match is kept apart as unconfirmed (the same name can belong to an unrelated entity).
+- **Breach history** — Have I Been Pwned's keyless breaches-by-domain metadata (the breached service's name, date,
+  record count and data classes; CC BY 4.0, credit haveibeenpwned.com). Never account lists or addresses.
+- **GitHub** — the organisation's public account and repositories, the public member count (never names), and in-scope
+  hosts named in a repo's homepage, description or README. `--code-leaks` (with `--self` and `SCRUTATOR_GITHUB_TOKEN`)
+  scans the org's own repositories for credential formats; the value is never stored, only its format, path, commit, a
+  salted-hash fingerprint and a 2+2 mask.
+- **Brand protection** — whether the brand name exists (and links back to an in-scope domain) on npm, PyPI, Docker Hub,
+  crates.io, RubyGems and NuGet, which look-alikes exist unlinked, which registries leave it free (dependency
+  confusion), and the brand handles on GitLab, Docker Hub and Bluesky. X, LinkedIn, Facebook, Instagram, TikTok,
+  Reddit, Medium, Substack and Telegram are never requested.
+
+The report gains an **Organisation** section (HTML and JSON) with evidence drawers; `verify` re-derives it
+(`organisation derivable`); a new attribution signal `org_record` makes an official sister domain a candidate. Full
+detail, terms and limits: [docs/organisation.md](docs/organisation.md). `quick` never runs these.
 
 ## Organisation exposure (authorised, aggregate)
 
@@ -517,6 +555,7 @@ output with weight 0 and the reason, so you can see what was ignored.
 | `network_owner` | 0.35 | its address is in a network with the same owner or AS as an in-scope address, and that is not a shared provider |
 | `scope_uses` | 0.20 | an in-scope name points its name servers, mail or SPF at it, and it is not a shared provider |
 | `cert_issuer` | 0.10 | it and an in-scope name use certificates from the same issuer, and that issuer is not a common CA |
+| `org_record` | 0.55 | only with `--org`: a public register (GLEIF) or Wikidata lists it as an official website of the organisation or of its parent or subsidiary, or the organisation's GitHub repositories name it; not an ownership signal, so on its own it stays `possible` |
 
 A certificate with more than ten names counts for less (ten divided by the number of names: it looks
 like a shared service's), and one that had been expired for over a year when it was collected counts

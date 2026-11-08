@@ -4,6 +4,45 @@ Built from the git history (`git log`), newest first. Dates are commit dates. Ve
 tagged or published; the numbers are the ones in `pyproject.toml` at the time. Nothing here has been released on
 PyPI.
 
+## 1.0.0rc5 (2026-11-08, a release candidate; not published)
+
+Round R9: organisation-scoped sources, opt-in behind `--org`. The seed stays a domain and the edge stays the same —
+every statement is signed evidence a stranger can re-derive — but the lens widens from the domain to the organisation
+behind it. Organisations only: no person is ever looked up, and no officer, member or commit author is collected.
+
+- **Organisation sources** (`scan --org`; docs/organisation.md, `scrutator sources`)
+  - *Company records*: GLEIF (legal entity by exact legal name or LEI, status, address, direct and ultimate parent and
+    direct children, all as legal entities; CC0) and Wikidata (the organisation item whose official website is the
+    seed — filtered to an organisation, never a person or product — its label, LEI, country, ticker, GitHub account and
+    the official websites of it, its parent and its subsidiaries; CC0). An exact legal-name match in GLEIF is kept apart
+    as *unconfirmed* (the same name can belong to an unrelated entity, e.g. "ICANN" matches a Mexican company); only a
+    record reached by the organisation's own LEI is confirmed.
+  - *Breach history*: Have I Been Pwned's keyless breaches-by-domain metadata (breach name, date, record count, data
+    classes). Metadata of the breached service only — never account lists or addresses; the endpoint that returns those
+    needs a key and proof of control and is never called. Finding `breach-history` (info; low when sensitive).
+  - *GitHub*: the organisation's public account and repositories (keyless, 60/hour; optional `SCRUTATOR_GITHUB_TOKEN`
+    raises it and is never logged), the public member *count* (never names), and in-scope hosts named in a repo's
+    homepage, description or README as claimed candidate domains. Opt-in `--code-leaks` (with `--self` and the token)
+    scans the organisation's own repositories for credential formats; the secret value is never stored — only its
+    format, path, commit, a salted-hash fingerprint and a 2+2 mask (finding `exposed-credential`, high: rotate, then
+    remove from history).
+  - *Brand protection*: whether the brand name exists on npm, PyPI, Docker Hub, crates.io, RubyGems and NuGet and links
+    back to an in-scope domain (a confirmed namespace), which look-alikes exist unlinked (`lookalike-package-exists`),
+    and which registries leave the brand free (`brand-namespace-unregistered`, the dependency-confusion note). Public
+    handles on GitLab, Docker Hub and Bluesky, by HTTP status; X, LinkedIn, Facebook, Instagram, TikTok, Reddit, Medium,
+    Substack and Telegram are never requested.
+  - *Attribution*: a new `org_record` signal — a public register or Wikidata listing a domain as an official website of
+    the organisation or its group — makes a sister domain a candidate (rule set 2; it never raises a name past
+    `possible` on its own).
+  - Integration: scope-gated and audited like every lookup, their own `scrutator sources` rows with terms and
+    non-commercial flags, an Organisation section in the report (HTML and JSON) with evidence drawers, risk rules with
+    fixed remediation and compliance mappings, SARIF, and `verify` re-derives the Organisation section (a tamper fails
+    `organisation derivable`). The three keyless company/breach sources whose stored payload is a slice of the response
+    are replayable; the rest store a minimised projection and are not. `quick` never runs these.
+  - Probes and decisions: docs/dev/r9-source-probes.md (each candidate source tested against a safe organisation before
+    it was written) and docs/dev/r9.md. ransomware.live, Reddit, Telegram, Medium and Substack were evaluated and
+    rejected (terms, or the status does not tell). OpenCorporates and UK Companies House (keyed) are not implemented yet.
+
 ## 1.0.0rc4 (2026-11-07, a release candidate; not published)
 
 Round R8: authorised active confirmation, strictly guardrailed, and an outbound proxy. The edge stays the same: every

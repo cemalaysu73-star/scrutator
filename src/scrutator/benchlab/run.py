@@ -64,7 +64,7 @@ from scrutator.scan import run_scan
 from scrutator.scope import ScopePolicy
 from scrutator.store import Store
 
-SCHEMA = "scrutator-bench/5"  # 2: sections brand and org_exposure (R5); 3: recall_speed (R6); 4: audit, bounty, monitor (R7); 5: active (R8)
+SCHEMA = "scrutator-bench/6"  # 2: sections brand and org_exposure (R5); 3: recall_speed (R6); 4: audit, bounty, monitor (R7); 5: active (R8); 6: org_sources (R9)
 SEED = Entity(type=EntityType.DOMAIN, value="example.com")
 KEYLESS = {m.name for m in load_builtin_modules() if not m.needs_key}
 
@@ -666,6 +666,78 @@ def _r7_sections(out: Path, state: dict, key) -> dict:
     return sections
 
 
+async def org_sources_section(work: Path, state: dict, key) -> dict:
+    """The organisation sources (`scan --org`) on the planted lab (benchlab/orglab.py): the planted organisation found
+    with precision, the code-leak secret value in no output, no person data, the Organisation section re-derived by
+    `verify` and a tamper caught, and no forbidden platform ever requested."""
+    import os as _os
+
+    from scrutator.benchlab import orglab
+    from scrutator.org.run import OrgConfig
+    from scrutator.report.sarif import to_sarif
+    from scrutator.sources import SourcePolicy
+
+    started = time.perf_counter()
+    packs = load_packs()
+    names = ("wikidata", "gleif", "hibp", "github", "github_leaks", "packages", "handles")
+    modules = [m for m in load_builtin_modules() if m.name in names]
+    policy = SourcePolicy().opt("wikidata", "gleif", "hibp", "github", "packages", "handles", "github_leaks")
+    lab = orglab.router()
+    (work / "org").mkdir(parents=True, exist_ok=True)
+    for old in (work / "org").glob("*.db"):
+        old.unlink()
+    store = Store(work / "org" / "scrutator.db")
+    scope = ScopePolicy(domains=[orglab.SEED])
+    had_token = _os.environ.get("SCRUTATOR_GITHUB_TOKEN")
+    _os.environ["SCRUTATOR_GITHUB_TOKEN"] = "ghp_" + "b" * 36
+    try:
+        async with httpx.AsyncClient(transport=lab.transport()) as http:
+            ctx = ModuleContext(http=http, resolver=tierlab.resolver())
+            scan_id, _ = await run_scan(Entity(type=EntityType.DOMAIN, value=orglab.SEED), scope, store, ctx,
+                                        modules=modules, packs=packs, source_policy=policy, attribution=True,
+                                        org=OrgConfig(code_leaks=True, self_attested=True, token_present=True))
+    finally:
+        if had_token is None:
+            _os.environ.pop("SCRUTATOR_GITHUB_TOKEN", None)
+        else:
+            _os.environ["SCRUTATOR_GITHUB_TOKEN"] = had_token
+    report = build_report(store, scan_id)
+    org = report["organisation"]
+    found = {
+        org["legal_entities"] and org["legal_entities"][0]["legal_name"] == orglab.TRUTH["legal_name"],
+        {d["domain"] for d in org["official_domains"]} == orglab.TRUTH["official_domains"],
+        bool(org["breaches"]) and org["breaches"][0]["name"] == orglab.TRUTH["breach"],
+        set(org["github"]["named_in_scope_hosts"]) == orglab.TRUTH["github_named_hosts"],
+        any((p["registry"], p["name"]) == orglab.TRUTH["lookalike_package"] for p in org["packages"]["lookalikes_existing"]),
+    }
+    precision = all(found)
+
+    generate_keypair(work / "org")
+    priv = load_private_key(private_key_path(work / "org"))
+    create_bundle(store, scan_id, priv, work / "org" / "proof.scrutator")
+    result = verify_bundle(work / "org" / "proof.scrutator")
+    checks = {c.name: c.ok for c in result.checks}
+
+    blobs = [render_json(report), render_html(report), json.dumps(to_sarif(report)), (work / "org" / "proof.scrutator").read_bytes().decode("latin-1")]
+    secret_absent = all(orglab.SECRET_VALUE not in b for b in blobs)
+    leak_recorded = any(r.get("source") == "github_leaks" and "code-leak " in r.get("request", "") for r in report["evidence"].values())
+    no_person = "nobody@example.com" not in render_json(report)
+    forbidden = {"x.com", "twitter.com", "www.linkedin.com", "linkedin.com", "facebook.com", "instagram.com", "tiktok.com", "www.reddit.com", "medium.com", "t.me"}
+    never_forbidden = not any(req.url.host in forbidden for req in lab.calls)
+    candidates = {c["value"] for c in report["attribution"]["candidates"]}
+    org_record = "holding.example" in candidates
+
+    metrics = {
+        "planted_found": _metric(precision, "all", precision),
+        "secret_value_absent": _metric(secret_absent and leak_recorded, "True (leak recorded, value absent)", secret_absent and leak_recorded),
+        "no_person_data": _metric(no_person, "True", no_person),
+        "forbidden_platforms_never_asked": _metric(never_forbidden, "True", never_forbidden),
+        "organisation_derivable": _metric(checks.get("organisation derivable", False), "True", checks.get("organisation derivable", False)),
+        "org_record_candidate": _metric(org_record, "True", org_record),
+    }
+    return _section(metrics, [] if precision else ["planted organisation not fully recovered"], started)
+
+
 async def _sections(out: Path, state: dict, key, model, ollama_url) -> dict:
     return {
         "risk_rules": await risk_rules(out, state),
@@ -675,6 +747,7 @@ async def _sections(out: Path, state: dict, key, model, ollama_url) -> dict:
         "scope_safety": await scope_safety(out, state),
         "hallucination": await hallucination(out, state, model, ollama_url),
         "brand": await brand(out, state, key),
+        "org_sources": await org_sources_section(out, state, key),
         "org_exposure": await org_exposure_section(out, state, key),
         "recall_speed": await recall_speed(),
         **_r7_sections(out, state, key),

@@ -338,3 +338,39 @@ entries:
       - {framework: cis, ref: "CIS 4.1", title: "Establish and maintain a secure configuration process", verified: true, source: "https://www.cisecurity.org/controls/cis-controls-navigator"}
       - {framework: owasp, ref: "OWASP A05:2021", title: "Security misconfiguration", verified: true, source: "https://top10.owasp.org/2021/A05_2021-Security_Misconfiguration"}
       - {framework: iso27001, ref: "ISO 27001 A.8.9", title: "Configuration management", verified: false, source: "https://www.iso.org/standard/27001"}
+  - id: breach-history
+    rule: breach-history
+    source: "https://publications.europa.eu/resource/cellar/9b84d482-85bd-11ed-9887-01aa75ed71a1.0006.03/DOC_1"
+    verified: false
+    note: "Informational: third-party history about a breached service, not a live finding."
+    mappings:
+      - {framework: nis2, ref: "NIS2 Art. 23", title: "Reporting obligations for significant incidents", verified: true, source: "https://publications.europa.eu/resource/cellar/9b84d482-85bd-11ed-9887-01aa75ed71a1.0006.03/DOC_1"}
+      - {framework: cis, ref: "CIS 17.1", title: "Designate personnel to manage incident handling", verified: true, source: "https://www.cisecurity.org/controls/cis-controls-navigator"}
+      - {framework: iso27001, ref: "ISO 27001 A.5.24", title: "Information security incident management planning and preparation", verified: false, source: "https://www.iso.org/standard/27001"}
+  - id: exposed-credential
+    rule: exposed-credential
+    source: "https://top10.owasp.org/2021/A07_2021-Identification_and_Authentication_Failures"
+    verified: false
+    note: "A match is a credential format in a public repository; confirm it is a live secret by hand."
+    mappings:
+      - {framework: nis2, ref: "NIS2 Art. 21(2)(i)", title: "Human resources security, access control policies and asset management", verified: true, source: "https://publications.europa.eu/resource/cellar/9b84d482-85bd-11ed-9887-01aa75ed71a1.0006.03/DOC_1"}
+      - {framework: cis, ref: "CIS 3.11", title: "Encrypt sensitive data and manage secrets", verified: true, source: "https://www.cisecurity.org/controls/cis-controls-navigator"}
+      - {framework: owasp, ref: "OWASP A07:2021", title: "Identification and authentication failures", verified: true, source: "https://top10.owasp.org/2021/A07_2021-Identification_and_Authentication_Failures"}
+      - {framework: iso27001, ref: "ISO 27001 A.8.24", title: "Use of cryptography", verified: false, source: "https://www.iso.org/standard/27001"}
+  - id: lookalike-package-exists
+    rule: lookalike-package-exists
+    source: "https://publications.europa.eu/resource/cellar/9b84d482-85bd-11ed-9887-01aa75ed71a1.0006.03/DOC_1"
+    verified: false
+    note: "A weak link: a look-alike package is a threat to watch, not a control failure."
+    mappings:
+      - {framework: nis2, ref: "NIS2 Art. 21(2)(d)", title: "Supply chain security", verified: true, source: "https://publications.europa.eu/resource/cellar/9b84d482-85bd-11ed-9887-01aa75ed71a1.0006.03/DOC_1"}
+      - {framework: iso27001, ref: "ISO 27001 A.5.7", title: "Threat intelligence", verified: false, source: "https://www.iso.org/standard/27001"}
+  - id: brand-namespace-unregistered
+    rule: brand-namespace-unregistered
+    source: "https://publications.europa.eu/resource/cellar/9b84d482-85bd-11ed-9887-01aa75ed71a1.0006.03/DOC_1"
+    verified: false
+    note: "Informational: a defensive-registration gap that enables dependency confusion."
+    mappings:
+      - {framework: nis2, ref: "NIS2 Art. 21(2)(d)", title: "Supply chain security", verified: true, source: "https://publications.europa.eu/resource/cellar/9b84d482-85bd-11ed-9887-01aa75ed71a1.0006.03/DOC_1"}
+      - {framework: cis, ref: "CIS 2.1", title: "Establish and maintain a software inventory", verified: true, source: "https://www.cisecurity.org/controls/cis-controls-navigator"}
+      - {framework: iso27001, ref: "ISO 27001 A.5.23", title: "Information security for use of cloud services", verified: false, source: "https://www.iso.org/standard/27001"}

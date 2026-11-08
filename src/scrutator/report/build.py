@@ -186,6 +186,11 @@ def build_report(
     brand = brand_presence(report, packs)
     if brand is not None:  # only scans run with --brand have the section
         report["brand"] = brand
+    from scrutator.org.section import organisation
+
+    org = organisation(report)
+    if org is not None:  # only scans run with --org have the section
+        report["organisation"] = org
     engagement = engagement_record(store.audit_log(scan_id))
     if engagement is not None:  # only `scrutator exposure` records an engagement
         report["engagement"] = engagement

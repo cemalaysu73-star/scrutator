@@ -375,6 +375,17 @@ def _verify(path: str | Path, pinned_fingerprint: str | None, result: VerifyRepo
     except Exception as exc:  # noqa: BLE001
         add("brand derivable", False, f"malformed brand section: {type(exc).__name__}: {exc}")
 
+    # the Organisation section (`scan --org`): re-derived from the report's own organisation-phase evidence and scope.
+    try:
+        from scrutator.org.section import SOURCES as ORG_SOURCES
+        from scrutator.org.section import organisation
+
+        if "organisation" in report or any(isinstance(r, dict) and r.get("source") in ORG_SOURCES for r in report["evidence"].values()):
+            same = organisation(report) == report.get("organisation")
+            add("organisation derivable", same, "" if same else "the organisation section is not what the cited evidence implies")
+    except Exception as exc:  # noqa: BLE001
+        add("organisation derivable", False, f"malformed organisation section: {type(exc).__name__}: {exc}")
+
     # organisation exposure: the engagement must be the one the signed audit log recorded before any lookup, and the
     # aggregate must be what the minimised evidence implies. Exposure evidence without a recorded engagement fails.
     try:
@@ -436,14 +447,22 @@ def _verify(path: str | Path, pinned_fingerprint: str | None, result: VerifyRepo
     try:
         if "attribution" in report and "packs" in report:
             recorded = (manifest.get("analysis") or {}).get("attribution") or {}
-            if recorded.get("ruleset", ATTRIBUTION_RULESET) != ATTRIBUTION_RULESET:
+            rec_ruleset = recorded.get("ruleset", ATTRIBUTION_RULESET)
+            # rule set 2 adds the org_record signal, which can only fire on organisation evidence. A rule-set-1 bundle
+            # that holds none is re-derived identically, so it is still checked.
+            org_sources = {"wikidata", "gleif", "github"}
+            has_org = any(isinstance(r, dict) and r.get("source") in org_sources for r in report["evidence"].values())
+            if rec_ruleset == ATTRIBUTION_RULESET or (rec_ruleset == 1 and not has_org):
+                derived = attribute(report)
+                if rec_ruleset != ATTRIBUTION_RULESET:
+                    derived = {**derived, "ruleset": rec_ruleset}  # same output, labelled with the rule set that made it
+                same = derived == report["attribution"]
+                add("attribution derivable", same, "" if same else "the attribution is not what the cited evidence and the packs imply")
+            else:
                 result.warnings.append(
-                    f"the attribution was made by rule set {recorded.get('ruleset')}; this tool implements "
+                    f"the attribution was made by rule set {rec_ruleset}; this tool implements "
                     f"{ATTRIBUTION_RULESET}, so it was not re-derived."
                 )
-            else:
-                same = attribute(report) == report["attribution"]
-                add("attribution derivable", same, "" if same else "the attribution is not what the cited evidence and the packs imply")
         elif "attribution" not in report:
             add("attribution derivable", True, "bundle predates attribution")
         if "promotions" in report:

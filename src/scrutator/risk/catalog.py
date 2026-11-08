@@ -218,6 +218,30 @@ _RULES = [
         "A handle that looks like the brand name (a homoglyph, an added word, a separator or a typo) exists on a platform the organisation's site links to. Who owns it is unknown: it may be the organisation's own, a fan, a reseller or an impersonator.",
         "Look at the account by hand. If it is not yours and impersonates you, report it through the platform's impersonation process; consider registering the closest look-alikes yourself.",
     ),
+    _rule(
+        "breach-history", "risk", "info",
+        "A public index lists a breach of a service under the organisation's domain",
+        "A public breach index names a breach affecting a service under the organisation's domain, with its date, record count and the kinds of data involved. This is third-party history about the breached service (metadata only, never account lists), not a live finding about the systems scanned now.",
+        "Confirm the breach and that credentials exposed in it have been rotated and are not reused. For sensitive breaches, check whether affected accounts were notified. Treat the date as the source's claim, not a verified fact.",
+    ),
+    _rule(
+        "exposed-credential", "risk", "high",
+        "A credential format was found in the organisation's own public repository",
+        "A bounded scan of the organisation's own public repositories (--code-leaks) matched a well-known credential format in a committed file. The secret value is never stored: only its format, the repository, the path, the commit and a salted-hash fingerprint are recorded. A match can be a real secret, a test fixture or an example.",
+        "Rotate the credential now (assume it is compromised), then remove it from the repository's history (not just the latest commit). Confirm by hand that the match is a live secret and not a sample before raising an incident.",
+    ),
+    _rule(
+        "lookalike-package-exists", "risk", "low",
+        "A look-alike of the brand name exists on a package registry",
+        "A package or namespace whose name looks like the organisation's brand (a homoglyph, an added word, a separator or a typo) exists on a public registry and is not linked back to an in-scope domain. It may be the organisation's own, unrelated, or a typosquat.",
+        "Look at the package by hand. If it impersonates the organisation or ships its name, report it to the registry; consider registering the closest look-alikes yourself.",
+    ),
+    _rule(
+        "brand-namespace-unregistered", "risk", "info",
+        "The brand name is unregistered on a public package registry",
+        "The organisation's brand name is free as a package or namespace on a public registry. If an internal build ever resolves a dependency by that name from the public registry, an attacker who registers it first can run code in the build (dependency confusion).",
+        "Register the brand name defensively on the registries the organisation uses, and pin internal packages to a private registry or a scope so a public package of the same name cannot be installed by mistake.",
+    ),
 ]
 
 RULES: dict[str, RuleInfo] = {rule.rule_id: rule for rule in _RULES}

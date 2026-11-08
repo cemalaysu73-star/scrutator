@@ -63,6 +63,7 @@ async def run_scan(
     timeout_cap: float | None = None,
     pre_audit: list[dict] | None = None,
     active: ActiveConfig | None = None,
+    org: "OrgConfig | None" = None,
 ) -> tuple[int, AgentStats]:
     """Run a scan. With a deadline (seconds, or a `Deadline` shared with the caller) the scan
     always returns in time: lookups still running when it passes are cancelled, nothing new
@@ -122,6 +123,13 @@ async def run_scan(
             engine, scan_id, seed, chosen, ai, max_steps=max_steps, max_entities=max_entities,
             playbooks=packs.playbooks if playbooks else (),
         )
+        if org is not None and not engine.expired:
+            # the organisation phase runs after the passive collection and before attribution, so its official-domain
+            # evidence can make a sister domain a candidate (the org_record signal)
+            from scrutator.org.run import run_org_phase
+
+            roots = {seed.value, *scope.to_dict()["domains"]}
+            await run_org_phase(engine, scan_id, seed, chosen, org, roots)
         if attribution and not engine.expired:
             await attribute_scan(engine, scan_id, chosen, packs, max_candidates=max_candidates)
         return stats

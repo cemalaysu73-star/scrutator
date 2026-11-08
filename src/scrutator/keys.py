@@ -24,7 +24,8 @@ REDACTED = "[redacted]"
 def _variables() -> tuple[str, ...]:
     from scrutator.modules.registry import load_builtin_modules
 
-    return tuple(sorted({m.needs_key for m in load_builtin_modules() if m.needs_key}))
+    modules = load_builtin_modules()
+    return tuple(sorted({m.needs_key for m in modules if m.needs_key} | {m.optional_key for m in modules if getattr(m, "optional_key", None)}))
 
 
 def key_variables() -> list[str]:

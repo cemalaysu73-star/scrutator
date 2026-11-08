@@ -635,10 +635,11 @@ function renderRisks() {
       if (filter.value && r.category !== filter.value) continue;
       const what = el("td", {}, el("b", {textContent: r.title}), el("span", {textContent: " "}), chip("tag", r.rule_id));
       if (r.category === "analyst") what.append(el("span", {textContent: " "}), chip("band-probable", "analyst"));
+      const how = basisLine(r.evidence_ids);
       what.append(el("div", {textContent: r.explanation}),
-        el("div", {className: "muted", textContent: "Remediation: " + r.remediation}),
-        basisLine(r.evidence_ids) ? el("div", {className: "basis", textContent: basisLine(r.evidence_ids)}) : null,
-        el("div", {className: "faint mono", textContent: r.entity_ids.join(", ")}));
+        el("div", {className: "muted", textContent: "Remediation: " + r.remediation}));
+      if (how) what.append(el("div", {className: "basis", textContent: how}));
+      what.append(el("div", {className: "faint mono", textContent: r.entity_ids.join(", ")}));
       const tr = el("tr", {},
         el("td", {}, sevBadge(r.severity), el("div", {className: "faint num", textContent: "confidence " + r.confidence})),
         what,
@@ -892,6 +893,47 @@ function renderOrgExposure() {
   document.getElementById("risks").append(el("div", {className: "sec-head"}, el("h3", {textContent: "Organisation exposure (authorised, aggregate)"})), host);
 }
 
+function renderOrganisation() {
+  const org = D.organisation;
+  if (!org) return;
+  const host = el("div", {className: "panel"}, el("div", {className: "panel-pad"},
+    el("p", {className: "lede", textContent: "Run with --org. The organisation behind the seed: its legal entity and group (GLEIF, Wikidata), the breach history of its own services (Have I Been Pwned, metadata only), its public GitHub account and repositories, and the package namespaces and public handles that carry its brand. Organisations only, never a person. A legal entity reached by an LEI is confirmed; an exact legal-name match is kept apart as unconfirmed."})));
+  const pad = host.firstChild;
+  const table = (title, head, rows) => {
+    if (!rows.length) return;
+    const body = el("tbody");
+    for (const r of rows) {
+      const tr = el("tr", {}, ...r.cells.map(c => el("td", {className: c.mono ? "mono" : (c.muted ? "muted" : ""), textContent: c.text})), el("td", {}, receiptStack(r.ids)));
+      rowOpensEvidence(tr, r.key, title, r.ids, null);
+      body.append(tr);
+    }
+    host.append(el("h3", {textContent: title}), el("div", {className: "tablewrap"}, el("table", {}, el("thead", {}, el("tr", {}, ...[...head, "Receipts"].map(t => el("th", {textContent: t})))), body)));
+  };
+  table("Legal entity", ["LEI", "Legal name", "Status", "Jurisdiction"], org.legal_entities.map(e => ({
+    key: e.lei, ids: [e.evidence_id], cells: [{text: e.lei, mono: true}, {text: e.legal_name}, {text: e.status || ""}, {text: e.jurisdiction || ""}]})));
+  if (org.name_matches.length) table("Unconfirmed legal-name matches (may be unrelated entities)", ["LEI", "Legal name", "Country"], org.name_matches.map(e => ({
+    key: e.lei, ids: [e.evidence_id], cells: [{text: e.lei, mono: true}, {text: e.legal_name}, {text: e.country || ""}]})));
+  table("Parents", ["Relation", "Name", "Via"], org.parents.map(p => ({key: p.name, ids: [p.evidence_id], cells: [{text: p.relation || "parent"}, {text: p.name || p.qid}, {text: p.via}]})));
+  table("Subsidiaries", ["Relation", "Name", "Via"], org.subsidiaries.map(p => ({key: p.name, ids: [p.evidence_id], cells: [{text: p.relation || "subsidiary"}, {text: p.name || p.qid}, {text: p.via}]})));
+  table("Official domains (candidates)", ["Domain", "Relation", "Via"], org.official_domains.map(d => ({key: d.domain, ids: [d.evidence_id], cells: [{text: d.domain, mono: true}, {text: d.relation}, {text: d.via}]})));
+  table("Breach history", ["Breach", "Date", "Records", "Data"], org.breaches.map(b => ({key: b.name, ids: [b.evidence_id], cells: [{text: b.title || b.name}, {text: b.breach_date || ""}, {text: b.pwn_count == null ? "" : String(b.pwn_count)}, {text: (b.data_classes || []).join(", "), muted: true}]})));
+  const gh = org.github || {};
+  if (gh.resolved) {
+    host.append(el("h3", {textContent: "GitHub"}));
+    host.append(el("p", {className: "muted", textContent: `${gh.login} — ${gh.public_repos} public repo(s), ${gh.public_members == null ? "?" : gh.public_members} public member(s)${gh.is_verified ? ", verified" : ""}. ${gh.named_in_scope_hosts.length} in-scope host(s) named in repositories${gh.abandoned_named_hosts.length ? "; " + gh.abandoned_named_hosts.length + " named by an archived repo" : ""}.`}));
+    table("Code exposure (--code-leaks)", ["Repository", "Path", "Format", "Value"], (gh.code_leaks || []).map(l => ({key: l.path, ids: [l.evidence_id], cells: [{text: l.repository, mono: true}, {text: l.path, mono: true}, {text: l.format}, {text: l.mask, mono: true}]})));
+  } else if (gh.reason) {
+    host.append(el("p", {className: "muted", textContent: "GitHub: " + gh.reason}));
+  }
+  const pk = org.packages || {};
+  table("Brand namespaces", ["Registry", "Name", "Role", "State"], (pk.checks || []).map(p => ({
+    key: p.registry + "/" + p.name, ids: [p.evidence_id],
+    cells: [{text: p.registry}, {text: p.name, mono: true}, {text: p.role + (p.linked_host ? " · linked to " + p.linked_host : (p.how ? " · " + p.how : ""))}, {text: p.exists === true ? "exists" : (p.exists === false ? "free" : "unverifiable")}]})));
+  table("Public handles", ["Platform", "Handle", "State"], (org.handles || []).map(h => ({
+    key: h.platform + "/" + h.handle, ids: [h.evidence_id], cells: [{text: h.platform}, {text: h.handle, mono: true}, {text: h.state}]})));
+  document.getElementById("risks").append(el("div", {className: "sec-head"}, el("h3", {textContent: "Organisation"})), host);
+}
+
 function renderFindings() {
   const host = document.getElementById("findings");
   const lede = document.getElementById("findings-lede");
@@ -1053,6 +1095,7 @@ renderDependencies();
 renderExposure();
 renderActive();
 renderBrand();
+renderOrganisation();
 renderOrgExposure();
 renderAttribution();
 renderAnalystLeads();

@@ -152,6 +152,20 @@ class Index:
     def zone_apexes(self) -> list[str]:
         return sorted(n for n in self.names if self.targets("NS", n) is not None)
 
+    @cached_property
+    def _org_records(self) -> dict[str, list[tuple[str, tuple[str, ...]]]]:
+        """Candidate host -> [(relation, evidence_ids)] for the edges by which the organisation phase named it as an
+        official domain of the organisation or its group (Wikidata official websites, a repo naming an in-scope host)."""
+        rels = {"org_official_site", "github_repo_names_host", "github_org_names_host"}
+        found: dict[str, list[tuple[str, tuple[str, ...]]]] = defaultdict(list)
+        for edge in self.edges:
+            if edge["rel"] in rels and isinstance(edge.get("dst"), str) and edge["dst"].startswith("domain:"):
+                found[edge["dst"][len("domain:") :]].append((edge["rel"], tuple(edge.get("evidence_ids") or ())))
+        return found
+
+    def org_records(self, name: str) -> list[tuple[str, tuple[str, ...]]]:
+        return self._org_records.get(host(name), [])
+
     # tables over the in-scope names, built once: a scan can have thousands of candidates, and every
     # signal compares a candidate with the scope
 

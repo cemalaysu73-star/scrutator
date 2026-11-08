@@ -131,7 +131,7 @@ class Engine:
         return [
             m
             for m in select_modules(modules, entity.type, allow_active=self.allow_active)
-            if self.applies(m, entity)
+            if self.applies(m, entity) and getattr(m, "phase", None) is None  # a phase module runs only in its phase
         ]
 
     @property

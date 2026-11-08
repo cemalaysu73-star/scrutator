@@ -69,7 +69,7 @@ def test_every_documented_command_and_option_exists(path, options, line):
 def test_the_signal_table_is_the_one_the_code_uses():
     for kind, (weight, _) in SIGNALS.items():
         assert f"| `{kind}` | {weight:.2f} |" in README, kind
-    assert len(SIGNALS) == 10
+    assert len(SIGNALS) == 11  # R9: org_record
 
 
 async def test_the_published_lab_table_is_what_the_lab_measures(http, tmp_path):

@@ -244,7 +244,17 @@ def scope_uses(view: Index, name: str) -> list[Signal]:
     return _best(found)
 
 
+def org_record(view: Index, name: str) -> list[Signal]:
+    records = view.org_records(name)
+    if not records:
+        return []
+    evidence = tuple(sorted({e for _, ids in records for e in ids}))
+    how = "Wikidata" if any(rel == "org_official_site" for rel, _ in records) else "the organisation's GitHub repositories"
+    return [_signal("org_record", f"{name} is listed as an official domain of the organisation by {how}", evidence)]
+
+
 EXTRACTORS: tuple[Callable[[Index, str], list[Signal]], ...] = (
+    org_record,
     ns_in_scope,
     mx_in_scope,
     spf_in_scope,

@@ -110,6 +110,12 @@ class Module(ABC):
     # for what is recorded): 3 for a certificate or a DNS record pointing at it, 2 for a source that saw it serve or
     # resolve, 1 for a list (an archive, a crawl, an aggregator that keeps names that no longer resolve).
     name_weight: ClassVar[int] = 1
+    # A module with a phase is never offered to the planner: it runs only in that phase of a scan. "org": the
+    # organisation phase of `scan --org` (scrutator/org/run.py), after the passive collection, on the seed apex.
+    phase: ClassVar[str | None] = None
+    # An environment variable holding a key the module uses when it is set and does without otherwise (GitHub's token
+    # raises the keyless rate limit). Redacted like every key; never a reason to turn the module off.
+    optional_key: ClassVar[str | None] = None
 
     @abstractmethod
     async def run(self, entity: Entity, ctx: ModuleContext) -> list[Observation | Fact]: ...

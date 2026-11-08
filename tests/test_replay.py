@@ -47,6 +47,8 @@ def test_allowlist_is_exactly_the_sources_the_modules_use():
         # R6: public addresses are asked of the regional registry's RDAP server directly
         "rdap.arin.net", "rdap.db.ripe.net", "rdap.apnic.net", "rdap.lacnic.net", "rdap.afrinic.net",
         "ip.thc.org",  # R6: IP.THC.ORG subdomain finder
+        # R9 (`scan --org`): the organisation sources whose stored payload is a slice of the response
+        "api.gleif.org", "query.wikidata.org", "haveibeenpwned.com",
     }
 
 
@@ -63,6 +65,12 @@ def test_every_host_a_module_contacts_is_replayable_and_nothing_else_is():
         if path.name == "exposure.py":
             # organisation exposure stores minimised records, not what the source answered: never replayed
             assert "api.github.com" not in ALLOWED_HTTP_HOSTS
+            continue
+        if path.name in ("org_github.py", "org_registry.py"):
+            # R9: GitHub, the package registries and the handle checks store a minimised projection or a status, not
+            # what the source answered: never replayed, so none of their hosts may be on the allowlist
+            named = set(re.findall(r"https://([a-z0-9.-]+)", path.read_text(encoding="utf-8")))
+            assert named and not named & ALLOWED_HTTP_HOSTS, named & ALLOWED_HTTP_HOSTS
             continue
         hosts.update(re.findall(r"https://([a-z0-9.-]+)", path.read_text(encoding="utf-8")))
     # the Common Crawl module gets its index URL from the collection list, not from a literal

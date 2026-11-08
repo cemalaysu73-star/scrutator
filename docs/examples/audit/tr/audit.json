@@ -591,7 +591,7 @@
     }
   ],
   "format": "scrutator-audit/1",
-  "generated_at": "2026-11-07T22:30:59+00:00",
+  "generated_at": "2026-11-08T12:40:01+00:00",
   "inventory": [
     {
       "addresses": [
@@ -954,7 +954,7 @@
   },
   "method": {
     "packs": "44bbd66959eeacfc",
-    "ruleset": 4,
+    "ruleset": 5,
     "sources_used": [
       "asn",
       "certspotter",
@@ -2288,7 +2288,7 @@
     "verified": 17,
     "wildcard": 0
   },
-  "tool": "1.0.0rc4",
+  "tool": "1.0.0rc5",
   "who": {
     "auditor": "Sample Auditor (placeholder)",
     "client": "Example Corp (fictional sample)"

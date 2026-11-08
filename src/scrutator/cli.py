@@ -229,6 +229,11 @@ def scan(
     exclude_sources: Optional[str] = typer.Option(None, "--exclude-sources", help="Do not use these sources (comma-separated).", rich_help_panel="Source policy"),
     noncommercial: bool = typer.Option(True, "--noncommercial/--no-noncommercial", help="--no-noncommercial: leave out sources whose free tier is for non-commercial use only (InternetDB, RIPEstat, CertSpotter, Subdomain Center).", rich_help_panel="Source policy"),
     brand: bool = typer.Option(False, "--brand", help="Brand presence (off by default; contacts the organisation's site): read the platform links on its home page (robots.txt honoured), check whether those accounts and look-alikes of the brand name exist (profile page status only). For an organisation's domain.", rich_help_panel="Source policy"),
+    org: bool = typer.Option(False, "--org", help="Organisation sources (off by default): the legal entity and its group (GLEIF, Wikidata), the breach history of its own services (Have I Been Pwned), its public GitHub account and repositories, and the package namespaces and public handles that carry its brand. Organisations only; never a person. See `scrutator sources` and docs/organisation.md.", rich_help_panel="Organisation"),
+    legal_name: Optional[str] = typer.Option(None, "--legal-name", help="With --org: the organisation's legal name, used for the company-record lookups when evidence does not already give one. Recorded with the scan.", rich_help_panel="Organisation"),
+    github_org: Optional[str] = typer.Option(None, "--github-org", help="With --org: the organisation's GitHub account login, when it is not found from Wikidata.", rich_help_panel="Organisation"),
+    code_leaks: bool = typer.Option(False, "--code-leaks", help="With --org and --self (and SCRUTATOR_GITHUB_TOKEN): a bounded scan of the organisation's OWN public repositories for credential formats. The secret value is never stored (only a format, path, commit, salted fingerprint and 2+2 mask). Rotate, then remove from history.", rich_help_panel="Organisation"),
+    self_owned: bool = typer.Option(False, "--self", help="With --org --code-leaks: confirm you own or control the organisation's public repositories and authorise a bounded secret scan of them. Recorded in the signed audit log before any lookup.", rich_help_panel="Organisation"),
     axfr: bool = typer.Option(False, "--axfr", help="Ask each name server of the in-scope zone once for a zone transfer (AXFR, TCP 53). Active-ish: it questions the target's own servers, so it also needs --active. Every answer, refusal included, is evidence.", rich_help_panel="Source policy"),
     active: bool = typer.Option(False, "--active", help="Confirm the active-ish lookups asked for (--axfr): you are authorised to query the target's own name servers. Recorded in the audit log before any lookup.", rich_help_panel="Source policy"),
     live: Optional[bool] = typer.Option(None, "--live/--no-live", help="Print each name the moment DNS confirms it is live, while the scan goes on (default: on when the output is a terminal). The report is the same either way."),
@@ -237,6 +242,23 @@ def scan(
     policy = _source_policy(sources, exclude_sources, not noncommercial)
     if brand:
         policy = policy.opt("brand")
+    org_config = None
+    if org:
+        import os as _os
+        from scrutator.org.run import OrgConfig
+        from scrutator.modules.org_github import TOKEN_VAR
+
+        policy = policy.opt("wikidata", "gleif", "hibp", "github", "packages", "handles")
+        token_present = bool(_os.environ.get(TOKEN_VAR, "").strip())
+        if code_leaks:
+            if not self_owned:
+                raise _fail("--code-leaks reads the organisation's own repositories for secrets: add --self to confirm you own or control them")
+            if not token_present:
+                raise _fail(f"--code-leaks needs a GitHub token: set {TOKEN_VAR} (never passed on the command line)")
+            policy = policy.opt("github_leaks")
+        org_config = OrgConfig(legal_name=legal_name, github_org=github_org, code_leaks=code_leaks, self_attested=self_owned, token_present=token_present)
+    elif legal_name or github_org or code_leaks or self_owned:
+        raise _fail("--legal-name, --github-org, --code-leaks and --self apply only with --org")
     if axfr and not active:
         raise _fail("--axfr asks the target's own name servers for its zone: add --active to confirm you may do that")
     if active and not axfr:
@@ -289,6 +311,7 @@ def scan(
                 attribution=attribute, max_candidates=max_candidates, playbooks=playbooks,
                 deadline=deadline, breaker_threshold=breaker, source_policy=policy,
                 listeners=[watcher] if watcher is not None else None, allow_active=active,
+                org=org_config,
             )
             if watcher is not None:
                 watcher.on_names_settled()  # the planner's rounds do not signal it; said once either way

@@ -52,7 +52,7 @@ def test_candidates_come_out_strongest_first_with_the_band_counts():
     result = attribute(zone.report(PACKS), PACKS)
     assert [c["entity_id"] for c in result["candidates"]] == ["domain:a.test", "domain:b.test", "domain:c.test"]
     assert result["bands"] == {"confirmed": 0, "probable": 2, "possible": 1, "unlikely": 0}
-    assert result["ruleset"] == 1 and result["omitted_unlikely"] == 0
+    assert result["ruleset"] == 2 and result["omitted_unlikely"] == 0
 
 
 def test_a_name_with_only_provider_evidence_is_not_a_candidate():

@@ -47,8 +47,20 @@ SOURCE_HOSTS = frozenset(
         "www.virustotal.com",
         "api.securitytrails.com",
         "api.shodan.io",
-        # only `scrutator exposure`, for the public repositories of organisations its engagement file names
+        # `scrutator exposure` (public repositories of named organisations) and `scan --org` (GitHub organisation sources)
         "api.github.com",
+        # `scan --org`: the organisation-scoped sources (docs/organisation.md). Keyless unless noted.
+        "api.gleif.org",  # company records (LEI)
+        "query.wikidata.org",  # Wikidata SPARQL
+        "haveibeenpwned.com",  # breach metadata by domain (keyless breaches endpoint only)
+        "registry.npmjs.org",  # npm packages and scopes
+        "pypi.org",  # PyPI project metadata
+        "hub.docker.com",  # Docker Hub namespaces
+        "crates.io",  # crates.io crates
+        "rubygems.org",  # RubyGems gems
+        "api.nuget.org",  # NuGet registration
+        "gitlab.com",  # GitLab public groups
+        "public.api.bsky.app",  # Bluesky handle resolution
     }
 )
 # Hosts whose redirects may leave the list: the RDAP bootstrap, and (once a redirect reached one) RDAP servers,

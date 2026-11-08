@@ -35,6 +35,13 @@ ALLOWED_HTTP_HOSTS = frozenset(
         "urlscan.io",
         "api.mnemonic.no",
         "internetdb.shodan.io",
+        # `scan --org`: the organisation sources whose request is a plain GET and whose STORED payload is a slice of
+        # the live response, so a replay can re-compare it (reviewed for R9). These three keep no person data and store
+        # the raw answer. The other organisation sources store a minimised projection (to leave out author and
+        # maintainer fields) or a status, so they are marked non-replayable and a replay skips them, like keyed sources.
+        "api.gleif.org",
+        "query.wikidata.org",
+        "haveibeenpwned.com",
     }
 )
 _DNS = re.compile(r"DNS (A|AAAA|CNAME|MX|NS|TXT|CAA) (\S+)")
